@@ -7,7 +7,8 @@ environment.
 
     This project is not affiliated with, endorsed by, or supported by Odoo S.A. Odoo.sh has no
     public API: odouche talks to what the Odoo.sh web interface uses, which can change without
-    notice.
+    notice. It acts with your own Odoo.sh access and nothing more, and staying within your
+    agreement with Odoo is your responsibility. See [Unofficial status](unofficial.md).
 
     The three packages install today, but the Odoo.sh client itself is not implemented yet. These
     pages describe what each package is for; they will describe how to use it as the features land.

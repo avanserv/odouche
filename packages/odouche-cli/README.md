@@ -3,7 +3,10 @@
 `osh`, an unofficial command-line interface for [Odoo.sh](https://www.odoo.sh), in the spirit of
 `gcloud`, `aws` and `scw`. Built on the [`odouche`](https://pypi.org/project/odouche/) library.
 
-> This project is not affiliated with, endorsed by, or supported by Odoo S.A.
+> This project is not affiliated with, endorsed by, or supported by Odoo S.A. Odoo.sh has no public
+> API; `osh` talks to what the Odoo.sh web interface uses, which can change without notice. It acts
+> with your own Odoo.sh access and nothing more, and staying within your agreement with Odoo is
+> your responsibility. See [Unofficial status](https://avanserv.github.io/odouche/unofficial/).
 
 **Status: pre-alpha.** The command installs and reports its version; no Odoo.sh commands exist yet.
 
