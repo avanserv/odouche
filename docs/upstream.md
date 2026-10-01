@@ -98,7 +98,7 @@ Contacted during login and on the project pages:
 
 | Host | Role | Authentication |
 | --- | --- | --- |
-| `www.odoo.sh` | Pages and every `/app/...` JSON request | `session_id` |
+| `www.odoo.sh` | Pages, every `/app/...` JSON request and the bus websocket | `session_id` |
 | `<worker>.odoo.com` | Build logs, under `/paas/...` | The project's `access_token` |
 | `github.com` | Hop 3 of the login | GitHub's own session |
 | `avatars.githubusercontent.com` | User avatars | None |
@@ -291,19 +291,69 @@ once.
 
 ### Build status changes
 
-Not captured. Over the six minutes the rebuild ran, the page sent no request to `www.odoo.sh`:
-it does not poll.
+The page does not poll: over a rebuild it sent no request to `www.odoo.sh`. Changes are pushed
+over Odoo's bus, a websocket opened from a shared worker, which is why a capture of the page does
+not show it. Fixture: `build_events.json`.
 
-From the page's script, changes are pushed over Odoo's bus:
+A client outside a browser can open the socket and receives the same events, with the
+`session_id` cookie and an `Origin` header.
 
-- A websocket on `wss://www.odoo.sh/websocket?version=<version>`, opened from a shared worker,
-  which is why a capture of the page does not show it.
-- The page subscribes to the channel `paas_repository:<project id>`.
-- A `paas.repository/build_event` message carries `repository_id`, `branch_id`, `build_id` and
-  `values`, the changed build fields. `paas.repository/new_tracking` announces a new history
-  entry.
+`GET wss://www.odoo.sh/websocket?version=<version>` answers 101.
 
-The handshake, the frames and whether the session cookie alone opens the socket are unknown.
+- `Origin: https://www.odoo.sh` is required. Without it the answer is 400, with or without a
+  session.
+- The session is the `session_id` cookie, as on a JSON request.
+- `version` is the `v` of the worker's script, `/bus/websocket_worker_bundle?v=18.0-7`. With a
+  made-up version the socket opened and sent nothing for 15 seconds, in which no build ran.
+- No subprotocol is asked for. The browser offers `permessage-deflate` and the answer does not
+  take it.
+- With no session, or a made-up one, the answer is still 101 and the subscription is accepted.
+  No frame follows. The socket gives no sign that a session is missing.
+
+The client sends text frames. To subscribe:
+
+```json
+{"event_name": "subscribe", "data": {"channels": ["paas_repository:4217"], "last": 0}}
+```
+
+- The channel is `paas_repository:<project id>`, with the project's numeric `id`.
+- `last` is the id of the last notification the client holds. The page sends the latest one it
+  has; `0` was accepted.
+- The page subscribes once with no channel on connecting, then again with the project's. It also
+  sends an `update_presence` message. Events arrived without either.
+- Idle, the page sends a binary frame of one zero byte, 60 seconds after the last frame and every
+  60 seconds from then.
+
+The server sends text frames, each a list of notifications:
+
+```json
+[{"id": 700390, "message": {"type": "paas.repository/build_event", "payload": {}}}]
+```
+
+- `id` increases from one notification to the next. One frame can hold several.
+- A `paas.repository/build_event` payload is `repository_id` (the project's `id`), `branch_id`,
+  `build_id` and `values`.
+- `values` is either the whole build, with the fields of the `builds` answer, or a short form of
+  `id`, `status`, `result` and sometimes `status_info`. The short form was the first two events
+  of a new build.
+- A `paas.repository/new_tracking` payload is `repository_id`, `branch_id` and `build_id`. It came
+  in the same frame as the new build's first event.
+- The channel is the project's, not the build's. Events came for builds of the staging and the
+  production branch, unchanged, and for the branch's previous build as it became `dropped`.
+- Other types arrive, such as `bus.bus/im_status_updated`.
+
+Over a rebuild, the new build's events were:
+
+| `status` | `result` | `status_info` | `values` |
+| --- | --- | --- | --- |
+| `progress` | `false` | absent | Short |
+| `progress` | `false` | `Starting build...` | Short |
+| `progress` | `false` | `Installing dependencies...` or `Installing database...` | Whole |
+| `progress` | `false` | `Installing: <module>` or `Testing: <module>` | Whole, 6 to 16 seconds apart |
+| `done` | `success` | `done` | Whole |
+
+Seen on two rebuilds of one development branch, once from the worker and once from outside a
+browser. Nothing closed the socket in 11 minutes with the idle frame, or in 4 minutes without it.
 
 Without the socket, a client can only ask `builds` again. Upstream sets no interval for that,
 since the page never does it. Successive `builds` answers for the rebuilt branch showed:
@@ -382,8 +432,9 @@ declared value that was not seen has never been observed in a payload.
 - `warning` was only seen in the history, never in a `builds` answer.
 - A development build had `install`, `pip` and `odoo`; a staging build `odoo`, `update` and
   `neutralize`. `logs/list` is the authority for a given build.
-- `status_info` is free text: `done`, an empty string, `Installing: <module>`,
-  `Could not establish http connection to the build (...)` and
+- `status_info` is free text: `done`, an empty string, `Starting build...`,
+  `Installing dependencies...`, `Installing database...`, `Installing: <module>`,
+  `Testing: <module>`, `Could not establish http connection to the build (...)` and
   `Platform error. Please contact the support if this persists.` were seen.
 - The combinations seen: `progress` with no result; `done` with `success`; `dropped` with
   `success`, `failed` or `warning`.
@@ -402,7 +453,8 @@ unauthenticated answer is in [Without a valid session](#without-a-valid-session)
 
 ### Open questions
 
-- The websocket: its handshake, its frames, and whether a client outside a browser can open it.
+- Whether the websocket replays the notifications after `last`, what it does when its session
+  expires, what a wrong `version` costs, and whether a socket that sends no idle frame is closed.
 - The JSON answer for an unknown or forbidden project, branch or build.
 - Whether `builds` honours a `build_limit` above 4, and `history` an `offset` above 0.
 - How long the `access_token` lasts, and whether it changes when the session does.
