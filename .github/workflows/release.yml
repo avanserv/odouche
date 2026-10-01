@@ -65,14 +65,31 @@ jobs:
           git push
 
   publish:
-    name: Publish to PyPI
+    name: Publish ${{ matrix.package }} to PyPI
     needs: release-please
     if: ${{ needs.release-please.outputs.release_created == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # One job and one environment per project, because PyPI ties a trusted publisher to the
+    # (repository, workflow, environment) it names. Before a project exists, a publisher that is
+    # still pending can stand for one project only, so three projects behind one environment could
+    # never be published a first time. It also keeps each job's upload credential scoped to the
+    # one project that job builds.
+    strategy:
+      # A leg that fails must not cancel the uploads of the others: PyPI cannot take a version
+      # back, and re-running the failed leg is how a half-published release is completed.
+      fail-fast: false
+      matrix:
+        include:
+          - package: odouche
+            environment: pypi
+          - package: odouche-cli
+            environment: pypi-cli
+          - package: odouche-mcp
+            environment: pypi-mcp
     environment:
-      name: pypi
-      url: https://pypi.org/project/odouche/
+      name: ${{ matrix.environment }}
+      url: https://pypi.org/project/${{ matrix.package }}/
     permissions:
       contents: read
       id-token: write # PyPI trusted publishing: the upload is authorised by this job's identity
@@ -88,10 +105,13 @@ jobs:
         with:
           enable-cache: false # see the note in the job above
 
+      # Only this leg's package, so dist/ holds nothing its credential is not meant for.
       - name: Build the distributions
-        run: make build
+        env:
+          PACKAGE: ${{ matrix.package }}
+        run: uv build --package "$PACKAGE"
 
-      # No token anywhere: PyPI trusts this workflow in this environment for each of the three
-      # projects, and exchanges the job's OIDC identity for a short-lived upload credential.
+      # No token anywhere: PyPI trusts this workflow in this environment for this project, and
+      # exchanges the job's OIDC identity for a short-lived upload credential.
       - name: Publish
         run: uv publish --trusted-publishing always
