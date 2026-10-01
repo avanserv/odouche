@@ -37,7 +37,7 @@ Issues = "https://github.com/avanserv/odouche/issues"
 Changelog = "https://github.com/avanserv/odouche/blob/main/CHANGELOG.md"
 
 [build-system]
-requires = ["uv_build>=0.11.11,<0.12"]
+requires = ["uv_build>=0.11.11,<0.13"]
 build-backend = "uv_build"
 
 [tool.uv.sources]
