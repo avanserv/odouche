@@ -106,7 +106,7 @@ Contacted during login and on the project pages:
 The pages also load fonts, analytics and an embedded video from third parties. A client needs
 none of them.
 
-Each build has a host of its own, `<project>-<branch>-<build id>.dev.odoo.com`, which serves
+Each build has a host of its own, `<build name>.dev.odoo.com`, which serves
 its database, its shell (`/odoo-sh/webshell/ws`) and its editor (`/odoo-sh/editor/lab`). The
 `www.odoo.sh` session is not sent there, since the cookie is bound to `www.odoo.sh`. Without
 authentication of its own, the build host answers 302 to
@@ -133,8 +133,8 @@ Captured on 2026-10-01, on one project with a production, a staging and a develo
 The project list held two projects. Where the capture could not show something, the page's own
 script was read, and the text says so.
 
-Each request has a fixture in `packages/odouche/tests/fixtures/`, written from the shapes below
-with invented values. Lists the library does not read are left out of `project_info.json`.
+The fixtures are in `packages/odouche/tests/fixtures/`, written from the shapes below with
+invented values. Lists the library does not read are left out of `project_info.json`.
 
 ### Common shape
 
@@ -232,8 +232,8 @@ Seen four times on one project, across the three stages.
 `result` is a list of one `{"branch_info": <branch>, "builds": [...]}`. `builds` holds at most
 `build_limit` builds. On the development branch they came newest first.
 
-- `build_limit` was sent as 1, 2 and 4, the only values the page uses. Without it, four builds
-  came back. Whether a larger value is honoured is unknown.
+- `build_limit` was sent as 1, 2 and 4. Without it, four builds came back. Whether a larger
+  value is honoured is unknown.
 - There is no offset. Older builds are only reachable through the history.
 
 | Field | Type | Observed |
@@ -340,7 +340,7 @@ Fixture: `build_log_install.txt`.
   capture. The interval is a constant in the page's script.
 - The page asks from the last byte it holds, not the one after, so the first byte of each answer
   is one it already has. What a range past the end answers is unknown.
-- No cookie is needed. Worker answers set a `session_id` of their own, which is not the
+- No cookie is needed. Each worker answer sets a new `session_id` of its own, which is not the
   `www.odoo.sh` session and is not to be kept.
 - From a browser the requests are cross-origin: the worker allows any origin.
 
@@ -348,7 +348,7 @@ Log kinds are in [Enumerations](#enumerations). A build that is waiting for a wo
 `worker_url`, so no log to read yet.
 
 `logs/list` was seen four times and log reads on five files, on a staging and a development
-build of one project, on one worker.
+build of one project, on two workers.
 
 ### Rebuild
 
