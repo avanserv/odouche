@@ -48,6 +48,14 @@ declared in the same change as the code that imports it, never ahead of it.
 Tests never contact the real Odoo.sh. Upstream responses are mocked or replayed from fixtures, and
 a fixture is scrubbed of session values and real project data before it is committed.
 
+Fixtures live in `packages/<package>/tests/fixtures/` and are written by hand from a browser
+capture, which is never committed.
+
+- Session values: write `session_id=REDACTED`. gitleaks fails on a real one, in any file.
+- E-mail addresses: use `example.com`. The test suite fails on any other domain in a fixture.
+- Nothing checks the rest, so scrub by hand: project names, repository names, commit authors and
+  messages, build hostnames.
+
 ## Commits and pull requests
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org):
