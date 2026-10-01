@@ -59,9 +59,23 @@ These are design constraints, not guidelines:
 - The MCP server is read-only by default; tools that change state on Odoo.sh are opt-in and
   documented as such. Every tool documents what it does and what it can touch.
 
-Open question (decide before implementing auth; record the outcome here):
+Session capture, at the end of the browser flow:
 
-- How the session is captured at the end of the browser flow.
+- odouche launches a Chromium-family browser found on the system, with a fresh profile that is
+  deleted when the login ends, and reads the cookie over `--remote-debugging-pipe`. It needs no
+  Python dependency and never downloads a browser.
+- The protocol could observe the GitHub page, so "never seen" rests on the capture code being
+  short and reviewable, not on it being impossible. That code sends only `Target.getTargets`
+  once at launch, `Target.attachToTarget`, `Network.getCookies` restricted to
+  `https://www.odoo.sh`, and `Browser.close`. It enables no domain, subscribes to no event and
+  injects no script.
+- With no display or no Chromium-family browser, the user pastes the cookie into a hidden prompt.
+- A captured or pasted session is stored only once the cookie is known to belong to the host the
+  upstream reference names and it has answered one authenticated request.
+- Rejected: the everyday browser's cookie store (it holds every other site's session), a browser
+  extension (a standing install per browser, with cookie access), a persistent profile (a GitHub
+  session on disk outside the keyring), a debugging port (open to any local process), Playwright
+  (downloads browsers, too large to review).
 
 ## Commands
 
