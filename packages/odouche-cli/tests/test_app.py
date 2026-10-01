@@ -1,3 +1,4 @@
+import click
 import pytest
 from typer.testing import CliRunner
 
@@ -20,8 +21,11 @@ def test_version_reports_the_cli_and_the_library():
 def test_no_arguments_shows_help():
     result = runner.invoke(app, [])
 
-    assert "Usage:" in result.output
-    assert "--version" in result.output
+    # Unstyled first: where colour is forced, as it is on a CI runner, the help renderer styles the
+    # dashes and the name of an option separately, so the raw output never contains the flag whole.
+    output = click.unstyle(result.output)
+    assert "Usage:" in output
+    assert "--version" in output
 
 
 def test_main_runs_the_application(monkeypatch: pytest.MonkeyPatch):
