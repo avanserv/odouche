@@ -24,7 +24,9 @@ print(odouche.__version__)
   information (`py.typed`).
 - **The only layer that knows Odoo.sh.** Endpoints, payload shapes and anything scraped from the
   web interface live in one place, so an upstream change is fixed in one place.
-- **Streaming where it matters.** Long-running operations, such as watching a build or following
-  logs, are exposed as iterators rather than as blocking calls.
+- **Synchronous.** Every call is a plain function. From async code, run it in a thread, for
+  example with `asyncio.to_thread`.
+- **Streaming where it matters.** Watching a build and following logs return iterators of typed
+  events. Close the iterator to stop; pass a deadline to bound it.
 
 The generated [API reference](reference.md) lists everything the library exports.

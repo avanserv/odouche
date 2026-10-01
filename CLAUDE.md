@@ -37,6 +37,34 @@ Rules that hold across packages:
 - Long-running operations (watching builds, streaming logs) are exposed by the library as
   iterators/streams so each frontend can present them its own way.
 
+### Library shape
+
+- The public API is synchronous and written once; there is no async surface. A CLI command calls
+  it directly. An MCP handler calls it through `asyncio.to_thread`, so the event loop never blocks.
+- A call running in a thread cannot be interrupted, so every call is bounded: each request has a
+  timeout and each stream takes a deadline.
+- Watching a build and following a log return a generator of typed events: the build's changed
+  state, or a chunk of log text with its offset. A watch ends on a terminal state. Closing the
+  generator closes the connection. A passed deadline raises a typed timeout error, never a silent
+  end.
+- Build status comes from upstream's bus websocket, opened by the transport so the host pin covers
+  it. The socket gives no sign of a missing or expired session, so a watch also asks `builds`: at
+  the start, after a reconnect and after a quiet spell. That request is what detects an
+  unauthenticated session and what catches an event the socket missed.
+- Logs are polled with `Range` requests, as the page does.
+- The HTTP client is `httpx2`, with its `ws` extra for the socket. Redirects are off unless a
+  request asks for them, responses stream, and `MockTransport` serves the request tests with no
+  network and no socket patching.
+- Models are frozen standard dataclasses. One reader in the upstream layer checks each field and
+  raises the "upstream changed shape" error naming the request and the field.
+- Rejected: an async surface with the sync one derived from it (a background event loop for every
+  sync caller), both surfaces over a sans-IO core (every polling loop becomes a state machine),
+  `httpx` (no release since 2024-12), `urllib3` and `requests` (no mock transport, no websocket),
+  `aiohttp` (async only), pydantic (a compiled dependency in a library others embed, and its base
+  class becomes public API), msgspec (upstream's `false` and `[id, name]` pairs need the same
+  hand-written hooks), polling alone for build status (upstream sets no interval: the page never
+  polls).
+
 ## Security model
 
 These are design constraints, not guidelines:
