@@ -44,6 +44,13 @@ These are design constraints, not guidelines:
 - The user's credentials (password, GitHub token) are never seen, stored, or logged.
 - Authentication is a browser-based GitHub login flow. Only the resulting Odoo.sh session is kept
   across runs, in the OS keyring — never in a plaintext file, config file, or cache.
+- The store accepts three keyring backends and picks among them itself, not through
+  `keyring.get_keyring()`: Secret Service (Linux, and WSL2 once a provider is installed), macOS
+  Keychain, Windows Credential Locker. Any other backend (`fail`, `null`, a chainer pick,
+  `keyrings.alt`, libsecret, KWallet, any third party) is an error with a message, not a fallback.
+- With no accepted backend, as on a bare WSL2, in a container or in CI, nothing is persisted. The
+  error names the two ways out: install a Secret Service provider, or supply the session through
+  the environment. The session is never written to a file or printed for the shell to export.
 - Upstream expiry is authoritative: an unauthenticated response invalidates the stored session and
   requires a new login. Sessions are never refreshed or extended. A client-side max age applies
   on top of upstream expiry.
@@ -52,11 +59,9 @@ These are design constraints, not guidelines:
 - The MCP server is read-only by default; tools that change state on Odoo.sh are opt-in and
   documented as such. Every tool documents what it does and what it can touch.
 
-Open questions (decide before implementing auth; record the outcome here):
+Open question (decide before implementing auth; record the outcome here):
 
 - How the session is captured at the end of the browser flow.
-- What happens when no keyring backend is available (e.g. WSL2). Do not fall back to a file
-  without an explicit decision.
 
 ## Commands
 
