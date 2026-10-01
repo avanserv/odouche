@@ -1,0 +1,97 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+# Nothing by default; each job below names what it holds and why.
+permissions: {}
+
+# One at a time and never cancelled: a run interrupted between tagging and publishing would leave
+# a release on GitHub that PyPI never received.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write # the tag and the GitHub release, and the lockfile commit on the release branch
+      pull-requests: write # opens and updates the release pull request
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      # Runs on the job's own token, so no App key or personal token is stored for releases. The
+      # cost is that GitHub starts no workflow for anything this token pushes: CI does not run on
+      # the release pull request until someone closes and reopens it. CONTRIBUTING.md has the step.
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+
+      # Release Please rewrites the version in the four manifests and knows nothing of uv.lock,
+      # which records the same versions. Left alone the release branch fails `uv sync --locked`,
+      # so the lockfile is brought back in step on the branch before anyone merges it.
+      - name: Checkout the release branch
+        if: ${{ steps.release.outputs.pr }}
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.release.outputs.pr && fromJSON(steps.release.outputs.pr).headBranchName || '' }}
+          # The push below is the whole reason for this checkout, so the credential stays.
+          persist-credentials: true # zizmor: ignore[artipacked]
+
+      - name: Setup uv
+        if: ${{ steps.release.outputs.pr }}
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          # No cache in a workflow that can write to the repository and publish: a cache is
+          # writable by any job that can reach the same key.
+          enable-cache: false
+
+      - name: Sync the lockfile
+        if: ${{ steps.release.outputs.pr }}
+        run: |
+          uv lock
+          if git diff --quiet -- uv.lock; then
+            echo "uv.lock already matches the release version."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: sync uv.lock with the release version" -- uv.lock
+          git push
+
+  publish:
+    name: Publish to PyPI
+    needs: release-please
+    if: ${{ needs.release-please.outputs.release_created == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: pypi
+      url: https://pypi.org/project/odouche/
+    permissions:
+      contents: read
+      id-token: write # PyPI trusted publishing: the upload is authorised by this job's identity
+    steps:
+      - name: Checkout the release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+          persist-credentials: false
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          enable-cache: false # see the note in the job above
+
+      - name: Build the distributions
+        run: make build
+
+      # No token anywhere: PyPI trusts this workflow in this environment for each of the three
+      # projects, and exchanges the job's OIDC identity for a short-lived upload credential.
+      - name: Publish
+        run: uv publish --trusted-publishing always

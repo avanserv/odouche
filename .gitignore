@@ -1,0 +1,36 @@
+# Debug a path: git check-ignore -v <file>
+
+# --- Python artifacts ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# --- Coverage ---
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# --- Build and distribution artifacts ---
+*.egg-info/
+build/
+dist/
+
+# --- Documentation site (zensical build) ---
+site/
+.cache/
+
+# --- IDE / editor ---
+.idea/
+.vscode/
+
+# --- Secrets and local env ---
+.env
+.env.*
+
+# --- AI agents & tools ---
+.claude/settings.local.json
+.claude/worktrees/
+.mcp.json
