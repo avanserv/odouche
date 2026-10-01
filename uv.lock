@@ -730,12 +730,12 @@ wheels = [
 
 [[package]]
 name = "odouche"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "packages/odouche" }
 
 [[package]]
 name = "odouche-cli"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "packages/odouche-cli" }
 dependencies = [
     { name = "odouche" },
@@ -750,7 +750,7 @@ requires-dist = [
 
 [[package]]
 name = "odouche-mcp"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "packages/odouche-mcp" }
 dependencies = [
     { name = "mcp" },
@@ -765,7 +765,7 @@ requires-dist = [
 
 [[package]]
 name = "odouche-workspace"
-version = "0.0.0"
+version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "odouche" },
