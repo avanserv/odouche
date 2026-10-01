@@ -68,7 +68,9 @@ a conventional one.
 - `feat` bumps the minor version and `fix` the patch.
 - `feat!`, or a `BREAKING CHANGE:` footer, is a breaking change: a minor bump while the version is
   below 1.0, a major one after.
-- Everything else (`docs`, `chore`, `refactor`, `test`, `ci`, `build`, ...) bumps nothing.
+- `docs`, `perf` and `revert` bump the patch too: they appear in the changelog, and whatever appears
+  there is released.
+- Everything else (`chore`, `refactor`, `test`, `ci`, `build`, `style`) bumps nothing.
 
 ## Releases
 
