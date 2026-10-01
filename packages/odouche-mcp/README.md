@@ -4,7 +4,10 @@ An unofficial [Model Context Protocol](https://modelcontextprotocol.io) server f
 [Odoo.sh](https://www.odoo.sh), so development agents can work with your projects. Built on the
 [`odouche`](https://pypi.org/project/odouche/) library.
 
-> This project is not affiliated with, endorsed by, or supported by Odoo S.A.
+> This project is not affiliated with, endorsed by, or supported by Odoo S.A. Odoo.sh has no public
+> API; this server talks to what the Odoo.sh web interface uses, which can change without notice.
+> It acts with your own Odoo.sh access and nothing more, and staying within your agreement with
+> Odoo is your responsibility. See [Unofficial status](https://avanserv.github.io/odouche/unofficial/).
 
 **Status: pre-alpha.** The server starts and exposes no tools yet.
 

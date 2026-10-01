@@ -11,6 +11,7 @@ nav = [
     { "CLI" = "cli.md" },
     { "MCP server" = "mcp.md" },
     { "Security" = "security.md" },
+    { "Unofficial status" = "unofficial.md" },
     { "API reference" = "reference.md" },
     { "Contributing" = "contributing.md" },
 ]
