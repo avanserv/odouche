@@ -12,6 +12,7 @@ nav = [
     { "MCP server" = "mcp.md" },
     { "Security" = "security.md" },
     { "Unofficial status" = "unofficial.md" },
+    { "Upstream reference" = "upstream.md" },
     { "API reference" = "reference.md" },
     { "Contributing" = "contributing.md" },
 ]
