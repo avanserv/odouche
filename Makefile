@@ -61,4 +61,4 @@ check: ## Full gate: format, lint, types, dependencies, dead code, tests with co
 	$(MAKE) --no-print-directory type-check deps deadcode coverage docs
 
 clean: ## Remove build, coverage and documentation output
-	rm -rf dist site htmlcov coverage.xml .coverage
+	rm -rf build dist site .cache htmlcov coverage.xml .coverage .coverage.*

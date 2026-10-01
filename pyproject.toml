@@ -189,6 +189,12 @@ line-ending = "lf"
 # pyrightconfig.json outranks a [tool.basedpyright] section, so a block here could only drift out
 # of step with the one in force.
 
+# codespell does not read .gitignore, so a manual `codespell` walks the virtualenv and the built
+# site. The hook reads this table too, which is why it carries no `exclude` of its own. `uv.lock`
+# is a bare name because the hook hands files over without the leading `./` a tree walk gives them.
+[tool.codespell]
+skip = "uv.lock,./.git,./.venv,./.cache,./site,./dist,./build,./htmlcov,./coverage.xml,*.har"
+
 [tool.vulture]
 paths = ["packages"]
 min_confidence = 80

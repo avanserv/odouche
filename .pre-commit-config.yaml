@@ -39,7 +39,7 @@ repos:
     hooks:
       - id: codespell
         name: all      | codespell
-        exclude: ^uv\.lock$
+        # What it skips is `[tool.codespell]` in pyproject.toml, so a manual run skips the same.
         additional_dependencies:
           - tomli
 

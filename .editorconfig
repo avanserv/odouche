@@ -8,7 +8,7 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
 
-[*.{yml,yaml,json,jsonc,md}]
+[*.{yml,yaml,json,jsonc,md,code-workspace}]
 indent_size = 2
 
 [Makefile]
