@@ -2,9 +2,13 @@
 // https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md; the defaults stand, so only
 // the rules switched off below need an argument.
 {
-  // The hook that runs this excludes the same file, so this is the half a manual run or an editor
-  // sees. release-please writes it, and a fix applied there dies with the next release.
-  "ignores": ["CHANGELOG.md", "site/**", ".venv/**"],
+  // The hook hands over tracked files only; a manual run or an editor walks the tree, where the
+  // virtualenv, the built site and the pytest cache all hold Markdown. Following .gitignore keeps
+  // one list of what is not ours instead of a second one here that drifts.
+  "gitignore": true,
+  // Tracked, and still not ours to fix: release-please writes it, and a fix applied there dies
+  // with the next release. The hook excludes the same file.
+  "ignores": ["CHANGELOG.md"],
   "config": {
     // Wrap width is a judgement each page makes rather than a number: a table, a long link and a
     // fence cannot wrap at all, and prose that reads better long is left long.
