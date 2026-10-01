@@ -5,8 +5,7 @@ design constraint rather than a guideline.
 
 !!! note "Authentication is not implemented yet"
 
-    This page states the model the implementation is held to. One point is still open and is
-    listed at the end.
+    This page states the model the implementation is held to.
 
 ## What odouche holds
 
@@ -15,6 +14,21 @@ design constraint rather than a guideline.
 - Only the resulting **Odoo.sh session** is kept between runs, in your operating system's keyring.
   It is never written to a plain-text file, a configuration file or a cache.
 - In headless use, such as CI, the session is read from the environment and kept in memory only.
+
+## How you sign in
+
+odouche opens a browser window of its own, in which you sign in to Odoo.sh with GitHub.
+
+- The browser is a Chromium-family one already on your machine (Chrome, Chromium, Edge, Brave).
+  odouche does not download one.
+- The window uses a temporary profile that is deleted when the login ends, so you sign in to
+  GitHub each time and nothing from that sign-in is kept.
+- odouche asks the browser for one thing, the cookies of `www.odoo.sh`. It does not read what the
+  pages show or the cookies of any other site, GitHub included.
+- The session is kept only after it has answered one request to Odoo.sh.
+
+With another browser, or with no display (over SSH, in a container), sign in to Odoo.sh in your
+own browser and paste the `session_id` cookie into a prompt that does not echo it.
 
 ## Where the session is stored
 
@@ -51,10 +65,6 @@ tool results.
 
 The server is read-only by default. Tools that change state on Odoo.sh are opt-in, and every tool
 documents what it does and what it can touch.
-
-## Open question
-
-How the session is captured at the end of the browser sign-in.
 
 ## Reporting a vulnerability
 
