@@ -88,6 +88,17 @@ def _get(backend: "KeyringBackend") -> tuple[bool, tuple[Secret, datetime] | Non
     return entry is not None, _read(entry)
 
 
+def _entry(backend: "KeyringBackend") -> Secret | None:
+    """Return the entry as it is stored, wrapped."""
+    entry = backend.get_password(KEYRING_SERVICE, KEYRING_ENTRY)
+    return None if entry is None else Secret(entry)
+
+
+def _unlock(backend: "KeyringBackend") -> None:
+    """Read the entry and keep nothing of it: a locked keyring asks to be unlocked, or fails."""
+    backend.get_password(KEYRING_SERVICE, KEYRING_ENTRY)
+
+
 def _delete(backend: "KeyringBackend") -> None:
     from keyring.errors import PasswordDeleteError  # noqa: PLC0415
 
@@ -159,21 +170,34 @@ class SessionStore:
             raise SessionExpiredError("The stored session passed its max age and was deleted. Log in again.")
         return Resolved(session, Source.KEYRING, stored_at + self._max_age)
 
+    def check(self) -> None:
+        """Raise `KeyringUnavailableError` if a session could not be saved: no accepted backend, or a locked one."""
+        _use(_unlock)
+
     def save(self, session: Secret) -> None:
         """Store the session in the keyring with the current time, replacing the stored one.
 
-        It is stored even when another session is passed or set in the environment.
+        It is stored even when another session is passed or set in the environment. If it cannot
+        be written, the stored one is put back.
         """
         stored_at = int(self._clock().timestamp())
 
         def replace(backend: "KeyringBackend") -> None:
-            # Credential Locker keeps the entry it overwrites under a second name.
-            _delete(backend)
-            backend.set_password(
-                KEYRING_SERVICE,
-                KEYRING_ENTRY,
-                json.dumps({"session": session.expose_secret(), "stored_at": stored_at}),
-            )
+            previous = _entry(backend)
+            if previous is not None:
+                # Credential Locker keeps the entry it overwrites under a second name.
+                _delete(backend)
+            try:
+                backend.set_password(
+                    KEYRING_SERVICE,
+                    KEYRING_ENTRY,
+                    json.dumps({"session": session.expose_secret(), "stored_at": stored_at}),
+                )
+            except BaseException:
+                if previous is not None:
+                    with suppress(Exception):
+                        backend.set_password(KEYRING_SERVICE, KEYRING_ENTRY, previous.expose_secret())
+                raise
 
         _use(replace)
 

@@ -17,7 +17,7 @@ from odouche import (
     UpstreamUnavailableError,
     __version__,
 )
-from odouche._upstream.transport import HOST, Transport, is_unauthenticated
+from odouche._upstream.transport import HOST, Transport, is_sendable, is_unauthenticated
 
 
 SESSION = "s3ss10n-v4lu3"
@@ -347,6 +347,22 @@ def test_bounds_every_phase_of_a_request_and_takes_no_option_to_change_it(connec
     assert None not in (timeout.connect, timeout.read, timeout.write, timeout.pool)
     assert not transport._client.follow_redirects
     assert set(inspect.signature(Transport).parameters) == {"session", "on_rejected", "transport", "sleep"}
+
+
+@pytest.mark.parametrize(
+    ("value", "sendable"),
+    [
+        (SESSION, True),
+        ("A-Za-z0-9_-", True),
+        ("", False),
+        ("a b", False),
+        (f"{SESSION}; tz=UTC", False),
+        (f"{SESSION}\r\nX-Injected: 1", False),
+        (f"{SESSION}\n", False),
+    ],
+)
+def test_tells_a_session_from_what_would_be_more_than_a_cookie_value(value, sendable):
+    assert is_sendable(Secret(value)) is sendable
 
 
 def test_the_session_is_exposed_only_where_it_is_sent_or_stored():

@@ -3,9 +3,10 @@
 odouche acts on your Odoo.sh projects with your access, so what it does with that access is a
 design constraint rather than a guideline.
 
-!!! note "Authentication is not implemented yet"
+!!! note "Logging in is in the library only"
 
-    This page states the model the implementation is held to.
+    The `osh auth` commands are not implemented yet. This page states the model the implementation
+    is held to.
 
 ## What odouche holds
 
@@ -27,8 +28,12 @@ odouche opens a browser window of its own, in which you sign in to Odoo.sh with 
   pages show or the cookies of any other site, GitHub included.
 - The session is kept only after it has answered one request to Odoo.sh.
 
-With another browser, or with no display (over SSH, in a container), sign in to Odoo.sh in your
-own browser and paste the `session_id` cookie into a prompt that does not echo it.
+With another browser, on Windows, or with no display (over SSH, in a container), sign in to
+Odoo.sh in your own browser and paste the `session_id` cookie into a prompt that does not echo it.
+
+The profile is deleted when the login is interrupted or the program is terminated, too. A program
+that is killed outright cannot delete it. If the profile cannot be deleted, the login fails, the
+session is not kept and the error names the directory to delete.
 
 ## Where the session is stored
 

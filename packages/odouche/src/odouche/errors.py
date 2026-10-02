@@ -86,3 +86,17 @@ class KeyringUnavailableError(OdoucheError):
 
     def __init__(self, message: str = _NO_KEYRING, *, operation: str | None = None, status: int | None = None) -> None:
         super().__init__(message, operation=operation, status=status)
+
+
+class LoginError(OdoucheError):
+    """Raised when a login ends without a session: none could be captured, or Odoo.sh refused it.
+
+    Nothing was stored, and the session stored before the login is untouched.
+    """
+
+
+class LoginTimeoutError(OdoucheError):
+    """Raised when nobody completes the browser login before its timeout.
+
+    Nothing was stored, and the session stored before the login is untouched.
+    """

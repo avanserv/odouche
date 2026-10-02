@@ -2,9 +2,12 @@
 
 from importlib.metadata import version
 
+from odouche._login import LoginStep, login
 from odouche._session import KEYRING_ENTRY, KEYRING_SERVICE, SESSION_ENV
 from odouche.errors import (
     KeyringUnavailableError,
+    LoginError,
+    LoginTimeoutError,
     NoSessionError,
     NotFoundError,
     OdoucheError,
@@ -21,6 +24,9 @@ __all__ = [
     "KEYRING_SERVICE",
     "SESSION_ENV",
     "KeyringUnavailableError",
+    "LoginError",
+    "LoginStep",
+    "LoginTimeoutError",
     "NoSessionError",
     "NotFoundError",
     "OdoucheError",
@@ -30,6 +36,7 @@ __all__ = [
     "UpstreamChangedError",
     "UpstreamUnavailableError",
     "__version__",
+    "login",
 ]
 
 __version__ = version("odouche")
