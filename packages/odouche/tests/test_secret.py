@@ -14,7 +14,7 @@ PLACEHOLDER = "**********"
 
 
 @pytest.fixture
-def secret():
+def wrapped():
     return Secret(VALUE)
 
 
@@ -22,12 +22,12 @@ def test_is_exported():
     assert "Secret" in odouche.__all__
 
 
-def test_expose_secret_returns_the_value(secret):
-    assert secret.expose_secret() == VALUE
+def test_expose_secret_returns_the_value(wrapped):
+    assert wrapped.expose_secret() == VALUE
 
 
-def test_is_not_a_str(secret):
-    assert not isinstance(secret, str)
+def test_is_not_a_str(wrapped):
+    assert not isinstance(wrapped, str)
 
 
 @pytest.mark.parametrize("value", [None, b"bytes", 42, Secret(VALUE)])
@@ -44,62 +44,62 @@ def test_rejects_anything_but_a_str(value):
         repr,
         str,
         format,
-        lambda secret: f"{secret}",
-        lambda secret: f"{secret!r}",
-        lambda secret: f"{secret:>20}",
-        lambda secret: "%s %r" % (secret, secret),  # noqa: UP031
+        lambda wrapped: f"{wrapped}",
+        lambda wrapped: f"{wrapped!r}",
+        lambda wrapped: f"{wrapped:>20}",
+        lambda wrapped: "%s %r" % (wrapped, wrapped),  # noqa: UP031
         "{}".format,
     ],
 )
-def test_renders_as_the_placeholder(secret, render):
-    rendered = render(secret)
+def test_renders_as_the_placeholder(wrapped, render):
+    rendered = render(wrapped)
 
     assert VALUE not in rendered
     assert PLACEHOLDER in rendered
 
 
-def test_logging_shows_the_placeholder(secret, caplog):
+def test_logging_shows_the_placeholder(wrapped, caplog):
     with caplog.at_level(logging.INFO):
-        logging.getLogger("odouche.test").info("session %s %r", secret, secret)
+        logging.getLogger("odouche.test").info("session %s %r", wrapped, wrapped)
 
     assert caplog.messages == [f"session {PLACEHOLDER} {PLACEHOLDER}"]
     assert VALUE not in caplog.text
 
 
-def test_dataclass_repr_shows_the_placeholder(secret):
+def test_dataclass_repr_shows_the_placeholder(wrapped):
     @dataclass(frozen=True)
     class Holder:
         name: str
         session: Secret
 
-    assert repr(Holder("dev", secret)) == f"{Holder.__qualname__}(name='dev', session={PLACEHOLDER})"
+    assert repr(Holder("dev", wrapped)) == f"{Holder.__qualname__}(name='dev', session={PLACEHOLDER})"
 
 
 @pytest.mark.parametrize("protocol", range(pickle.HIGHEST_PROTOCOL + 1))
-def test_cannot_be_pickled(secret, protocol):
+def test_cannot_be_pickled(wrapped, protocol):
     with pytest.raises(TypeError):
-        pickle.dumps(secret, protocol)
+        pickle.dumps(wrapped, protocol)
 
 
 @pytest.mark.parametrize("duplicate", [copy.copy, copy.deepcopy])
-def test_cannot_be_copied(secret, duplicate):
+def test_cannot_be_copied(wrapped, duplicate):
     with pytest.raises(TypeError):
-        duplicate(secret)
+        duplicate(wrapped)
 
 
-def test_has_no_state_to_read(secret):
+def test_has_no_state_to_read(wrapped):
     with pytest.raises(TypeError):
-        vars(secret)
+        vars(wrapped)
     with pytest.raises(TypeError):
-        secret.__getstate__()
+        wrapped.__getstate__()
 
 
-def test_equality_compares_the_values(secret):
-    assert secret == Secret(VALUE)
-    assert secret != Secret("another")
-    assert secret != VALUE
+def test_equality_compares_the_values(wrapped):
+    assert wrapped == Secret(VALUE)
+    assert wrapped != Secret("another")
+    assert wrapped != VALUE
 
 
-def test_cannot_be_hashed(secret):
+def test_cannot_be_hashed(wrapped):
     with pytest.raises(TypeError):
-        hash(secret)
+        hash(wrapped)
