@@ -81,6 +81,9 @@ signal is `error.data.name`.
 - JSON requests are `POST` with `Content-Type: application/json` and a JSON-RPC body
   (`{"jsonrpc": "2.0", "method": "call", "params": {}, "id": 1}`). The read requests captured
   send no CSRF token, and are accepted without `Origin` or `Referer`.
+- No browser `User-Agent` is needed. On 2026-10-02, `POST /app/projects` sent with
+  `User-Agent: odouche/<version>` and a session fresh from a sign-in was answered 200 with no
+  `error`. Seen once.
 - The `/project` page embeds a `csrf_token`. No state-changing request was captured, so whether
   one requires it is unknown.
 - `POST /app/project/<project>/get_info` returns an `access_token` of 32 characters, distinct

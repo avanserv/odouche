@@ -7,6 +7,8 @@ import pytest
 import odouche
 from odouche import (
     KeyringUnavailableError,
+    LoginError,
+    LoginTimeoutError,
     NoSessionError,
     NotFoundError,
     OdoucheError,
@@ -30,6 +32,8 @@ BUILDERS = {
     UpstreamChangedError: lambda: UpstreamChangedError(OPERATION, FIELD, status=200),
     UpstreamUnavailableError: lambda: UpstreamUnavailableError("Odoo.sh is down.", operation=OPERATION, status=502),
     KeyringUnavailableError: KeyringUnavailableError,
+    LoginError: lambda: LoginError("The browser was closed.", operation="login"),
+    LoginTimeoutError: lambda: LoginTimeoutError("The login was not completed.", operation="login"),
 }
 CLASSES = [OdoucheError, *BUILDERS]
 

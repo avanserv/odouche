@@ -8,7 +8,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 official public API; this project is an **unofficial** client for what the Odoo.sh web UI uses.
 
 Status: the workspace, tooling and CI exist; the packages are skeletons (`osh --version`, an MCP
-server with no tools, an empty library). The Odoo.sh client and authentication are not implemented.
+server with no tools). The library has its transport, session store and login; the Odoo.sh client
+is not implemented.
 The architecture and security sections below are the design the implementation is held to.
 
 ## Architecture
@@ -98,6 +99,7 @@ Session capture, at the end of the browser flow:
   `https://www.odoo.sh`, and `Browser.close`. It enables no domain, subscribes to no event and
   injects no script.
 - With no display or no Chromium-family browser, the user pastes the cookie into a hidden prompt.
+  Native Windows pastes too: the browser is not launched there yet.
 - A captured or pasted session is stored only once the cookie is known to belong to the host the
   upstream reference names and it has answered one authenticated request.
 - Rejected: the everyday browser's cookie store (it holds every other site's session), a browser

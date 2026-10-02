@@ -2,6 +2,7 @@
 
 import json
 import logging
+import re
 import threading
 import time
 from collections.abc import Callable, Mapping
@@ -27,6 +28,7 @@ HOST = "www.odoo.sh"
 
 _LOGIN_PATH = "/web/login"
 _SESSION_EXPIRED = "odoo.http.SessionExpiredException"
+_SESSION_ALPHABET = re.compile(r"[A-Za-z0-9_-]+")
 _TIMEOUT = httpx2.Timeout(connect=10, read=30, write=10, pool=10)
 _BACKOFF = (1.0, 2.0)
 _TRANSIENT = frozenset({502, 503, 504})
@@ -61,6 +63,11 @@ def is_unauthenticated(status: int, location: str | None, body: object) -> bool:
     error = cast("dict[str, object]", body).get("error")
     data = cast("dict[str, object]", error).get("data") if isinstance(error, dict) else None
     return isinstance(data, dict) and cast("dict[str, object]", data).get("name") == _SESSION_EXPIRED
+
+
+def is_sendable(session: Secret) -> bool:
+    """Tell whether a value has the alphabet of a session, so that it is a cookie value and no more."""
+    return _SESSION_ALPHABET.fullmatch(session.expose_secret()) is not None
 
 
 def _is_login(location: str) -> bool:

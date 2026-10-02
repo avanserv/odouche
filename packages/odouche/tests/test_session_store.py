@@ -1,12 +1,11 @@
 import json
 import sys
 import traceback
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 import keyring
 import pytest
-from keyring.backend import KeyringBackend
-from keyring.errors import KeyringLocked, PasswordDeleteError
+from keyring.errors import KeyringLocked
 
 import odouche
 from odouche import (
@@ -24,16 +23,7 @@ from odouche._session import MAX_AGE, SessionStore, Source
 
 SESSION = "s3ss10n-v4lu3"
 OTHER = "0th3r-v4lu3"
-STORED_AT = datetime(2026, 1, 1, 12, tzinfo=UTC)
 KEY = (KEYRING_SERVICE, KEYRING_ENTRY)
-
-
-class Clock:
-    def __init__(self):
-        self.now = STORED_AT
-
-    def __call__(self):
-        return self.now
 
 
 @pytest.fixture(autouse=True)
@@ -43,62 +33,6 @@ def no_file_written(tmp_path, monkeypatch):
         monkeypatch.delenv(name, raising=False)
     yield
     assert list(tmp_path.iterdir()) == []
-
-
-@pytest.fixture
-def clock():
-    return Clock()
-
-
-def memory():
-    class Memory(KeyringBackend):
-        """Keeps entries on the class: the store builds a backend on every use."""
-
-        priority = 1  # pyright: ignore[reportAssignmentType]
-        entries = {}
-        calls = 0
-        failure = None
-        refuses_deletion = False
-
-        def _call(self):
-            type(self).calls += 1
-            if self.failure is not None:
-                raise self.failure(f"failed, entry: {SESSION}")
-
-        def get_password(self, service, username):
-            self._call()
-            return self.entries.get((service, username))
-
-        def set_password(self, service, username, password):
-            self._call()
-            # As Credential Locker does with the entry it overwrites.
-            if (service, username) in self.entries:
-                self.entries[f"{username}@{service}", username] = self.entries[service, username]
-            self.entries[service, username] = password
-
-        def delete_password(self, service, username):
-            self._call()
-            if self.refuses_deletion or (service, username) not in self.entries:
-                raise PasswordDeleteError("No such password!")
-            del self.entries[service, username]
-
-    return Memory
-
-
-@pytest.fixture
-def backend(monkeypatch):
-    backend = memory()
-    monkeypatch.setattr(_session, "_accepted", lambda: backend)
-    return backend
-
-
-@pytest.fixture
-def no_backend(monkeypatch):
-    class NotViable(memory()):
-        viable = False  # pyright: ignore[reportAssignmentType]
-
-    monkeypatch.setattr(_session, "_accepted", lambda: NotViable)
-    return NotViable
 
 
 @pytest.fixture
@@ -123,13 +57,14 @@ def test_constants_are_exported(name):
 
 
 def test_survives_a_run(stored, clock):
+    stored_at = clock.now
     clock.now += MAX_AGE
 
     resolved = SessionStore(clock=clock).load()
 
     assert resolved.session == Secret(SESSION)
     assert resolved.source is Source.KEYRING
-    assert resolved.expires_at == STORED_AT + MAX_AGE
+    assert resolved.expires_at == stored_at + MAX_AGE
 
 
 def test_stores_one_entry_with_the_session_and_the_time(stored, clock):
@@ -220,10 +155,10 @@ def test_the_environment_needs_no_keyring(no_backend, monkeypatch):
     assert SessionStore().load().session == Secret(SESSION)
 
 
-def test_an_empty_environment_variable_is_unset(stored, monkeypatch):
+def test_an_empty_environment_variable_is_unset(stored, clock, monkeypatch):
     monkeypatch.setenv(SESSION_ENV, "")
 
-    assert SessionStore(clock=Clock()).load().source is Source.KEYRING
+    assert SessionStore(clock=clock).load().source is Source.KEYRING
 
 
 def test_a_passed_session_wins_and_is_never_stored(stored, clock, monkeypatch):
@@ -249,6 +184,61 @@ def test_discard_deletes_the_entry_and_is_safe_twice(stored, clock):
     assert stored.entries == {}
 
 
+def test_check_passes_with_a_keyring_and_changes_no_entry(stored):
+    entries = dict(stored.entries)
+
+    SessionStore().check()
+
+    assert stored.entries == entries
+
+
+def test_check_raises_with_a_keyring_that_stays_locked(stored):
+    stored.failure = KeyringLocked
+
+    with pytest.raises(KeyringUnavailableError, match="KeyringLocked") as raised:
+        SessionStore().check()
+
+    assert all(SESSION not in text for text in shown(raised.value))
+
+
+def test_a_session_that_cannot_be_written_leaves_the_stored_one(stored, clock):
+    entries = dict(stored.entries)
+    stored.failing_writes = 1
+
+    with pytest.raises(KeyringUnavailableError, match="PasswordSetError") as raised:
+        SessionStore(clock=clock).save(Secret(OTHER))
+
+    assert stored.entries == entries
+    assert SessionStore(clock=clock).load().session == Secret(SESSION)
+    assert all(value not in text for text in shown(raised.value) for value in (SESSION, OTHER))
+
+
+def test_an_interrupted_write_leaves_the_stored_session(stored, clock):
+    entries = dict(stored.entries)
+    stored.failing_writes = 1
+    stored.write_failure = KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        SessionStore(clock=clock).save(Secret(OTHER))
+
+    assert stored.entries == entries
+
+
+def test_a_keyring_that_takes_no_write_at_all_shows_nothing_of_either_session(stored, clock):
+    stored.failing_writes = 2
+
+    with pytest.raises(KeyringUnavailableError, match="PasswordSetError") as raised:
+        SessionStore(clock=clock).save(Secret(OTHER))
+
+    assert stored.entries == {}
+    assert all(value not in text for text in shown(raised.value) for value in (SESSION, OTHER))
+
+
+def test_check_raises_without_a_keyring(no_backend):
+    with pytest.raises(KeyringUnavailableError, match="Secret Service provider"):
+        SessionStore().check()
+
+
 def test_discard_without_a_keyring_does_nothing(no_backend):
     SessionStore().discard()
 
@@ -256,7 +246,7 @@ def test_discard_without_a_keyring_does_nothing(no_backend):
 
 
 @pytest.mark.parametrize("use", [SessionStore.load, lambda store: store.save(Secret(SESSION))], ids=["load", "save"])
-def test_no_plaintext(no_backend, monkeypatch, use):
+def test_no_plaintext(no_backend, memory, monkeypatch, use):
     plaintext = memory()
     monkeypatch.setattr(keyring.core, "_keyring_backend", plaintext())
     assert isinstance(keyring.get_keyring(), plaintext)
