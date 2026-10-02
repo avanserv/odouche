@@ -29,4 +29,22 @@ print(odouche.__version__)
 - **Streaming where it matters.** Watching a build and following logs return iterators of typed
   events. Close the iterator to stop; pass a deadline to bound it.
 
+## Errors
+
+Everything the library raises is an `OdoucheError`, so one `except` catches any failure and no
+HTTP client exception has to be imported.
+
+| Error | Meaning |
+| --- | --- |
+| `NoSessionError` | There is no session. Log in. |
+| `SessionExpiredError` | Odoo.sh rejected the session, or it passed its max age. Log in again. |
+| `NotFoundError` | The project, branch or build does not exist. |
+| `PermissionDeniedError` | The session is not allowed to do this. |
+| `UpstreamChangedError` | Odoo.sh answered in a shape the library does not read. Please report it. |
+| `UpstreamUnavailableError` | Odoo.sh could not be reached, or answered with a server error. |
+| `KeyringUnavailableError` | No accepted keyring backend is available to store the session. |
+
+An error carries `operation`, `status` and a message. It never carries a session value, request
+headers or a response body.
+
 The generated [API reference](reference.md) lists everything the library exports.
