@@ -2,7 +2,9 @@
 
 from importlib.metadata import version
 
+from odouche.secret import Secret
 
-__all__ = ["__version__"]
+
+__all__ = ["Secret", "__version__"]
 
 __version__ = version("odouche")
