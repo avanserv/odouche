@@ -25,6 +25,7 @@ classifiers = [
 # nothing imports, and on an import nothing declares.
 dependencies = [
     "httpx2>=2.13.1",
+    "keyring>=25.7.0",
 ]
 
 [project.urls]

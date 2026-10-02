@@ -45,16 +45,22 @@ odouche accepts three keyrings and nothing else:
 Any other keyring backend is refused with an error, including the plain-text ones from
 `keyrings.alt`.
 
+The entry is named `session`, under the service `odouche`, so you can find it and delete it by
+hand.
+
 When none of the three is available, odouche does not keep the session. It says so and names the
 two ways out: install a Secret Service provider, or supply the session through the environment. It
 never falls back to a file, and never prints the session for you to export.
+
+The environment variable is `ODOUCHE_SESSION`. When it is set, the session in the keyring is
+neither read nor deleted, and the one from the environment is never stored.
 
 ## How long a session lasts
 
 - Odoo.sh decides. If Odoo.sh says a session is no longer valid, odouche discards it and asks you
   to sign in again. Sessions are never refreshed or extended.
-- A client-side maximum age applies on top of that, so a session forgotten on a machine does not
-  stay usable for as long as Odoo.sh would allow.
+- A client-side maximum age of 30 days applies on top of that, counted from the login and never
+  extended by use.
 
 ## What never leaves
 
