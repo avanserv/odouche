@@ -2,6 +2,7 @@
 
 from importlib.metadata import version
 
+from odouche._session import KEYRING_ENTRY, KEYRING_SERVICE, SESSION_ENV
 from odouche.errors import (
     KeyringUnavailableError,
     NoSessionError,
@@ -16,6 +17,9 @@ from odouche.secret import Secret
 
 
 __all__ = [
+    "KEYRING_ENTRY",
+    "KEYRING_SERVICE",
+    "SESSION_ENV",
     "KeyringUnavailableError",
     "NoSessionError",
     "NotFoundError",

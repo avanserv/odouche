@@ -29,6 +29,11 @@ print(odouche.__version__)
 - **Streaming where it matters.** Watching a build and following logs return iterators of typed
   events. Close the iterator to stop; pass a deadline to bound it.
 
+## Session
+
+The session is taken from the `ODOUCHE_SESSION` environment variable when it is set, and from the
+OS keyring otherwise. [Security](security.md) says where it is stored and for how long.
+
 ## Errors
 
 Everything the library raises is an `OdoucheError`, so one `except` catches any failure and no

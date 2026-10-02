@@ -349,11 +349,11 @@ def test_bounds_every_phase_of_a_request_and_takes_no_option_to_change_it(connec
     assert set(inspect.signature(Transport).parameters) == {"session", "on_rejected", "transport", "sleep"}
 
 
-def test_the_session_is_exposed_in_the_transport_only():
+def test_the_session_is_exposed_only_where_it_is_sent_or_stored():
     exposing = sorted(
         str(path.relative_to(SOURCES))
         for path in SOURCES.rglob("*.py")
         if "expose_secret(" in path.read_text(encoding="utf-8")
     )
 
-    assert exposing == ["_upstream/transport.py", "secret.py"]
+    assert exposing == ["_session.py", "_upstream/transport.py", "secret.py"]
