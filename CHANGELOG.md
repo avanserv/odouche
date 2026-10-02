@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.2.0](https://github.com/avanserv/odouche/compare/v0.1.0...v0.2.0) (2026-10-02)
+
+
+### Features
+
+* **lib:** Carry the session in a type that cannot print itself ([#16](https://github.com/avanserv/odouche/issues/16)) ([0e506b5](https://github.com/avanserv/odouche/commit/0e506b5bc01e8e76a802fa361cdbd40396d9078c))
+* **lib:** Give the library one error hierarchy callers can catch ([#17](https://github.com/avanserv/odouche/issues/17)) ([aaf1046](https://github.com/avanserv/odouche/commit/aaf104614e62a3dbec52ef7337eb5afe611539bc))
+* **lib:** Keep the session in the OS keyring with a client-side max age ([#19](https://github.com/avanserv/odouche/issues/19)) ([8b9a7e9](https://github.com/avanserv/odouche/commit/8b9a7e9af63d28bade096ac58caffc316bbe4b7d))
+* **lib:** Log in through the browser GitHub flow and store only the session ([#20](https://github.com/avanserv/odouche/issues/20)) ([1441eea](https://github.com/avanserv/odouche/commit/1441eeaf3728fe5c580dfb6c48664acb6d67957f))
+* **lib:** Put every Odoo.sh request behind one transport that pins the host ([#18](https://github.com/avanserv/odouche/issues/18)) ([b759656](https://github.com/avanserv/odouche/commit/b759656232754fab26b913417eab7a3ee3042461))
+
+
+### Documentation
+
+* Say that docs, perf and revert commits open a patch release ([#14](https://github.com/avanserv/odouche/issues/14)) ([a91dc23](https://github.com/avanserv/odouche/commit/a91dc23fa97fa93935c852c82e256aa3e88ee28a))
+
 ## 0.1.0 (2026-10-01)
 
 
