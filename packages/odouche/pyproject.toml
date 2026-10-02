@@ -23,7 +23,9 @@ classifiers = [
 ]
 # Declared with the code that imports them, never ahead of it: deptry fails on a dependency
 # nothing imports, and on an import nothing declares.
-dependencies = []
+dependencies = [
+    "httpx2>=2.13.1",
+]
 
 [project.urls]
 Homepage = "https://github.com/avanserv/odouche"

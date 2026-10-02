@@ -732,6 +732,12 @@ wheels = [
 name = "odouche"
 version = "0.1.0"
 source = { editable = "packages/odouche" }
+dependencies = [
+    { name = "httpx2" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "httpx2", specifier = ">=2.13.1" }]
 
 [[package]]
 name = "odouche-cli"

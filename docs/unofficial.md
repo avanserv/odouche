@@ -10,8 +10,11 @@ session.
 
 ## Pacing
 
-odouche makes the requests the web interface would make, at no higher rate. Polling for a build or
-a log never runs faster than the interface polls.
+odouche makes the requests the web interface would make, one at a time. It repeats only a read that
+failed on the network or at a gateway, at most twice and after a pause. Polling for a build or a log never runs faster
+than the interface polls.
+
+It sets no other limit: a tool that calls the library in a loop spaces its own calls.
 
 ## What Odoo's terms say
 
