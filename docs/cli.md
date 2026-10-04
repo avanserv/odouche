@@ -19,6 +19,16 @@ osh --help
 `osh` is built on the [`odouche` library](library.md) and adds nothing of its own beyond
 presentation: every command is a call into the library, rendered for a terminal.
 
+## Output
+
+`--format table` (the default) or `--format json`, given before the command. Only the result is
+written to stdout, so `osh --format json ... | jq` receives nothing else.
+
+- JSON keys are the attribute names of the library's models in the [reference](reference.md).
+  Datetimes are ISO 8601 with an offset. A stream is one object per line.
+- A table has no colour and no box drawing when stdout is not a terminal or `NO_COLOR` is set.
+- An empty result is `[]` as JSON, and one line on stderr as a table. Both exit 0.
+
 ## Exit codes
 
 A command that fails prints one or two lines on stderr, what happened and what to do, and nothing
