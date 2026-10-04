@@ -32,6 +32,8 @@ class OdoucheError(Exception):
 class NoSessionError(OdoucheError):
     """Raised when there is no session: none was passed, set in the environment or stored.
 
+    One that is not a `session_id` cookie value is none.
+
     The user has to log in.
     """
 

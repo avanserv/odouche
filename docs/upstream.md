@@ -95,6 +95,31 @@ signal is `error.data.name`.
 `session_id`. It takes no CSRF token. The previous value is invalidated on the server: replayed
 afterwards, it gets the `SessionExpiredException` answer above.
 
+### User profile
+
+Captured on 2026-10-04. Fixture: `user_profile.json`.
+
+`POST /app/user/profile`, no params, is what the profile page loads. `result` is the signed-in
+user:
+
+| Field | Type | Observed |
+| --- | --- | --- |
+| `id` | int | The `hosting_user_id` of [Projects](#projects) |
+| `name` | str | The display name |
+| `username` | str | The GitHub login |
+| `email` | str | |
+| `avatar_url`, `url` | str | The GitHub avatar and profile |
+| `notification_push`, `notification_mail` | str | `off`, `warning` |
+| `changelog` | bool | |
+| `ssh_keys` | list | `id`, `fingerprint`, `name` |
+| `devices` | list | `id`, `name`, `type`, `last_activity`, `ip`, `is_current`, `location` |
+
+- It needs no project, unlike the `user` of `get_info`.
+- `devices` look like the user's sessions, each with an address and a location. The library reads
+  neither list, and the fixture leaves them out.
+- Seen once. What `name` and `email` are for a user who has none is unknown: the library reads
+  `false` and `null` as none.
+
 ### Hosts
 
 Contacted during login and on the project pages:
@@ -151,6 +176,7 @@ Every `/app/...` request is `POST www.odoo.sh` with `Content-Type: application/j
 The answer is 200 with `{"jsonrpc": "2.0", "id": 1, "result": ...}`.
 
 - An absent value is `false`, not `null`: a field typed as a string below is "string or `false`".
+  The library reads `null` as absent too.
 - Timestamps are `YYYY-MM-DD HH:MM:SS` in UTC with no zone marker. Dates are `YYYY-MM-DD`.
 - A many-to-one is a pair `[id, name]`.
 

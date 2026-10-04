@@ -60,7 +60,7 @@ class _Answer:
 def is_unauthenticated(status: int, location: str | None, body: object) -> bool:
     """Tell whether an answer is one of the two Odoo.sh gives to a missing or expired session."""
     if status == httpx2.codes.SEE_OTHER:
-        return location is not None and _is_login(location)
+        return _lands_on(location, _LOGIN_PATH)
     return status == httpx2.codes.OK and _error_name(body) == _SESSION_EXPIRED
 
 
@@ -76,12 +76,15 @@ def _error_name(body: object) -> object:
     return cast("dict[str, object]", data).get("name") if isinstance(data, dict) else None
 
 
-def _is_login(location: str) -> bool:
+def _lands_on(location: str | None, path: str) -> bool:
+    """Tell whether a redirect sends the browser to a path of Odoo.sh."""
+    if location is None:
+        return False
     try:
         url = httpx2.URL(f"https://{HOST}/").join(location)
     except httpx2.InvalidURL:
         return False
-    return (url.scheme, url.host, url.port, url.path) == ("https", HOST, None, _LOGIN_PATH)
+    return (url.scheme, url.host, url.port, url.path) == ("https", HOST, None, path)
 
 
 def _url(path: str) -> httpx2.URL:
@@ -173,43 +176,68 @@ class Transport:
         reason for, which is its answer to a branch that does not exist. Without it that answer
         is an `UpstreamChangedError`.
         """
-        url = _url(path)
-        with self._lock:
-            answer = self._send(url, params)
-            for delay in _BACKOFF if retry else ():
-                if not answer.transient:
-                    break
-                self._sleep(delay)
-                answer = self._send(url, params)
-        if answer.status is not None and is_unauthenticated(answer.status, answer.location, answer.body):
-            self._on_rejected()
-            raise SessionExpiredError(
-                "Odoo.sh rejected the session. Log in again.", operation=operation, status=answer.status
-            )
+        answer = self._attempt(operation, "POST", _url(path), params, retry=retry)
         error = _error(operation, answer, not_found)
         if error is not None:
             raise error
         return cast("dict[str, object]", answer.body)
 
-    def _send(self, url: httpx2.URL, params: Mapping[str, object] | None) -> _Answer:
-        """Make one attempt.
+    def leave(
+        self, operation: str, path: str, params: Mapping[str, str] | None = None, *, to: str, retry: bool = False
+    ) -> None:
+        """Send one `GET` that Odoo.sh answers by sending the browser to the path `to`, and follow nothing.
+
+        `params` is the query. Any answer other than a 303 to `to` raises as in `call`.
+        """
+        answer = self._attempt(operation, "GET", _url(path), params, retry=retry)
+        if answer.status == httpx2.codes.SEE_OTHER and _lands_on(answer.location, to):
+            return
+        if answer.status == httpx2.codes.OK:
+            raise UpstreamChangedError(operation, "status", status=answer.status)
+        raise cast("OdoucheError", _error(operation, answer, None))
+
+    def _attempt(
+        self, operation: str, method: str, url: httpx2.URL, params: Mapping[str, object] | None, *, retry: bool
+    ) -> _Answer:
+        """Send a request, again if it may be, and raise if Odoo.sh rejects the session."""
+        with self._lock:
+            answer = self._send(method, url, params)
+            for delay in _BACKOFF if retry else ():
+                if not answer.transient:
+                    break
+                self._sleep(delay)
+                answer = self._send(method, url, params)
+        if answer.status is not None and is_unauthenticated(answer.status, answer.location, answer.body):
+            self._on_rejected()
+            raise SessionExpiredError(
+                "Odoo.sh rejected the session. Log in again.", operation=operation, status=answer.status
+            )
+        return answer
+
+    def _send(self, method: str, url: httpx2.URL, params: Mapping[str, object] | None) -> _Answer:
+        """Make one attempt: a `POST` with `params` as a JSON-RPC body, or a `GET` with them as the query.
 
         A failure is returned, not raised: the client's exception holds the request, and an error
         raised while it is being handled would carry it as its context.
         """
+        headers = {"Cookie": f"session_id={self._session.expose_secret()}"}
         started = time.perf_counter()
         try:
-            response = self._client.post(
-                url,
-                json={"jsonrpc": "2.0", "method": "call", "params": dict(params or {}), "id": 1},
-                headers={"Cookie": f"session_id={self._session.expose_secret()}"},
-            )
+            if method == "GET":
+                query = {key: str(value) for key, value in (params or {}).items()}
+                response = self._client.get(url, params=query or None, headers=headers)
+            else:
+                response = self._client.post(
+                    url,
+                    json={"jsonrpc": "2.0", "method": "call", "params": dict(params or {}), "id": 1},
+                    headers=headers,
+                )
         except httpx2.RequestError as error:
             answer = _Answer(failure=type(error).__name__)
         else:
             answer = _Answer(response.status_code, response.headers.get("Location"), _json(response.content))
         elapsed = (time.perf_counter() - started) * 1000
-        _logger.debug("POST %s: %s in %.0f ms", url.path, answer.status or answer.failure, elapsed)
+        _logger.debug("%s %s: %s in %.0f ms", method, url.path, answer.status or answer.failure, elapsed)
         return answer
 
 

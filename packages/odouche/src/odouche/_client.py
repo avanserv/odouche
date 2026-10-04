@@ -4,9 +4,9 @@ from collections.abc import Callable
 from typing import Self
 
 from odouche._session import SessionStore
-from odouche._upstream import branches, builds, projects
+from odouche._upstream import branches, builds, projects, user
 from odouche._upstream.transport import Transport
-from odouche.models import Branch, Build, Project
+from odouche.models import Branch, Build, Identity, Project, SessionInfo
 from odouche.secret import Secret
 
 
@@ -29,7 +29,9 @@ class Client:
 
     def __init__(self, session: Secret | None = None) -> None:
         store = SessionStore(session)
-        self._transport = _transport(store.load().session, on_rejected=store.discard)
+        resolved = store.load()
+        self._session = SessionInfo(resolved.source, resolved.stored_at, resolved.expires_at)
+        self._transport = _transport(resolved.session, on_rejected=store.discard)
 
     def __enter__(self) -> Self:
         return self
@@ -40,6 +42,15 @@ class Client:
     def close(self) -> None:
         """Close the connections."""
         self._transport.close()
+
+    @property
+    def session(self) -> SessionInfo:
+        """Where the session came from and when it passes its max age. Odoo.sh is not asked."""
+        return self._session
+
+    def identity(self) -> Identity:
+        """Return the user the session belongs to, which also tells that Odoo.sh still accepts it."""
+        return user.identity(self._transport, self._session)
 
     def projects(self) -> list[Project]:
         """List the projects the session's user can reach."""

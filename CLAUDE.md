@@ -8,8 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 official public API; this project is an **unofficial** client for what the Odoo.sh web UI uses.
 
 Status: the workspace, tooling and CI exist; the packages are skeletons (`osh --version`, an MCP
-server with no tools). The library has its transport, session store, login and a client that
-lists projects, branches and builds; watching a build, logs and rebuild are not implemented.
+server with no tools). The library has its transport, session store, login, logout and a client
+that reports the session's user and lists projects, branches and builds; watching a build, logs
+and rebuild are not implemented.
 The architecture and security sections below are the design the implementation is held to.
 
 ## Architecture

@@ -28,6 +28,7 @@ SOURCES = Path(__file__).parents[1] / "src" / "odouche"
 
 UNAUTHENTICATED = json.loads((FIXTURES / "unauthenticated.json").read_text())
 LOGIN = "/web/login?redirect=%2Fproject%3F"
+LOGOUT = "/web/session/logout"
 
 
 class Upstream:
@@ -98,6 +99,100 @@ def test_returns_an_answer_that_has_no_result(connect):
     transport, _ = connect(fixture("rebuild.json"))
 
     assert "result" not in transport.call("rebuild", "/app/branch/1/rebuild")
+
+
+def test_leaves_with_a_get_that_carries_the_session_and_follows_nothing(connect):
+    transport, upstream = connect(redirect("/"))
+
+    assert transport.leave("logout", LOGOUT, {"redirect": "/"}, to="/") is None
+
+    (request,) = upstream.requests
+    assert request.method == "GET"
+    assert str(request.url) == f"https://{HOST}{LOGOUT}?redirect=%2F"
+    assert request.content == b""
+    assert request.headers["Cookie"] == f"session_id={SESSION}"
+
+
+def test_leaving_without_params_keeps_the_query_of_the_path(connect):
+    transport, upstream = connect(redirect("/"))
+
+    transport.leave("logout", f"{LOGOUT}?redirect=%2F", to="/")
+
+    assert str(upstream.requests[0].url) == f"https://{HOST}{LOGOUT}?redirect=%2F"
+
+
+@pytest.mark.parametrize("location", ["/", f"https://{HOST}/", f"https://{HOST}/?db=x"])
+def test_leaves_when_sent_where_it_expects(connect, location):
+    transport, _ = connect(redirect(location))
+
+    transport.leave("logout", LOGOUT, to="/")
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        redirect("https://evil.example.com/"),
+        redirect(f"http://{HOST}/"),
+        redirect("/web/session/confirm"),
+        httpx2.Response(303),
+    ],
+)
+def test_leaving_for_elsewhere_is_a_changed_upstream(connect, answer):
+    transport, _ = connect(answer)
+
+    with pytest.raises(UpstreamChangedError) as raised:
+        transport.leave("logout", LOGOUT, to="/")
+
+    assert raised.value.field == "Location"
+
+
+def test_leaving_with_a_rejected_session_is_a_rejection(connect):
+    transport, upstream = connect(redirect(LOGIN))
+
+    with pytest.raises(SessionExpiredError):
+        transport.leave("logout", LOGOUT, to="/")
+
+    assert upstream.rejected == 1
+
+
+@pytest.mark.parametrize(
+    ("answer", "error", "field"),
+    [
+        (httpx2.Response(200), UpstreamChangedError, "status"),
+        (redirect("/", 302), UpstreamChangedError, "Location"),
+        (httpx2.Response(404), NotFoundError, None),
+        (httpx2.Response(500), UpstreamUnavailableError, None),
+        (httpx2.ConnectError, UpstreamUnavailableError, None),
+    ],
+)
+def test_leaving_raises_on_any_answer_but_the_one_it_knows(connect, answer, error, field):
+    transport, upstream = connect(answer)
+
+    with pytest.raises(error) as raised:
+        transport.leave("logout", LOGOUT, to="/")
+
+    assert raised.value.operation == "logout"
+    assert getattr(raised.value, "field", None) == field
+    assert len(upstream.requests) == 1
+    assert SESSION not in "".join(traceback.format_exception(raised.value))
+
+
+def test_leaving_is_retried_when_asked(connect):
+    transport, upstream = connect(httpx2.Response(502), httpx2.ConnectError, redirect("/"))
+
+    transport.leave("logout", LOGOUT, retry=True, to="/")
+
+    assert len(upstream.requests) == 3
+    assert upstream.sleeps == [1.0, 2.0]
+
+
+def test_leaves_only_to_the_host(connect):
+    transport, upstream = connect(redirect("/"))
+
+    with pytest.raises(ValueError, match="absolute"):
+        transport.leave("logout", "//evil.example.com/x", to="/")
+
+    assert upstream.requests == []
 
 
 def test_closes_as_a_context_manager():

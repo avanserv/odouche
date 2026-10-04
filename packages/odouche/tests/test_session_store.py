@@ -17,9 +17,10 @@ from odouche import (
     NoSessionError,
     Secret,
     SessionExpiredError,
+    SessionSource,
     _session,
 )
-from odouche._session import MAX_AGE, SessionStore, Source
+from odouche._session import MAX_AGE, SessionStore
 
 
 SESSION = "s3ss10n-v4lu3"
@@ -64,7 +65,7 @@ def test_survives_a_run(stored, clock):
     resolved = SessionStore(clock=clock).load()
 
     assert resolved.session == Secret(SESSION)
-    assert resolved.source is Source.KEYRING
+    assert resolved.source is SessionSource.KEYRING
     assert resolved.expires_at == stored_at + MAX_AGE
 
 
@@ -136,7 +137,7 @@ def test_the_environment_stays_in_memory(stored, clock, monkeypatch):
     store.discard()
 
     assert resolved.session == Secret(OTHER)
-    assert resolved.source is Source.ENVIRONMENT
+    assert resolved.source is SessionSource.ENVIRONMENT
     assert resolved.expires_at is None
     assert stored.entries == entries
     assert stored.calls == calls
@@ -159,7 +160,7 @@ def test_the_environment_needs_no_keyring(no_backend, monkeypatch):
 def test_an_empty_environment_variable_is_unset(stored, clock, monkeypatch):
     monkeypatch.setenv(SESSION_ENV, "")
 
-    assert SessionStore(clock=clock).load().source is Source.KEYRING
+    assert SessionStore(clock=clock).load().source is SessionSource.KEYRING
 
 
 def test_a_passed_session_wins_and_is_never_stored(stored, clock, monkeypatch):
@@ -171,7 +172,7 @@ def test_a_passed_session_wins_and_is_never_stored(stored, clock, monkeypatch):
     store.discard()
 
     assert resolved.session == Secret(OTHER)
-    assert resolved.source is Source.ARGUMENT
+    assert resolved.source is SessionSource.ARGUMENT
     assert stored.entries == entries
     assert stored.calls == calls
 
@@ -446,3 +447,35 @@ def test_does_not_show_the_session(stored, clock):
     assert SESSION not in repr(store)
     assert SESSION not in repr(vars(store))
     assert SESSION not in repr(SessionStore(clock=clock).load())
+
+
+NOT_SENDABLE = ["s\u00e9ss10n", f"{SESSION}; tz=UTC", f"{SESSION}\r\nX-Injected: 1"]
+
+
+@pytest.mark.parametrize("value", NOT_SENDABLE)
+def test_a_passed_value_that_is_not_a_cookie_value_is_no_session(backend, value):
+    with pytest.raises(NoSessionError, match="The session passed") as raised:
+        SessionStore(Secret(value)).load()
+
+    assert value not in "".join(traceback.format_exception(raised.value))
+    assert backend.calls == 0
+
+
+@pytest.mark.parametrize("value", NOT_SENDABLE)
+def test_an_environment_value_that_is_not_a_cookie_value_is_no_session(backend, value):
+    with pytest.raises(NoSessionError, match=SESSION_ENV) as raised:
+        SessionStore(environ={SESSION_ENV: value}).load()
+
+    assert value not in "".join(traceback.format_exception(raised.value))
+    assert backend.calls == 0
+
+
+@pytest.mark.parametrize("value", NOT_SENDABLE)
+def test_a_stored_value_that_is_not_a_cookie_value_is_deleted(backend, clock, value):
+    backend.entries[KEY] = json.dumps({"session": value, "stored_at": int(clock().timestamp())})
+
+    with pytest.raises(NoSessionError) as raised:
+        SessionStore(clock=clock).load()
+
+    assert value not in "".join(traceback.format_exception(raised.value))
+    assert KEY not in backend.entries
