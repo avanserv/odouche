@@ -123,6 +123,22 @@ def checkout_branch() -> str | None:
     return _git("branch", "--show-current")
 
 
+def checkout_head() -> str | None:
+    """Return the full hash of the commit checked out, or `None` outside a repository or on a branch with no commit."""
+    return _git("rev-parse", "--verify", "--quiet", "HEAD")
+
+
+def checkout_is_of(project: str, projects: Callable[[], Iterable[odouche.Project]]) -> bool:
+    """Tell whether the checkout's repository is the one the project of that name builds.
+
+    `projects` is called only from a checkout that has a GitHub remote.
+    """
+    repository = _checkout_repository()
+    if repository is None:
+        return False
+    return any(found.name == project and found.repository.casefold() == repository.casefold() for found in projects())
+
+
 def _checkout_repository() -> str | None:
     """Return the GitHub repository of the current branch's remote, or of `origin`, as `owner/name`."""
     branch = checkout_branch()

@@ -21,8 +21,14 @@ EXIT_UNEXPECTED = 1
 _LOGIN = "Run `osh auth login`."
 _LOGIN_AGAIN = "Run `osh auth login` again."
 
+# What `osh builds watch` exits with, in the 20 to 29 kept for the result of a build.
+EXIT_BUILD_FAILED = 20
+EXIT_BUILD_WARNING = 21
+EXIT_BUILD_NO_RESULT = 22
+EXIT_BUILD_TIMEOUT = 23
+
 # The first row an error is an instance of wins, so the base class comes last. 1 and 2 are the
-# unexpected error and click's usage error, 20 to 29 are kept for `osh builds watch`.
+# unexpected error and click's usage error.
 EXIT_CODES: tuple[tuple[type[odouche.OdoucheError], int, str | None], ...] = (
     (odouche.NoSessionError, 3, _LOGIN),
     (odouche.SessionExpiredError, 3, _LOGIN),

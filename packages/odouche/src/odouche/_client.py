@@ -1,6 +1,6 @@
 """The client: the one object a caller asks Odoo.sh through."""
 
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterator
 from typing import Self
 
 from odouche._session import SessionStore
@@ -110,7 +110,7 @@ class Client:
         stage = branch.stage if isinstance(branch, Branch) else None
         return rebuild.rebuild(self._transport, _branch_id(branch), stage)
 
-    def watch_build(self, project: Project | str, build: Build, *, timeout: float) -> Iterator[Build]:
+    def watch_build(self, project: Project | str, build: Build, *, timeout: float) -> Generator[Build]:
         """Yield a build of a project as it is now, then at each change, and end once it has finished.
 
         A change is one of `status`, `result` or `status_info`. The last build yielded is the
@@ -155,7 +155,7 @@ class Client:
         timeout: float,
         tail: int = 0,
         offset: int | None = None,
-    ) -> Iterator[LogLine]:
+    ) -> Generator[LogLine]:
         """Yield the lines of one log of a build as they are written, until the iterator is closed.
 
         Log content is untrusted, as in `read_log`.
