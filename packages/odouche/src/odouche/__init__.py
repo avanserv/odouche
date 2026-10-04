@@ -82,3 +82,4 @@ __all__ = [
 ]
 
 __version__ = version("odouche")
+"""The version of the installed `odouche` distribution."""

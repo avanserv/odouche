@@ -8,10 +8,25 @@ as typed models, for use in your own tools.
 > It acts with your own Odoo.sh access and nothing more, and staying within your agreement with
 > Odoo is your responsibility. See [Unofficial status](https://avanserv.github.io/odouche/unofficial/).
 
-**Status: pre-alpha.** Logging in, listing projects, branches and builds, watching a build, reading build logs and rebuilding work.
+**Status: pre-alpha.** Below 1.0, a minor release can break the API.
 
 ```bash
 uv add odouche
 ```
 
-Documentation: <https://avanserv.github.io/odouche/>
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    for project in client.projects():
+        print(project.name, project.repository, project.url)
+```
+
+It logs in through a browser, lists projects, branches and builds, watches a build, reads and
+follows build logs and triggers a rebuild. The session is kept in the OS keyring, or taken from
+`ODOUCHE_SESSION` in headless use.
+
+- [Guide](https://avanserv.github.io/odouche/library/)
+- [API reference](https://avanserv.github.io/odouche/reference/)
+- [Security](https://avanserv.github.io/odouche/security/)
