@@ -80,6 +80,11 @@ These are design constraints, not guidelines:
 - With no accepted backend, as on a bare WSL2, in a container or in CI, nothing is persisted. The
   error names the two ways out: install a Secret Service provider, or supply the session through
   the environment. The session is never written to a file or printed for the shell to export.
+- Every keyring call is bounded: it runs in a daemon thread that is left behind at the bound, and
+  a write happens only after a read has shown the keyring unlocked and the wait has not been given
+  up. The thread and the dialog outlive the call, and the next call waits for that thread rather
+  than starting another. Not covered: on macOS Keychain a write can prompt on its own, so one
+  given up on there can still land, and its error says so. Credential Locker shows no dialog.
 - Upstream expiry is authoritative: an unauthenticated response invalidates the stored session and
   requires a new login. Sessions are never refreshed or extended. A client-side max age applies
   on top of upstream expiry.

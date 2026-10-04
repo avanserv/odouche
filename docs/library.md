@@ -46,8 +46,9 @@ def ask() -> odouche.Secret:
 odouche.login(ask=ask, notify=lambda step: print(step.value), timeout=300)
 ```
 
-- The library neither prints nor prompts. `notify` is called with a `LoginStep`: `BROWSER` when
-  the window is open, `PASTE` when no browser can be launched and `ask` is about to be called.
+- The library neither prints nor prompts. `notify` is called with a `LoginStep`: `KEYRING` when
+  the keyring is checked and may be showing a dialog to be unlocked, `BROWSER` when the window is
+  open, `PASTE` when no browser can be launched and `ask` is about to be called.
 - `ask` returns the pasted cookie, wrapped in a `Secret`. Without it, a machine with no browser to
   launch gets a `LoginError`.
 - The session is stored once Odoo.sh has answered one request sent with it. A login that is
@@ -55,8 +56,10 @@ odouche.login(ask=ask, notify=lambda step: print(step.value), timeout=300)
 - A login nobody completes raises `LoginTimeoutError` after `timeout` seconds.
 - Called from the main thread, a login that `SIGTERM` or `SIGHUP` ends deletes the browser profile
   before the signal takes effect.
-- With no keyring to store the session in, or one that stays locked, `KeyringUnavailableError` is
-  raised before the browser opens.
+- With no keyring to store the session in, or one not unlocked within `timeout` seconds,
+  `KeyringUnavailableError` is raised before the browser opens.
+- Outside a login, a keyring showing a dialog is waited for ten seconds, then
+  `KeyringUnavailableError` is raised.
 
 ## Client
 

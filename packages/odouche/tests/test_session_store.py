@@ -1,5 +1,6 @@
 import json
 import sys
+import threading
 import traceback
 from datetime import timedelta
 
@@ -199,6 +200,110 @@ def test_check_raises_with_a_keyring_that_stays_locked(stored):
         SessionStore().check()
 
     assert all(SESSION not in text for text in shown(raised.value))
+
+
+@pytest.fixture
+def locked(stored, monkeypatch):
+    monkeypatch.setattr(_session, "_WAIT", 0.01)
+    stored.lock()
+    yield stored
+    stored.unlock()
+
+
+@pytest.mark.parametrize(
+    "use",
+    [SessionStore.check, SessionStore.load, lambda store: store.save(Secret(OTHER))],
+    ids=["check", "load", "save"],
+)
+def test_a_keyring_showing_a_dialog_is_not_waited_for_without_end(locked, clock, use):
+    entries = dict(locked.entries)
+
+    with pytest.raises(KeyringUnavailableError, match=r"waiting to be unlocked.*dialog.*environment") as raised:
+        use(SessionStore(clock=clock))
+
+    assert all(value not in text for text in shown(raised.value) for value in (SESSION, OTHER))
+    locked.unlock()
+    assert locked.entries == entries
+
+
+def test_a_discard_given_up_on_deletes_nothing_later(locked, clock):
+    entries = dict(locked.entries)
+
+    SessionStore(clock=clock).discard()
+    locked.unlock()
+
+    assert locked.entries == entries
+
+
+def test_a_dialog_answered_within_the_wait_lets_the_call_through(locked, clock):
+    threading.Timer(0.01, locked.dialog.set).start()
+
+    SessionStore(clock=clock).save(Secret(OTHER), 60)
+
+    assert json.loads(locked.entries[KEY])["session"] == OTHER
+
+
+def test_a_write_that_has_started_is_waited_for(stored, clock, monkeypatch):
+    written = threading.Event()
+    write = stored.set_password
+
+    def slow(self, service, username, password):
+        written.wait()
+        write(self, service, username, password)
+
+    monkeypatch.setattr(stored, "set_password", slow)
+    threading.Timer(0.05, written.set).start()
+
+    SessionStore(clock=clock).save(Secret(OTHER), 0.01)
+
+    assert json.loads(stored.entries[KEY])["session"] == OTHER
+
+
+def test_a_write_that_does_not_finish_is_not_reported_as_nothing_stored(stored, clock, monkeypatch):
+    written = threading.Event()
+    monkeypatch.setattr(_session, "_WAIT", 0.01)
+    monkeypatch.setattr(stored, "set_password", lambda *_: written.wait())
+
+    with pytest.raises(KeyringUnavailableError, match="may have changed") as raised:
+        SessionStore(clock=clock).save(Secret(OTHER))
+
+    assert all(value not in text for text in shown(raised.value) for value in (SESSION, OTHER))
+    written.set()
+    stored.unlock()
+
+
+def test_an_interrupted_wait_writes_nothing_later(locked, clock, monkeypatch):
+    entries = dict(locked.entries)
+
+    class Interrupted(threading.Event):
+        interrupts = 1
+
+        def wait(self, timeout=None):
+            if self.interrupts:
+                self.interrupts = 0
+                raise KeyboardInterrupt
+            return super().wait(timeout)
+
+    monkeypatch.setattr(_session, "Event", Interrupted)
+
+    with pytest.raises(KeyboardInterrupt):
+        SessionStore(clock=clock).save(Secret(OTHER))
+
+    monkeypatch.undo()
+    locked.unlock()
+    assert locked.entries == entries
+
+
+def test_a_dialog_nobody_answers_holds_one_thread(locked, clock):
+    store = SessionStore(clock=clock)
+
+    for _ in range(3):
+        with pytest.raises(KeyringUnavailableError, match="waiting to be unlocked"):
+            store.load()
+
+    assert [thread.name for thread in threading.enumerate()].count(_session._WORKER) == 1
+    locked.unlock()
+    assert store.load().session == Secret(SESSION)
 
 
 def test_a_session_that_cannot_be_written_leaves_the_stored_one(stored, clock):

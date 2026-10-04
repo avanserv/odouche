@@ -3,11 +3,13 @@
 import json
 import os
 import sys
+import time
 from collections.abc import Callable, Mapping
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import Enum
+from threading import Event, Lock, Thread
 from typing import TYPE_CHECKING, cast
 
 from odouche.errors import KeyringUnavailableError, NoSessionError, SessionExpiredError
@@ -28,6 +30,18 @@ KEYRING_ENTRY = "session"
 """The name of the keyring entry, which holds the session and the time it was stored."""
 
 MAX_AGE = timedelta(days=30)
+
+_WAIT = 10.0
+"""Seconds a keyring call is waited for when nobody is known to be at its dialog."""
+
+_WORKER = "odouche-keyring"
+
+_LOCKED = "The keyring is waiting to be unlocked. Answer its dialog, or supply the session through the environment."
+
+_UNFINISHED = "The keyring has not finished writing, and the stored session may have changed. Log in again."
+
+# The calls left behind that have not ended: the next call waits for them, not beside them.
+_left: list[Event] = []
 
 
 class Source(Enum):
@@ -62,24 +76,88 @@ def _accepted() -> "type[KeyringBackend]":
     return SecretService
 
 
-def _use[T](action: "Callable[[KeyringBackend], T]") -> T:
-    """Run one action on the accepted backend.
+class _Gate:
+    """Settles once whether a call may write: its worker commits, unless its caller gave up first."""
 
-    A failure is raised once its handler has ended: the backend's exception can hold the entry,
-    and an error raised while it is being handled would carry it as its context. No caller binds
-    the entry to a name either, since a frame's locals travel with its traceback.
+    def __init__(self) -> None:
+        self._lock = Lock()
+        self._committed: bool | None = None
+
+    def commit(self) -> bool:
+        with self._lock:
+            if self._committed is None:
+                self._committed = True
+            return self._committed
+
+    def abandon(self) -> bool:
+        with self._lock:
+            if self._committed is None:
+                self._committed = False
+            return not self._committed
+
+
+def _use[T](action: "Callable[[KeyringBackend], T]", *, wait: float | None = None, writes: bool = False) -> T:
+    """Run one action on the accepted backend, waiting `wait` seconds, `_WAIT` by default, for a keyring showing a dialog.
+
+    The action runs in a thread that is left behind at the bound, since a blocked keyring call
+    cannot be interrupted. One that `writes` reads first, which is what the dialog blocks, and
+    writes only if the wait has not been given up. A call left behind is waited for by the next
+    one, so a dialog nobody answers holds one thread.
+
+    Only the name of a failure leaves the thread: the backend's exception can hold the entry. No
+    caller binds the entry to a name either, since a frame's locals travel with its traceback.
     """
     backend = _accepted()
     if not backend.viable:
         raise KeyringUnavailableError
+    deadline = time.monotonic() + (_WAIT if wait is None else wait)
+    for left in list(_left):
+        if not left.wait(max(0.0, deadline - time.monotonic())):
+            raise KeyringUnavailableError(_LOCKED)
+        with suppress(ValueError):
+            _left.remove(left)
+    gate = _Gate()
+    done = Event()
+    results: list[T] = []
+    failures: list[str | BaseException] = []
+
+    def work() -> None:
+        try:
+            keyring = backend()
+            if writes:
+                _unlock(keyring)
+                if not gate.commit():
+                    return
+            results.append(action(keyring))
+        # Backends let through more than `KeyringError`: D-Bus, pywin32 and decoding errors.
+        except Exception as error:  # noqa: BLE001
+            failures.append(type(error).__name__)
+        except BaseException as error:  # noqa: BLE001
+            failures.append(error)
+        finally:
+            done.set()
+
+    Thread(target=work, name=_WORKER, daemon=True).start()
     try:
-        return action(backend())
-    # Backends let through more than `KeyringError`: D-Bus, pywin32 and decoding errors.
-    except Exception as error:  # noqa: BLE001
-        failure = type(error).__name__
-    raise KeyringUnavailableError(
-        f"The keyring could not be used ({failure}). Unlock it, or supply the session through the environment."
-    )
+        finished = done.wait(max(0.0, deadline - time.monotonic()))
+    except BaseException:
+        gate.abandon()
+        _left.append(done)
+        raise
+    if not finished:
+        _left.append(done)
+        if gate.abandon():
+            raise KeyringUnavailableError(_LOCKED)
+        # The write has started, so the keyring is unlocked.
+        if not done.wait(_WAIT):
+            raise KeyringUnavailableError(_UNFINISHED)
+    for failure in failures:
+        if isinstance(failure, BaseException):
+            raise failure
+        raise KeyringUnavailableError(
+            f"The keyring could not be used ({failure}). Unlock it, or supply the session through the environment."
+        )
+    return results[0]
 
 
 def _get(backend: "KeyringBackend") -> tuple[bool, tuple[Secret, datetime] | None]:
@@ -161,20 +239,23 @@ class SessionStore:
         if not found:
             raise NoSessionError("Not logged in.")
         if stored is None:
-            _use(_delete)
+            _use(_delete, writes=True)
             raise NoSessionError("The stored session could not be read and was deleted. Log in again.")
         session, stored_at = stored
         # A time in the future is a clock that moved or an entry that was edited.
         if not timedelta(0) <= self._clock() - stored_at <= self._max_age:
-            _use(_delete)
+            _use(_delete, writes=True)
             raise SessionExpiredError("The stored session passed its max age and was deleted. Log in again.")
         return Resolved(session, Source.KEYRING, stored_at + self._max_age)
 
-    def check(self) -> None:
-        """Raise `KeyringUnavailableError` if a session could not be saved: no accepted backend, or a locked one."""
-        _use(_unlock)
+    def check(self, wait: float | None = None) -> None:
+        """Raise `KeyringUnavailableError` if a session could not be saved: no accepted backend, or a locked one.
 
-    def save(self, session: Secret) -> None:
+        A keyring asking to be unlocked is waited for `wait` seconds.
+        """
+        _use(_unlock, wait=wait)
+
+    def save(self, session: Secret, wait: float | None = None) -> None:
         """Store the session in the keyring with the current time, replacing the stored one.
 
         It is stored even when another session is passed or set in the environment. If it cannot
@@ -199,13 +280,13 @@ class SessionStore:
                         backend.set_password(KEYRING_SERVICE, KEYRING_ENTRY, previous.expose_secret())
                 raise
 
-        _use(replace)
+        _use(replace, wait=wait, writes=True)
 
     def discard(self) -> None:
         """Delete the stored session, if that is the one in use. Safe to call twice."""
         if self._given() is None:
             with suppress(KeyringUnavailableError):
-                _use(_delete)
+                _use(_delete, writes=True)
 
     def _given(self) -> Resolved | None:
         if self._session is not None:
