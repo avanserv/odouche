@@ -17,7 +17,7 @@ from odouche.errors import (
     UpstreamChangedError,
     UpstreamUnavailableError,
 )
-from odouche.models import Project
+from odouche.models import Branch, Project, Stage
 from odouche.secret import Secret
 
 
@@ -25,6 +25,7 @@ __all__ = [
     "KEYRING_ENTRY",
     "KEYRING_SERVICE",
     "SESSION_ENV",
+    "Branch",
     "Client",
     "KeyringUnavailableError",
     "LoginError",
@@ -37,6 +38,7 @@ __all__ = [
     "Project",
     "Secret",
     "SessionExpiredError",
+    "Stage",
     "UpstreamChangedError",
     "UpstreamUnavailableError",
     "__version__",

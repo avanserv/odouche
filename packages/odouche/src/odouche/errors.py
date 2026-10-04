@@ -44,7 +44,7 @@ class SessionExpiredError(OdoucheError):
 
 
 class NotFoundError(OdoucheError):
-    """Raised when the project, branch or build asked for does not exist."""
+    """Raised when the project, branch or build asked for is not one the session's user can reach."""
 
 
 class PermissionDeniedError(OdoucheError):

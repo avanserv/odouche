@@ -190,6 +190,7 @@ def test_is_unauthenticated(status, location, body, expected):
     [
         (fixture("not_found.html", 404), NotFoundError, 404),
         (httpx2.Response(403), PermissionDeniedError, 403),
+        (fixture("access_error.json"), PermissionDeniedError, 200),
         (httpx2.Response(429), UpstreamUnavailableError, 429),
         (httpx2.Response(500), UpstreamUnavailableError, 500),
         (httpx2.Response(503), UpstreamUnavailableError, 503),
@@ -219,7 +220,7 @@ def test_maps_a_failure_to_a_library_error(connect, answer, cls, status):
         (fixture("not_found.html"), "body"),
         (httpx2.Response(200, content=b"\xff"), "body"),
         (httpx2.Response(200, json=[1]), "body"),
-        (httpx2.Response(200, json={"error": {"data": {"name": "odoo.exceptions.AccessError"}}}), "error.data.name"),
+        (httpx2.Response(200, json={"error": {"data": {"name": "builtins.Exception"}}}), "error.data.name"),
     ],
 )
 def test_reports_an_answer_the_reference_does_not_describe(connect, answer, field):
@@ -237,6 +238,7 @@ def test_reports_an_answer_the_reference_does_not_describe(connect, answer, fiel
     "answer",
     [
         fixture("unauthenticated.json"),
+        fixture("access_error.json"),
         redirect("https://evil.example.com/"),
         httpx2.Response(404),
         httpx2.Response(502),
@@ -255,6 +257,7 @@ def test_an_error_carries_nothing_of_the_request(connect, answer):
     for text in (str(raised.value), repr(raised.value), "".join(traceback.format_exception(raised.value))):
         assert SESSION not in text
         assert "Cookie" not in text
+        assert "octo-dev" not in text
 
 
 def test_logs_the_request_without_the_session(connect, caplog):

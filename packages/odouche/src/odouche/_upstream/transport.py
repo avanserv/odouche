@@ -28,13 +28,15 @@ HOST = "www.odoo.sh"
 
 _LOGIN_PATH = "/web/login"
 _SESSION_EXPIRED = "odoo.http.SessionExpiredException"
+_ACCESS_DENIED = "odoo.exceptions.AccessError"
 _SESSION_ALPHABET = re.compile(r"[A-Za-z0-9_-]+")
 _TIMEOUT = httpx2.Timeout(connect=10, read=30, write=10, pool=10)
 _BACKOFF = (1.0, 2.0)
 _TRANSIENT = frozenset({502, 503, 504})
+_DENIED = "Odoo.sh does not allow this to the session's user."
 _REFUSED: dict[int, tuple[type[OdoucheError], str]] = {
     404: (NotFoundError, "Odoo.sh has nothing at this address."),
-    403: (PermissionDeniedError, "Odoo.sh does not allow this to the session's user."),
+    403: (PermissionDeniedError, _DENIED),
 }
 
 _logger = logging.getLogger("odouche")
@@ -58,16 +60,19 @@ def is_unauthenticated(status: int, location: str | None, body: object) -> bool:
     """Tell whether an answer is one of the two Odoo.sh gives to a missing or expired session."""
     if status == httpx2.codes.SEE_OTHER:
         return location is not None and _is_login(location)
-    if status != httpx2.codes.OK or not isinstance(body, dict):
-        return False
-    error = cast("dict[str, object]", body).get("error")
-    data = cast("dict[str, object]", error).get("data") if isinstance(error, dict) else None
-    return isinstance(data, dict) and cast("dict[str, object]", data).get("name") == _SESSION_EXPIRED
+    return status == httpx2.codes.OK and _error_name(body) == _SESSION_EXPIRED
 
 
 def is_sendable(session: Secret) -> bool:
     """Tell whether a value has the alphabet of a session, so that it is a cookie value and no more."""
     return _SESSION_ALPHABET.fullmatch(session.expose_secret()) is not None
+
+
+def _error_name(body: object) -> object:
+    """Return the name of the exception an answer reports, when it reports one."""
+    error = cast("dict[str, object]", body).get("error") if isinstance(body, dict) else None
+    data = cast("dict[str, object]", error).get("data") if isinstance(error, dict) else None
+    return cast("dict[str, object]", data).get("name") if isinstance(data, dict) else None
 
 
 def _is_login(location: str) -> bool:
@@ -103,6 +108,8 @@ def _error(operation: str, answer: _Answer) -> OdoucheError | None:
     if status in _REFUSED:
         cls, message = _REFUSED[status]
         return cls(message, operation=operation, status=status)
+    if status == httpx2.codes.OK and _error_name(answer.body) == _ACCESS_DENIED:
+        return PermissionDeniedError(_DENIED, operation=operation, status=status)
     field = _unexpected(status, answer.body)
     return UpstreamChangedError(operation, field, status=status) if field else None
 

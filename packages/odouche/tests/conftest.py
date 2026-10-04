@@ -1,10 +1,17 @@
+import json
 from datetime import UTC, datetime
+from pathlib import Path
 
+import httpx2
 import pytest
 from keyring.backend import KeyringBackend
 from keyring.errors import PasswordDeleteError, PasswordSetError
 
-from odouche import _session
+from odouche import SESSION_ENV, Client, Secret, _client, _session
+from odouche._upstream.transport import Transport
+
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 
 class Clock:
@@ -79,3 +86,47 @@ def no_backend(monkeypatch):
 @pytest.fixture
 def memory():
     return _memory
+
+
+class Upstream:
+    """Answers each request with the body of its path, and keeps the requests and the transports it was reached through."""
+
+    def __init__(self):
+        self.bodies = {
+            "/app/projects": self.load("projects.json"),
+            "/app/project/acme-corp-odoo-addons-4217/branches": self.load("branches.json"),
+        }
+        self.requests = []
+        self.transports = []
+
+    @staticmethod
+    def load(name):
+        return json.loads((FIXTURES / name).read_text())
+
+    def connect(self, session, **options):
+        self.transports.append(Transport(session, transport=httpx2.MockTransport(self._answer), **options))
+        return self.transports[-1]
+
+    def _answer(self, request):
+        self.requests.append(request)
+        return httpx2.Response(200, json=self.bodies[request.url.path])
+
+
+@pytest.fixture
+def upstream(monkeypatch):
+    upstream = Upstream()
+    monkeypatch.setattr(_client, "_transport", upstream.connect)
+    monkeypatch.delenv(SESSION_ENV, raising=False)
+    yield upstream
+    for transport in upstream.transports:
+        transport.close()
+
+
+@pytest.fixture
+def session():
+    return "s3ss10n-v4lu3"
+
+
+@pytest.fixture
+def client(upstream, session):
+    return Client(Secret(session))

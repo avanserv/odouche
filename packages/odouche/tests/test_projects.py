@@ -1,9 +1,6 @@
 import dataclasses
-import json
 import traceback
-from pathlib import Path
 
-import httpx2
 import pytest
 
 from odouche import (
@@ -14,54 +11,15 @@ from odouche import (
     Secret,
     SessionExpiredError,
     UpstreamChangedError,
-    _client,
 )
 from odouche._session import KEYRING_ENTRY, KEYRING_SERVICE, SessionStore
-from odouche._upstream.transport import Transport
 
 
-SESSION = "s3ss10n-v4lu3"
 KEY = (KEYRING_SERVICE, KEYRING_ENTRY)
-FIXTURES = Path(__file__).parent / "fixtures"
+PATH = "/app/projects"
 
 
-def answer():
-    return json.loads((FIXTURES / "projects.json").read_text())
-
-
-class Upstream:
-    """Answers every request with `body`, and keeps the requests and the transports it was reached through."""
-
-    def __init__(self):
-        self.body = answer()
-        self.requests = []
-        self.transports = []
-
-    def connect(self, session, **options):
-        self.transports.append(Transport(session, transport=httpx2.MockTransport(self._answer), **options))
-        return self.transports[-1]
-
-    def _answer(self, request):
-        self.requests.append(request)
-        return httpx2.Response(200, json=self.body)
-
-
-@pytest.fixture
-def upstream(monkeypatch):
-    upstream = Upstream()
-    monkeypatch.setattr(_client, "_transport", upstream.connect)
-    monkeypatch.delenv(SESSION_ENV, raising=False)
-    yield upstream
-    for transport in upstream.transports:
-        transport.close()
-
-
-@pytest.fixture
-def client(upstream):
-    return Client(Secret(SESSION))
-
-
-def test_lists_the_projects_as_models(client, upstream):
+def test_lists_the_projects_as_models(client, upstream, session):
     assert client.projects() == [
         Project(
             id=4217,
@@ -77,8 +35,8 @@ def test_lists_the_projects_as_models(client, upstream):
         ),
     ]
     (request,) = upstream.requests
-    assert request.url.path == "/app/projects"
-    assert request.headers["Cookie"] == f"session_id={SESSION}"
+    assert request.url.path == PATH
+    assert request.headers["Cookie"] == f"session_id={session}"
 
 
 def test_a_project_is_immutable_and_holds_no_payload(client):
@@ -90,14 +48,14 @@ def test_a_project_is_immutable_and_holds_no_payload(client):
 
 
 def test_no_project_is_an_empty_list(client, upstream):
-    upstream.body["result"]["repos"] = []
+    upstream.bodies[PATH]["result"]["repos"] = []
 
     assert client.projects() == []
 
 
 def test_asks_again_on_every_call(client, upstream):
     client.projects()
-    upstream.body["result"]["repos"].pop()
+    upstream.bodies[PATH]["result"]["repos"].pop()
 
     assert len(client.projects()) == 1
     assert len(upstream.requests) == 2
@@ -105,8 +63,8 @@ def test_asks_again_on_every_call(client, upstream):
 
 def test_ignores_a_field_it_does_not_read(client, upstream):
     expected = client.projects()
-    upstream.body["result"]["added"] = {"later": True}
-    for repo in upstream.body["result"]["repos"]:
+    upstream.bodies[PATH]["result"]["added"] = {"later": True}
+    for repo in upstream.bodies[PATH]["result"]["repos"]:
         repo["added"] = "later"
 
     assert client.projects() == expected
@@ -115,7 +73,7 @@ def test_ignores_a_field_it_does_not_read(client, upstream):
 @pytest.mark.parametrize("field", ["id", "project_name", "owner", "name", "project_url"])
 @pytest.mark.parametrize("change", ["missing", "false", "true", "list"])
 def test_names_the_field_that_changed_shape(client, upstream, field, change):
-    repo = upstream.body["result"]["repos"][1]
+    repo = upstream.bodies[PATH]["result"]["repos"][1]
     if change == "missing":
         del repo[field]
     else:
@@ -139,7 +97,7 @@ def test_names_the_field_that_changed_shape(client, upstream, field, change):
     ],
 )
 def test_names_the_part_of_the_answer_that_changed_shape(client, upstream, body, field):
-    upstream.body = body
+    upstream.bodies[PATH] = body
 
     with pytest.raises(UpstreamChangedError) as raised:
         client.projects()
@@ -147,19 +105,19 @@ def test_names_the_part_of_the_answer_that_changed_shape(client, upstream, body,
     assert raised.value.field == field
 
 
-def test_a_changed_shape_error_shows_nothing_of_the_answer(client, upstream):
-    del upstream.body["result"]["repos"][0]["project_url"]
+def test_a_changed_shape_error_shows_nothing_of_the_answer(client, upstream, session):
+    del upstream.bodies[PATH]["result"]["repos"][0]["project_url"]
 
     with pytest.raises(UpstreamChangedError) as raised:
         client.projects()
 
     text = "".join(traceback.format_exception(raised.value))
-    for value in ("acme-shop", "Acme-Corp", "octo-dev", SESSION):
+    for value in ("acme-shop", "Acme-Corp", "octo-dev", session):
         assert value not in text
 
 
 def test_a_rejected_session_that_was_passed_leaves_the_keyring_alone(client, upstream, backend):
-    upstream.body = json.loads((FIXTURES / "unauthenticated.json").read_text())
+    upstream.bodies[PATH] = upstream.load("unauthenticated.json")
 
     with pytest.raises(SessionExpiredError):
         client.projects()
@@ -167,26 +125,26 @@ def test_a_rejected_session_that_was_passed_leaves_the_keyring_alone(client, ups
     assert backend.calls == 0
 
 
-def test_uses_the_stored_session_and_deletes_it_once_rejected(upstream, backend):
-    SessionStore().save(Secret(SESSION))
+def test_uses_the_stored_session_and_deletes_it_once_rejected(upstream, backend, session):
+    SessionStore().save(Secret(session))
     client = Client()
 
     assert len(client.projects()) == 2
-    assert upstream.requests[0].headers["Cookie"] == f"session_id={SESSION}"
+    assert upstream.requests[0].headers["Cookie"] == f"session_id={session}"
 
-    upstream.body = json.loads((FIXTURES / "unauthenticated.json").read_text())
+    upstream.bodies[PATH] = upstream.load("unauthenticated.json")
     with pytest.raises(SessionExpiredError):
         client.projects()
 
     assert KEY not in backend.entries
 
 
-def test_uses_the_session_in_the_environment(upstream, backend, monkeypatch):
-    monkeypatch.setenv(SESSION_ENV, SESSION)
+def test_uses_the_session_in_the_environment(upstream, backend, monkeypatch, session):
+    monkeypatch.setenv(SESSION_ENV, session)
 
     Client().projects()
 
-    assert upstream.requests[0].headers["Cookie"] == f"session_id={SESSION}"
+    assert upstream.requests[0].headers["Cookie"] == f"session_id={session}"
     assert backend.calls == 0
 
 
@@ -197,14 +155,14 @@ def test_there_is_no_client_without_a_session(upstream, backend):
     assert upstream.transports == []
 
 
-def test_closes_its_connections(upstream):
-    with Client(Secret(SESSION)) as client:
+def test_closes_its_connections(upstream, session):
+    with Client(Secret(session)) as client:
         client.projects()
 
     (transport,) = upstream.transports
     assert transport._client.is_closed
 
 
-def test_does_not_show_the_session(client):
-    assert SESSION not in repr(client)
-    assert SESSION not in repr(vars(client))
+def test_does_not_show_the_session(client, session):
+    assert session not in repr(client)
+    assert session not in repr(vars(client))
