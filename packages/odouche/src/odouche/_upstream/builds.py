@@ -55,6 +55,11 @@ def _not_listed(branch_id: int, build_id: int) -> NotFoundError:
 
 
 def _listed(transport: Transport, branch_id: int, limit: int) -> list[Reader]:
+    return entry(transport, branch_id, limit).items("builds")
+
+
+def entry(transport: Transport, branch_id: int, limit: int) -> Reader:
+    """Return what Odoo.sh answers for a branch: its `branch_info` and its latest `builds`."""
     number("branch", branch_id)
     if number("limit", limit) < 1:
         raise ValueError("A limit is at least 1")
@@ -71,7 +76,7 @@ def _listed(transport: Transport, branch_id: int, limit: int) -> list[Reader]:
     branches = answer.items("result")
     if len(branches) != 1:
         raise answer.changed("result")
-    return branches[0].items("builds")
+    return branches[0]
 
 
 def number(what: str, value: int) -> int:

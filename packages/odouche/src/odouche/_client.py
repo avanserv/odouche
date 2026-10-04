@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterator
 from typing import Self
 
 from odouche._session import SessionStore
-from odouche._upstream import branches, builds, logs, projects, user, watch
+from odouche._upstream import branches, builds, logs, projects, rebuild, user, watch
 from odouche._upstream.transport import Transport
 from odouche.models import Branch, Build, Identity, Log, LogKind, LogLine, Project, SessionInfo
 from odouche.secret import Secret
@@ -25,13 +25,15 @@ class Client:
     Every call raises `SessionExpiredError` when Odoo.sh rejects the session, after deleting it if
     it is the stored one. Nothing is cached: each call asks Odoo.sh. Use the client as a context
     manager, or call `close`.
+
+    With `read_only`, a call that changes state on Odoo.sh raises `ReadOnlyError` and sends nothing.
     """
 
-    def __init__(self, session: Secret | None = None) -> None:
+    def __init__(self, session: Secret | None = None, *, read_only: bool = False) -> None:
         store = SessionStore(session)
         resolved = store.load()
         self._session = SessionInfo(resolved.source, resolved.stored_at, resolved.expires_at)
-        self._transport = _transport(resolved.session, on_rejected=store.discard)
+        self._transport = _transport(resolved.session, on_rejected=store.discard, read_only=read_only)
 
     def __enter__(self) -> Self:
         return self
@@ -47,6 +49,11 @@ class Client:
     def session(self) -> SessionInfo:
         """Where the session came from and when it passes its max age. Odoo.sh is not asked."""
         return self._session
+
+    @property
+    def read_only(self) -> bool:
+        """Whether the client refuses the calls that change state on Odoo.sh."""
+        return self._transport.read_only
 
     def identity(self) -> Identity:
         """Return the user the session belongs to, which also tells that Odoo.sh still accepts it."""
@@ -87,6 +94,21 @@ class Client:
         """Return the newest build of a branch, or `None` when it has none."""
         latest = builds.builds(self._transport, _branch_id(branch), 1)
         return latest[0] if latest else None
+
+    def rebuild(self, branch: Branch | int) -> Build:
+        """Change state on Odoo.sh: start a new build of a branch, given as a `Branch` or by its number.
+
+        Returns the new build, which replaces the branch's latest one. Only a development or a
+        staging branch is rebuilt: any other raises `StageRefusedError` before the request.
+
+        The request is sent once. Raises `OutcomeUnknownError` when it left and Odoo.sh did not
+        confirm it, or the new build cannot be found: look at the branch before calling again,
+        since a second call can start a second build. Raises `ReadOnlyError` on a read-only
+        client, and `NotFoundError` when the branch is not one the session's user can reach.
+        A branch that is not a number raises `TypeError`.
+        """
+        stage = branch.stage if isinstance(branch, Branch) else None
+        return rebuild.rebuild(self._transport, _branch_id(branch), stage)
 
     def watch_build(self, project: Project | str, build: Build, *, timeout: float) -> Iterator[Build]:
         """Yield a build of a project as it is now, then at each change, and end once it has finished.

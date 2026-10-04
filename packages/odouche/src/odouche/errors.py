@@ -80,6 +80,22 @@ class UpstreamUnavailableError(OdoucheError):
     """Raised when Odoo.sh cannot be reached, or answers with a server error."""
 
 
+class ReadOnlyError(OdoucheError):
+    """Raised when a read-only client is asked to change state on Odoo.sh. Nothing was sent."""
+
+
+class StageRefusedError(OdoucheError):
+    """Raised when a branch is in a stage the library does not change. Nothing was changed."""
+
+
+class OutcomeUnknownError(OdoucheError):
+    """Raised when a state-changing request was sent and what Odoo.sh did with it is not known.
+
+    Look at Odoo.sh before trying again: the request is never repeated, since it may have been
+    carried out.
+    """
+
+
 class StreamTimeoutError(OdoucheError):
     """Raised when a stream is still open at its timeout. Nothing says Odoo.sh is unavailable."""
 

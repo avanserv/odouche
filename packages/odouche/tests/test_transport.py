@@ -508,7 +508,7 @@ def test_bounds_every_phase_of_a_request_and_takes_no_option_to_change_it(connec
     timeout = transport._client.timeout
     assert None not in (timeout.connect, timeout.read, timeout.write, timeout.pool)
     assert not transport._client.follow_redirects
-    assert set(inspect.signature(Transport).parameters) == {"session", "on_rejected", "transport", "sleep"}
+    assert set(inspect.signature(Transport).parameters) == {"session", "on_rejected", "read_only", "transport", "sleep"}
 
 
 @pytest.mark.parametrize(

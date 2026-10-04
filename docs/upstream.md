@@ -84,8 +84,8 @@ signal is `error.data.name`.
 - No browser `User-Agent` is needed. On 2026-10-02, `POST /app/projects` sent with
   `User-Agent: odouche/<version>` and a session fresh from a sign-in was answered 200 with no
   `error`. Seen once.
-- The `/project` page embeds a `csrf_token`. No state-changing request was captured, so whether
-  one requires it is unknown.
+- The `/project` page embeds a `csrf_token`. The [rebuild](#rebuild) does not need it. Whether
+  another state-changing request does is unknown.
 - `POST /app/project/<project>/get_info` returns an `access_token` of 32 characters, distinct
   from the session. It is what the worker hosts take: see [Logs](#logs).
 
