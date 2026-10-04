@@ -57,6 +57,9 @@ When none of the three is available, odouche does not keep the session. It says 
 two ways out: install a Secret Service provider, or supply the session through the environment. It
 never falls back to a file, and never prints the session for you to export.
 
+A locked keyring shows its own dialog, and its password never goes through odouche. A dialog left
+unanswered ends with an error: after ten seconds, or after the login's timeout during a login.
+
 The environment variable is `ODOUCHE_SESSION`. When it is set, the session in the keyring is
 neither read nor deleted, and the one from the environment is never stored.
 

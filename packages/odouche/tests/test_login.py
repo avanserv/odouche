@@ -157,7 +157,7 @@ def test_a_browser_login_stores_the_session(backend, upstream, browser, frontend
     assert stored(backend) == [SESSION]
     assert browser.launched == [BROWSER]
     assert browser.closed == 1
-    assert frontend.steps == [LoginStep.BROWSER]
+    assert frontend.steps == [LoginStep.KEYRING, LoginStep.BROWSER]
     assert frontend.asked == 0
 
 
@@ -260,7 +260,7 @@ def test_without_a_browser_the_session_is_pasted(backend, upstream, no_browser, 
     login(ask=frontend.ask, notify=frontend.steps.append)
 
     assert stored(backend) == [SESSION]
-    assert frontend.steps == [LoginStep.PASTE]
+    assert frontend.steps == [LoginStep.KEYRING, LoginStep.PASTE]
     assert no_browser.launched == []
 
 
@@ -290,7 +290,7 @@ def test_with_nowhere_to_store_a_session_nothing_is_asked_of_the_user(no_backend
         login(ask=frontend.ask, notify=frontend.steps.append)
 
     assert browser.launched == []
-    assert frontend.steps == []
+    assert frontend.steps == [LoginStep.KEYRING]
     assert upstream.requests == []
 
 
@@ -302,8 +302,37 @@ def test_with_a_locked_keyring_nothing_is_asked_of_the_user(backend, upstream, b
         login(ask=frontend.ask, notify=frontend.steps.append)
 
     assert browser.launched == []
-    assert frontend.steps == []
+    assert frontend.steps == [LoginStep.KEYRING]
     assert upstream.requests == []
+
+
+def test_a_keyring_that_is_never_unlocked_ends_the_login(backend, upstream, browser, frontend):
+    backend.lock()
+    browser.cookies = [SESSION]
+
+    with pytest.raises(KeyringUnavailableError, match="waiting to be unlocked"):
+        login(ask=frontend.ask, notify=frontend.steps.append, timeout=0.01)
+
+    backend.unlock()
+    assert browser.launched == []
+    assert frontend.steps == [LoginStep.KEYRING]
+    assert upstream.requests == []
+    assert backend.entries == {}
+
+
+def test_a_login_waits_for_the_keyring_to_be_unlocked(backend, upstream, browser, frontend):
+    backend.lock()
+    browser.cookies = [SESSION]
+
+    def notify(step):
+        frontend.steps.append(step)
+        if step is LoginStep.KEYRING:
+            backend.dialog.set()
+
+    login(notify=notify, timeout=60)
+
+    assert frontend.steps == [LoginStep.KEYRING, LoginStep.BROWSER]
+    assert stored(backend) == [SESSION]
 
 
 def test_odoo_sh_being_down_is_not_a_rejected_session(backend, upstream, no_browser, frontend):

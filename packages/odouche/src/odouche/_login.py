@@ -28,6 +28,9 @@ _sleep = time.sleep
 class LoginStep(Enum):
     """What a login is waiting for, for a frontend to say in its own words."""
 
+    KEYRING = "keyring"
+    """The keyring is being checked, and may be showing a dialog to be unlocked."""
+
     BROWSER = "browser"
     """A browser window is open on the Odoo.sh login, for the user to sign in with GitHub."""
 
@@ -52,13 +55,14 @@ def login(
     `LoginTimeoutError` when the sign-in has been waited for `timeout` seconds,
     `LoginError` when no session is obtained or Odoo.sh refuses the one pasted, and
     `KeyringUnavailableError`, before anything is asked of the user, when there is nowhere to
-    store one.
+    store one or the keyring has not been unlocked within `timeout` seconds.
     """
     store = SessionStore()
-    store.check()
+    notify(LoginStep.KEYRING)
+    store.check(timeout)
     browser = _find()
     session = _pasted(ask, notify) if browser is None else _captured(browser, notify, timeout)
-    store.save(session)
+    store.save(session, timeout)
     _logger.debug("login: session stored")
 
 

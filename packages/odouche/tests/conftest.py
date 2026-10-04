@@ -1,4 +1,5 @@
 import json
+import threading
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -38,8 +39,25 @@ def _memory():
         refuses_deletion = False
         failing_writes = 0
         write_failure = PasswordSetError
+        dialog = None
+
+        @classmethod
+        def lock(cls):
+            """Show a dialog: every call blocks until `unlock`."""
+            cls.dialog = threading.Event()
+
+        @classmethod
+        def unlock(cls):
+            """Answer the dialog and let the calls it blocked end."""
+            if cls.dialog is not None:
+                cls.dialog.set()
+            for thread in threading.enumerate():
+                if thread.name == _session._WORKER:
+                    thread.join()
 
         def _call(self):
+            if self.dialog is not None:
+                self.dialog.wait()
             type(self).calls += 1
             if self.failure is not None:
                 raise self.failure(f"failed, entry: {self.entries}")

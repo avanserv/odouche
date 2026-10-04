@@ -79,9 +79,10 @@ class UpstreamUnavailableError(OdoucheError):
 
 
 class KeyringUnavailableError(OdoucheError):
-    """Raised when no accepted keyring backend is available to store the session.
+    """Raised when no accepted keyring backend is available to store the session, or it stays locked.
 
-    Nothing was persisted. The message names the two ways out.
+    Nothing was persisted, unless the message says a write did not finish. The message names the
+    ways out.
     """
 
     def __init__(self, message: str = _NO_KEYRING, *, operation: str | None = None, status: int | None = None) -> None:
