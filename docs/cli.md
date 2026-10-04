@@ -34,6 +34,16 @@ osh auth logout
   `ODOUCHE_SESSION` set, that session is the one in use: `login` still stores the one it gets,
   and `logout` leaves the variable for you to unset.
 
+## Projects
+
+```bash
+osh projects list
+```
+
+- `list` shows the projects the session's user can reach: the name, the GitHub repository and
+  the address of the project's page. As JSON it is the whole
+  [`Project`](reference.md) model.
+
 ## Output
 
 `--format table` (the default) or `--format json`, given before the command. Only the result is

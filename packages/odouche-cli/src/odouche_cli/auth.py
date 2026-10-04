@@ -9,6 +9,7 @@ from typing import Annotated
 import typer
 
 import odouche
+from odouche_cli._client import open_client
 from odouche_cli._output import Column, Output
 
 
@@ -66,7 +67,7 @@ def login(ctx: typer.Context) -> None:
         typer.echo(f"{odouche.SESSION_ENV} is set and is used instead of it until it is unset.", err=True)
         identity = None
     else:
-        with odouche.Client() as client:
+        with open_client() as client:
             identity = client.identity()
     output.stream([Login(identity)], _login_line)
 
@@ -82,7 +83,7 @@ def status(
 ) -> None:
     """Show where the session comes from and how long it lasts. Exits 3 when there is none."""
     output: Output = ctx.obj
-    with odouche.Client() as client:
+    with open_client() as client:
         if not check:
             output.one(client.session, _session_columns(_itself))
             return
