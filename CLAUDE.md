@@ -7,8 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `odouche` helps Odoo developers work with Odoo.sh from their dev environment. Odoo.sh has no
 official public API; this project is an **unofficial** client for what the Odoo.sh web UI uses.
 
-Status: the workspace, tooling and CI exist; the CLI has `osh auth` and nothing else yet, and
-the MCP server has no tools. The library has its transport, session store, login, logout and a
+Status: the workspace, tooling and CI exist; the CLI has `osh auth` and `osh projects list` and
+nothing else yet, and the MCP server has no tools. The library has its transport, session store, login, logout and a
 client that reports the session's user, lists projects, branches and builds, watches a build, reads
 and follows a build's logs, and triggers a rebuild.
 The architecture and security sections below are the design the implementation is held to.
