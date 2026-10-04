@@ -447,18 +447,34 @@ declared value that was not seen has never been observed in a payload.
 | Request | Status | Answer |
 | --- | --- | --- |
 | Page: `GET /project/no-such-project` | 404 | An HTML page titled `Page Not Found` |
+| `POST /app/project/no-such-owner-no-such-repo-1/branches` | 200 | `error.data.name` is `odoo.exceptions.AccessError` |
+| `POST /app/project/no-such-project/get_info` | 200 | `error.data.name` is `builtins.Exception` |
+| `POST /app/branch/1/builds` | 200 | `error.data.name` is `builtins.Exception` |
 
-Fixture: `not_found.html`, cut down to its title.
+Fixtures: `not_found.html`, cut down to its title, and `access_error.json`.
 
-What a JSON request answers for an unknown project, branch or build was not captured. The
-unauthenticated answer is in [Without a valid session](#without-a-valid-session), and in
+The JSON requests were sent by hand on 2026-10-04, once each: the page never asks for a project
+it does not have.
+
+- No JSON answer means "not found".
+- The `AccessError` message names the signed-in user, their id and `paas.repository`. The
+  `technical_name` ended in `-1`, so it was probably read as repository 1, which the user cannot
+  read.
+- The `builtins.Exception` message is only `If the error persists contact the support and
+  communicate the following error code: SH-<hex>`. Nothing tells it from a server failure.
+- The `branches` and `builds` answers had `"id": null`; the `get_info` answer had the request's id.
+
+The unauthenticated answer is in [Without a valid session](#without-a-valid-session), and in
 `unauthenticated.json`.
 
 ### Open questions
 
 - Whether the websocket replays the notifications after `last`, what it does when its session
   expires, what a wrong `version` costs, and whether a socket that sends no idle frame is closed.
-- The JSON answer for an unknown or forbidden project, branch or build.
+- The JSON answer for a `technical_name` whose trailing id belongs to no project, and whether
+  anything before that id is read.
+- Whether `builtins.Exception` on a branch or build request means it does not exist, is forbidden,
+  or either.
 - Whether `builds` honours a `build_limit` above 4, and `history` an `offset` above 0.
 - How long the `access_token` lasts, and whether it changes when the session does.
 - Which fields vary between projects: one project was captured.

@@ -9,8 +9,8 @@ uv add odouche
 
 !!! note "Being built"
 
-    Logging in and listing projects work. Branches, builds and logs are not implemented yet; this
-    page documents the client as it lands.
+    Logging in and listing projects and branches work. Builds and logs are not implemented yet;
+    this page documents the client as it lands.
 
 ## What it is designed to be
 
@@ -88,6 +88,24 @@ with odouche.Client() as client:
 | `repository` | The GitHub repository the project builds, as `owner/name`. |
 | `url` | The address of the project's page on Odoo.sh. |
 
+### Branches
+
+`client.branches(project)` returns the branches of a project, as a list of `Branch`. `project` is a
+`Project` or a project's name.
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The number Odoo.sh gives the branch. |
+| `name` | The git branch. |
+| `stage` | A `Stage`: `PRODUCTION`, `STAGING`, `DEVELOPMENT` or `UNKNOWN`. |
+| `stage_name` | What Odoo.sh calls that stage, such as `dev`. |
+
+- The branches come in the order Odoo.sh answers them, which is not by name or by stage.
+- A stage the library does not know is `Stage.UNKNOWN`, not an error. `stage_name` says which.
+- A project that is not among those the user can reach raises `NotFoundError`, whether or not it
+  exists. One that Odoo.sh lists but refuses the branches of raises `PermissionDeniedError`.
+- Each call asks Odoo.sh twice: for the projects, then for the branches.
+
 ## Errors
 
 Everything the library raises is an `OdoucheError`, so one `except` catches any failure and no
@@ -97,7 +115,7 @@ HTTP client exception has to be imported.
 | --- | --- |
 | `NoSessionError` | There is no session. Log in. |
 | `SessionExpiredError` | Odoo.sh rejected the session, or it passed its max age. Log in again. |
-| `NotFoundError` | The project, branch or build does not exist. |
+| `NotFoundError` | The project, branch or build is not one the session's user can reach. |
 | `PermissionDeniedError` | The session is not allowed to do this. |
 | `UpstreamChangedError` | Odoo.sh answered in a shape the library does not read. Please report it. |
 | `UpstreamUnavailableError` | Odoo.sh could not be reached, or answered with a server error. |

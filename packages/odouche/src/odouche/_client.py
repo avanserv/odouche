@@ -4,9 +4,9 @@ from collections.abc import Callable
 from typing import Self
 
 from odouche._session import SessionStore
-from odouche._upstream import projects
+from odouche._upstream import branches, projects
 from odouche._upstream.transport import Transport
-from odouche.models import Project
+from odouche.models import Branch, Project
 from odouche.secret import Secret
 
 
@@ -44,3 +44,14 @@ class Client:
     def projects(self) -> list[Project]:
         """List the projects the session's user can reach."""
         return projects.projects(self._transport)
+
+    def branches(self, project: Project | str) -> list[Branch]:
+        """List the branches of a project, given as a `Project` or by its name.
+
+        They come in the order Odoo.sh answers them, which is not by name or by stage. Raises
+        `NotFoundError` when the project is not among those the session's user can reach, whether
+        or not it exists, and `PermissionDeniedError` when Odoo.sh lists it but refuses its
+        branches. Asks Odoo.sh twice, for the projects and then for the branches.
+        """
+        name = project.name if isinstance(project, Project) else project
+        return branches.branches(self._transport, name)
