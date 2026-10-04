@@ -1,3 +1,5 @@
+import json
+
 import click
 import pytest
 from typer.testing import CliRunner
@@ -16,6 +18,13 @@ def test_version_reports_the_cli_and_the_library():
 
     assert result.exit_code == 0
     assert result.output.strip() == f"osh {odouche_cli.__version__} (odouche {odouche.__version__})"
+
+
+def test_version_as_json_is_one_object():
+    result = runner.invoke(app, ["--format", "json", "--version"])
+
+    assert result.exit_code == 0
+    assert json.loads(result.stdout) == {"osh": odouche_cli.__version__, "odouche": odouche.__version__}
 
 
 def test_no_arguments_shows_help():

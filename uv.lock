@@ -824,12 +824,14 @@ version = "0.2.0"
 source = { editable = "packages/odouche-cli" }
 dependencies = [
     { name = "odouche" },
+    { name = "rich" },
     { name = "typer" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "odouche", editable = "packages/odouche" },
+    { name = "rich", specifier = ">=15.0.0" },
     { name = "typer", specifier = ">=0.27.2" },
 ]
 
