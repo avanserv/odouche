@@ -9,8 +9,8 @@ uv add odouche
 
 !!! note "Being built"
 
-    Logging in works. Projects, branches, builds and logs are not implemented yet; this page
-    documents the client as it lands.
+    Logging in and listing projects work. Branches, builds and logs are not implemented yet; this
+    page documents the client as it lands.
 
 ## What it is designed to be
 
@@ -57,6 +57,36 @@ odouche.login(ask=ask, notify=lambda step: print(step.value), timeout=300)
   before the signal takes effect.
 - With no keyring to store the session in, or one that stays locked, `KeyringUnavailableError` is
   raised before the browser opens.
+
+## Client
+
+`Client` is the one object everything is asked through. It closes its connections when the block
+ends.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    for project in client.projects():
+        print(project.name, project.repository, project.url)
+```
+
+- With no argument, the session is resolved as [above](#session). A tool that keeps sessions itself
+  passes its own, `odouche.Client(odouche.Secret(value))`, which is never stored.
+- With no session, `Client()` raises `NoSessionError`.
+- Nothing is cached: each call asks Odoo.sh.
+
+### Projects
+
+`client.projects()` returns the projects the session's user can reach, as a list of `Project`:
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The number Odoo.sh gives the project. |
+| `name` | The project's name on Odoo.sh, as in the address of its page. |
+| `repository` | The GitHub repository the project builds, as `owner/name`. |
+| `url` | The address of the project's page on Odoo.sh. |
 
 ## Errors
 

@@ -2,6 +2,7 @@
 
 from importlib.metadata import version
 
+from odouche._client import Client
 from odouche._login import LoginStep, login
 from odouche._session import KEYRING_ENTRY, KEYRING_SERVICE, SESSION_ENV
 from odouche.errors import (
@@ -16,6 +17,7 @@ from odouche.errors import (
     UpstreamChangedError,
     UpstreamUnavailableError,
 )
+from odouche.models import Project
 from odouche.secret import Secret
 
 
@@ -23,6 +25,7 @@ __all__ = [
     "KEYRING_ENTRY",
     "KEYRING_SERVICE",
     "SESSION_ENV",
+    "Client",
     "KeyringUnavailableError",
     "LoginError",
     "LoginStep",
@@ -31,6 +34,7 @@ __all__ = [
     "NotFoundError",
     "OdoucheError",
     "PermissionDeniedError",
+    "Project",
     "Secret",
     "SessionExpiredError",
     "UpstreamChangedError",

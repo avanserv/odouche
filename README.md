@@ -10,7 +10,8 @@ environment: list branches, watch builds, stream logs, from a script, a terminal
 > Odoo.sh has no public API: odouche talks to what the Odoo.sh web interface uses, which can change
 > without notice.
 >
-> **Pre-alpha.** The three packages install, but the Odoo.sh client itself is not implemented yet.
+> **Pre-alpha.** The three packages install, and the library logs in and lists projects. Nothing else is
+> implemented yet.
 
 ## Packages
 

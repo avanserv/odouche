@@ -7,12 +7,12 @@ from enum import Enum
 
 from odouche._session import SessionStore
 from odouche._upstream.browser import Capture, find
+from odouche._upstream.projects import PATH as _PROJECTS
 from odouche._upstream.transport import Transport, is_sendable
 from odouche.errors import LoginError, LoginTimeoutError, SessionExpiredError
 from odouche.secret import Secret
 
 
-_PROJECTS = "/app/projects"
 _POLL = 1.0
 
 _logger = logging.getLogger("odouche")
