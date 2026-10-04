@@ -9,8 +9,9 @@ uv add odouche
 
 !!! note "Being built"
 
-    Logging in and listing projects, branches and builds work. Watching a build, logs and
-    rebuilding are not implemented yet; this page documents the client as it lands.
+    Logging in and out, the session's user and listing projects, branches and builds work.
+    Watching a build, logs and rebuilding are not implemented yet; this page documents the client
+    as it lands.
 
 ## What it is designed to be
 
@@ -61,6 +62,39 @@ odouche.login(ask=ask, notify=lambda step: print(step.value), timeout=300)
 - Outside a login, a keyring showing a dialog is waited for ten seconds, then
   `KeyringUnavailableError` is raised.
 
+## Logging out
+
+`logout` ends the stored session on Odoo.sh, so that a copy of it stops working, and deletes it
+from the keyring.
+
+```python
+result = odouche.logout()
+if result.failure is not None:
+    print("Deleted here, but Odoo.sh could not be asked to end it:", result.failure)
+```
+
+It returns a `LogoutResult`:
+
+| Field | Meaning |
+| --- | --- |
+| `source` | A `SessionSource`: `KEYRING`, `ENVIRONMENT` or `ARGUMENT`. `None` when there was no session. |
+| `deleted` | Whether the stored session was deleted. |
+| `invalidated` | Whether Odoo.sh has ended the session. |
+| `failure` | The error that kept Odoo.sh from being asked, or `None`. |
+
+- The stored session is deleted even when Odoo.sh cannot be reached. `failure` then holds the
+  error, and the session works until Odoo.sh expires it.
+- With no session, nothing is asked and nothing is raised. A stored one past its max age, or
+  that cannot be read, is deleted and not ended on Odoo.sh.
+- A session from the environment or passed as `logout(session)` is not deleted: unset it
+  yourself. It is ended on Odoo.sh only with `invalidate_given=True`, since a session shared
+  between jobs would stop working for all of them. The stored session is then left as it is:
+  unset the variable and call `logout()` again to end it.
+- A session passed or set in the environment that is not a `session_id` cookie value raises
+  `NoSessionError`.
+- `KeyringUnavailableError` is raised when the keyring cannot be read or the session not deleted.
+  When it is not deleted, the message says whether Odoo.sh ended it.
+
 ## Client
 
 `Client` is the one object everything is asked through. It closes its connections when the block
@@ -77,8 +111,31 @@ with odouche.Client() as client:
 
 - With no argument, the session is resolved as [above](#session). A tool that keeps sessions itself
   passes its own, `odouche.Client(odouche.Secret(value))`, which is never stored.
-- With no session, `Client()` raises `NoSessionError`.
+- With no session, or a value that is not a `session_id` cookie value, `Client()` raises
+  `NoSessionError`.
 - Nothing is cached: each call asks Odoo.sh.
+
+### Who is logged in
+
+`client.identity()` asks Odoo.sh who the session belongs to, and returns an `Identity`. Being
+answered also means the session is still valid: a rejected one raises `SessionExpiredError`.
+
+| Field | Meaning |
+| --- | --- |
+| `user_id` | The number Odoo.sh gives the user. |
+| `name` | The user's display name, or `None`. |
+| `username` | The user's GitHub login. |
+| `email` | The user's email address, or `None`. Treat it as personal data. |
+| `session` | The `SessionInfo` below. |
+
+`client.session` is a `SessionInfo`, read without asking Odoo.sh, so it works offline. It never
+holds the session itself.
+
+| Field | Meaning |
+| --- | --- |
+| `source` | A `SessionSource`: `KEYRING`, `ENVIRONMENT` or `ARGUMENT`. |
+| `stored_at` | When the login stored the session. `None` unless it came from the keyring. |
+| `expires_at` | When it passes the client-side max age. `None` unless it came from the keyring. |
 
 ### Projects
 

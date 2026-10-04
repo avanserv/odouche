@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
 
+from odouche.errors import OdoucheError
+
 
 @dataclass(frozen=True, slots=True)
 class Project:
@@ -144,3 +146,63 @@ class Build:
         `KILLED` are counted as ended from their names alone. An unknown status is not finished.
         """
         return self.status in _FINISHED
+
+
+class SessionSource(StrEnum):
+    """Where a session came from."""
+
+    ARGUMENT = "argument"
+    """The caller passed it."""
+    ENVIRONMENT = "environment"
+    KEYRING = "keyring"
+
+
+@dataclass(frozen=True, slots=True)
+class SessionInfo:
+    """What is known of a session without asking Odoo.sh. It never holds the session."""
+
+    source: SessionSource
+    """Where the session came from."""
+
+    stored_at: datetime | None
+    """When the login stored it, in UTC, or `None` when it is not the stored one."""
+
+    expires_at: datetime | None
+    """When it passes the client-side max age, in UTC, or `None` when it is not the stored one."""
+
+
+@dataclass(frozen=True, slots=True)
+class Identity:
+    """The user a session belongs to, as Odoo.sh reports them."""
+
+    user_id: int
+    """The number Odoo.sh gives the user."""
+
+    name: str | None
+    """The user's display name, when Odoo.sh gives one."""
+
+    username: str
+    """The user's GitHub login."""
+
+    email: str | None
+    """The user's email address, when Odoo.sh gives one. It is personal data, carried as given."""
+
+    session: SessionInfo
+    """The session that was asked with."""
+
+
+@dataclass(frozen=True, slots=True)
+class LogoutResult:
+    """What a logout did."""
+
+    source: SessionSource | None
+    """Where the session came from, or `None` when there was none to log out of."""
+
+    deleted: bool
+    """Whether the stored session was deleted. One passed or set in the environment never is."""
+
+    invalidated: bool
+    """Whether Odoo.sh has ended the session, so that a copy of it no longer works."""
+
+    failure: OdoucheError | None
+    """Why Odoo.sh could not be asked to end the session, or `None`."""

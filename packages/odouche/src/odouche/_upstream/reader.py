@@ -27,8 +27,8 @@ class Reader:
         return self._read(key, int)
 
     def optional_text(self, key: str) -> str | None:
-        """Return a string field, or `None` when Odoo.sh answers `false` for an absent value."""
-        if self._fields.get(key) is False:
+        """Return a string field, or `None` when Odoo.sh answers `false` or `null` for an absent value."""
+        if key in self._fields and (self._fields[key] is False or self._fields[key] is None):
             return None
         return self._read(key, str)
 

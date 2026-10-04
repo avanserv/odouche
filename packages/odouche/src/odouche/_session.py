@@ -8,11 +8,12 @@ from collections.abc import Callable, Mapping
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from enum import Enum
 from threading import Event, Lock, Thread
 from typing import TYPE_CHECKING, cast
 
+from odouche._upstream.transport import is_sendable
 from odouche.errors import KeyringUnavailableError, NoSessionError, SessionExpiredError
+from odouche.models import SessionSource
 from odouche.secret import Secret
 
 
@@ -44,20 +45,17 @@ _UNFINISHED = "The keyring has not finished writing, and the stored session may 
 _left: list[Event] = []
 
 
-class Source(Enum):
-    """Where a session came from."""
-
-    ARGUMENT = "argument"
-    ENVIRONMENT = "environment"
-    KEYRING = "keyring"
+class UnreadableError(NoSessionError):
+    """Raised when the stored entry is not a session. It has been deleted."""
 
 
 @dataclass(frozen=True, slots=True)
 class Resolved:
-    """A session, where it came from and, when it is the stored one, when it passes the max age."""
+    """A session, where it came from and, when it is the stored one, when it was stored and passes the max age."""
 
     session: Secret
-    source: Source
+    source: SessionSource
+    stored_at: datetime | None = None
     expires_at: datetime | None = None
 
 
@@ -200,6 +198,8 @@ def _read(entry: str | None) -> tuple[Secret, datetime] | None:
     session, stored_at = fields.get("session"), fields.get("stored_at")
     if not isinstance(session, str) or not session or type(stored_at) is not int:
         return None
+    if not is_sendable(Secret(session)):
+        return None
     try:
         return Secret(session), datetime.fromtimestamp(stored_at, UTC)
     except (OverflowError, OSError, ValueError):
@@ -232,7 +232,7 @@ class SessionStore:
 
         A stored session past the max age is deleted and raises `SessionExpiredError`.
         """
-        given = self._given()
+        given = self.given()
         if given is not None:
             return given
         found, stored = _use(_get)
@@ -240,13 +240,13 @@ class SessionStore:
             raise NoSessionError("Not logged in.")
         if stored is None:
             _use(_delete, writes=True)
-            raise NoSessionError("The stored session could not be read and was deleted. Log in again.")
+            raise UnreadableError("The stored session could not be read and was deleted. Log in again.")
         session, stored_at = stored
         # A time in the future is a clock that moved or an entry that was edited.
         if not timedelta(0) <= self._clock() - stored_at <= self._max_age:
             _use(_delete, writes=True)
             raise SessionExpiredError("The stored session passed its max age and was deleted. Log in again.")
-        return Resolved(session, Source.KEYRING, stored_at + self._max_age)
+        return Resolved(session, SessionSource.KEYRING, stored_at, stored_at + self._max_age)
 
     def check(self, wait: float | None = None) -> None:
         """Raise `KeyringUnavailableError` if a session could not be saved: no accepted backend, or a locked one.
@@ -284,12 +284,25 @@ class SessionStore:
 
     def discard(self) -> None:
         """Delete the stored session, if that is the one in use. Safe to call twice."""
-        if self._given() is None:
+        if self.given() is None:
             with suppress(KeyringUnavailableError):
-                _use(_delete, writes=True)
+                self.delete()
 
-    def _given(self) -> Resolved | None:
+    def delete(self) -> None:
+        """Delete the stored session, whichever is in use. Safe to call twice."""
+        _use(_delete, writes=True)
+
+    def given(self) -> Resolved | None:
+        """Return the session passed or set in the environment, if there is one."""
         if self._session is not None:
-            return Resolved(self._session, Source.ARGUMENT)
+            return Resolved(_sendable(self._session, "The session passed"), SessionSource.ARGUMENT)
         value = self._environ.get(SESSION_ENV)
-        return Resolved(Secret(value), Source.ENVIRONMENT) if value else None
+        if not value:
+            return None
+        return Resolved(_sendable(Secret(value), f"The value of {SESSION_ENV}"), SessionSource.ENVIRONMENT)
+
+
+def _sendable(session: Secret, what: str) -> Secret:
+    if not is_sendable(session):
+        raise NoSessionError(f"{what} is not a session_id cookie value.")
+    return session

@@ -68,7 +68,9 @@ neither read nor deleted, and the one from the environment is never stored.
 - Odoo.sh decides. If Odoo.sh says a session is no longer valid, odouche discards it and asks you
   to sign in again. Sessions are never refreshed or extended.
 - A client-side maximum age of 30 days applies on top of that, counted from the login and never
-  extended by use.
+  extended by use. A session deleted for its age is not ended on Odoo.sh.
+- Logging out ends the stored session on Odoo.sh and deletes it from the keyring. It is deleted
+  even when Odoo.sh cannot be reached. A session from the environment is neither ended nor deleted.
 
 ## What never leaves
 
