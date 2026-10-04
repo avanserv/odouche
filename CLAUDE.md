@@ -9,8 +9,8 @@ official public API; this project is an **unofficial** client for what the Odoo.
 
 Status: the workspace, tooling and CI exist; the packages are skeletons (`osh --version`, an MCP
 server with no tools). The library has its transport, session store, login, logout and a client
-that reports the session's user and lists projects, branches and builds; watching a build, logs
-and rebuild are not implemented.
+that reports the session's user, lists projects, branches and builds, and reads and follows a
+build's logs; watching a build and rebuild are not implemented.
 The architecture and security sections below are the design the implementation is held to.
 
 ## Architecture
@@ -46,14 +46,16 @@ Rules that hold across packages:
 - A call running in a thread cannot be interrupted, so every call is bounded: each request has a
   timeout and each stream takes a deadline.
 - Watching a build and following a log return a generator of typed events: the build's changed
-  state, or a chunk of log text with its offset. A watch ends on a terminal state. Closing the
+  state, or a line of log text with its offset. A watch ends on a terminal state. Closing the
   generator closes the connection. A passed deadline raises a typed timeout error, never a silent
   end.
 - Build status comes from upstream's bus websocket, opened by the transport so the host pin covers
   it. The socket gives no sign of a missing or expired session, so a watch also asks `builds`: at
   the start, after a reconnect and after a quiet spell. That request is what detects an
   unauthenticated session and what catches an event the socket missed.
-- Logs are polled with `Range` requests, as the page does.
+- Logs are polled with `Range` requests, as the page does. They are on the build's worker, which
+  the transport accepts only as `https://<label>.odoo.com` and asks with the project's access
+  token, never with the session. The token is kept in memory for the one call.
 - The HTTP client is `httpx2`, with its `ws` extra for the socket. Redirects are off unless a
   request asks for them, responses stream, and `MockTransport` serves the request tests with no
   network and no socket patching.

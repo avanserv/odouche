@@ -29,6 +29,7 @@ SOURCES = Path(__file__).parents[1] / "src" / "odouche"
 UNAUTHENTICATED = json.loads((FIXTURES / "unauthenticated.json").read_text())
 LOGIN = "/web/login?redirect=%2Fproject%3F"
 LOGOUT = "/web/session/logout"
+WORKER = "https://eupd00.odoo.com"
 
 
 class Upstream:
@@ -210,6 +211,32 @@ def test_refuses_a_path_that_could_leave_the_host(connect, path):
         transport.call(OPERATION, path)
 
     assert upstream.requests == []
+
+
+@pytest.mark.parametrize("path", ["//evil.example.com/x", "@evil.example.com/x", ".evil.example.com/x", ":8443/x", ""])
+def test_refuses_a_path_that_could_leave_the_worker(connect, path):
+    transport, upstream = connect(fixture("build_logs_list.json"))
+
+    with pytest.raises(ValueError, match="worker"):
+        transport.worker_call("logs", WORKER, path, Secret("t0k3n"))
+    with (
+        pytest.raises(ValueError, match="worker"),
+        transport.worker_read("logs", WORKER, path, Secret("t0k3n"), "bytes=0-"),
+    ):
+        pass
+
+    assert upstream.requests == []
+
+
+def test_a_worker_is_asked_without_the_session(connect):
+    transport, upstream = connect(fixture("build_logs_list.json"))
+
+    transport.worker_call("logs", WORKER, "/paas/build/1/logs/list", Secret("t0k3n"))
+
+    (request,) = upstream.requests
+    assert str(request.url) == f"{WORKER}/paas/build/1/logs/list"
+    assert json.loads(request.content)["params"] == {"token": "t0k3n"}
+    assert "Cookie" not in request.headers
 
 
 @pytest.mark.parametrize("status", [301, 302, 303, 307, 308])

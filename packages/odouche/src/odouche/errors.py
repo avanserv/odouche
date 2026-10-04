@@ -46,7 +46,7 @@ class SessionExpiredError(OdoucheError):
 
 
 class NotFoundError(OdoucheError):
-    """Raised when the project, branch or build asked for is not one the session's user can reach."""
+    """Raised when the project, branch, build or log asked for is not one the session's user can reach."""
 
 
 class PermissionDeniedError(OdoucheError):
@@ -78,6 +78,10 @@ class UpstreamChangedError(OdoucheError):
 
 class UpstreamUnavailableError(OdoucheError):
     """Raised when Odoo.sh cannot be reached, or answers with a server error."""
+
+
+class StreamTimeoutError(OdoucheError):
+    """Raised when a stream is still open at its timeout. Nothing says Odoo.sh is unavailable."""
 
 
 class KeyringUnavailableError(OdoucheError):
