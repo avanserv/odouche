@@ -29,6 +29,7 @@ HOST = "www.odoo.sh"
 _LOGIN_PATH = "/web/login"
 _SESSION_EXPIRED = "odoo.http.SessionExpiredException"
 _ACCESS_DENIED = "odoo.exceptions.AccessError"
+_UNEXPLAINED = "builtins.Exception"
 _SESSION_ALPHABET = re.compile(r"[A-Za-z0-9_-]+")
 _TIMEOUT = httpx2.Timeout(connect=10, read=30, write=10, pool=10)
 _BACKOFF = (1.0, 2.0)
@@ -99,7 +100,7 @@ def _unexpected(status: int, body: object) -> str | None:
     return "error.data.name" if "error" in body else None
 
 
-def _error(operation: str, answer: _Answer) -> OdoucheError | None:
+def _error(operation: str, answer: _Answer, not_found: str | None) -> OdoucheError | None:
     status = answer.status
     if status is None:
         return UpstreamUnavailableError(f"Odoo.sh could not be reached ({answer.failure}).", operation=operation)
@@ -110,6 +111,8 @@ def _error(operation: str, answer: _Answer) -> OdoucheError | None:
         return cls(message, operation=operation, status=status)
     if status == httpx2.codes.OK and _error_name(answer.body) == _ACCESS_DENIED:
         return PermissionDeniedError(_DENIED, operation=operation, status=status)
+    if not_found is not None and status == httpx2.codes.OK and _error_name(answer.body) == _UNEXPLAINED:
+        return NotFoundError(not_found, operation=operation, status=status)
     field = _unexpected(status, answer.body)
     return UpstreamChangedError(operation, field, status=status) if field else None
 
@@ -153,12 +156,22 @@ class Transport:
         self._client.close()
 
     def call(
-        self, operation: str, path: str, params: Mapping[str, object] | None = None, *, retry: bool = False
+        self,
+        operation: str,
+        path: str,
+        params: Mapping[str, object] | None = None,
+        *,
+        retry: bool = False,
+        not_found: str | None = None,
     ) -> dict[str, object]:
         """Send one JSON-RPC request and return the answer, which holds no `error`.
 
         `retry` repeats a request that failed in transit or on a gateway error. It is for reads
         only: a state-changing request sent twice is done twice.
+
+        `not_found` is the message of the `NotFoundError` raised for the error Odoo.sh gives no
+        reason for, which is its answer to a branch that does not exist. Without it that answer
+        is an `UpstreamChangedError`.
         """
         url = _url(path)
         with self._lock:
@@ -173,7 +186,7 @@ class Transport:
             raise SessionExpiredError(
                 "Odoo.sh rejected the session. Log in again.", operation=operation, status=answer.status
             )
-        error = _error(operation, answer)
+        error = _error(operation, answer, not_found)
         if error is not None:
             raise error
         return cast("dict[str, object]", answer.body)

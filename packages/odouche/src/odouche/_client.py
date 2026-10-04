@@ -4,9 +4,9 @@ from collections.abc import Callable
 from typing import Self
 
 from odouche._session import SessionStore
-from odouche._upstream import branches, projects
+from odouche._upstream import branches, builds, projects
 from odouche._upstream.transport import Transport
-from odouche.models import Branch, Project
+from odouche.models import Branch, Build, Project
 from odouche.secret import Secret
 
 
@@ -55,3 +55,29 @@ class Client:
         """
         name = project.name if isinstance(project, Project) else project
         return branches.branches(self._transport, name)
+
+    def builds(self, branch: Branch | int, *, limit: int = builds.DEFAULT_LIMIT) -> list[Build]:
+        """List the latest builds of a branch, given as a `Branch` or by its number, newest first.
+
+        At most `limit` builds are returned, in one request. Odoo.sh may answer fewer than asked
+        for: it has only been seen to answer up to four, and older builds are out of reach. Raises
+        `NotFoundError` when the branch is not one the session's user can reach.
+        """
+        return builds.builds(self._transport, _branch_id(branch), limit)
+
+    def build(self, branch: Branch | int, build_id: int) -> Build:
+        """Return one build of a branch by its number.
+
+        Odoo.sh has no request for a build by its number, so the build is looked for among the
+        branch's latest. Raises `NotFoundError` when it is not there, which an older build is not.
+        """
+        return builds.build(self._transport, _branch_id(branch), build_id)
+
+    def latest_build(self, branch: Branch | int) -> Build | None:
+        """Return the newest build of a branch, or `None` when it has none."""
+        latest = builds.builds(self._transport, _branch_id(branch), 1)
+        return latest[0] if latest else None
+
+
+def _branch_id(branch: Branch | int) -> int:
+    return branch.id if isinstance(branch, Branch) else branch

@@ -95,6 +95,7 @@ class Upstream:
         self.bodies = {
             "/app/projects": self.load("projects.json"),
             "/app/project/acme-corp-odoo-addons-4217/branches": self.load("branches.json"),
+            "/app/branch/51044/builds": self.load("builds.json"),
         }
         self.requests = []
         self.transports = []

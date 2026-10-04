@@ -9,8 +9,8 @@ uv add odouche
 
 !!! note "Being built"
 
-    Logging in and listing projects and branches work. Builds and logs are not implemented yet;
-    this page documents the client as it lands.
+    Logging in and listing projects, branches and builds work. Watching a build, logs and
+    rebuilding are not implemented yet; this page documents the client as it lands.
 
 ## What it is designed to be
 
@@ -105,6 +105,49 @@ with odouche.Client() as client:
 - A project that is not among those the user can reach raises `NotFoundError`, whether or not it
   exists. One that Odoo.sh lists but refuses the branches of raises `PermissionDeniedError`.
 - Each call asks Odoo.sh twice: for the projects, then for the branches.
+
+### Builds
+
+`client.builds(branch)` returns the latest builds of a branch, newest first, as a list of `Build`.
+`branch` is a `Branch` or a branch's number.
+
+```python
+with odouche.Client() as client:
+    branch = client.branches("acme-shop")[0]
+    for build in client.builds(branch, limit=2):
+        print(build.id, build.status, build.result, build.commit.hash)
+    latest = client.latest_build(branch)
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The number Odoo.sh gives the build. |
+| `name` | The build's name on Odoo.sh. |
+| `branch_id`, `branch_name` | The branch the build belongs to. |
+| `commit` | A `Commit`: `hash`, `message`, `author`, `timestamp` and `url`. |
+| `status` | A `BuildStatus`: `PROGRESS`, `UPDATING`, `DONE`, `DROPPED`, `SKIPPED`, `KILLED` or `UNKNOWN`. |
+| `status_name` | What Odoo.sh calls that status. |
+| `result` | A `BuildResult`: `SUCCESS`, `FAILED`, `WARNING` or `UNKNOWN`. `None` when Odoo.sh gives none. |
+| `result_name` | What Odoo.sh calls that result. `None` with `result`. |
+| `status_info` | What the build is doing, in Odoo.sh's own words, or `None`. |
+| `started_at` | When a worker took the build. `None` while it waits for one. |
+| `url` | The address of the build's database, or `None`. |
+| `finished` | Whether the build has ended, whatever its result. |
+
+- `finished` is true for `DONE`, `DROPPED`, `SKIPPED` and `KILLED`. A `DROPPED` build is one a
+  newer build replaced.
+- A status or result the library does not know is `UNKNOWN`, not an error, and the `_name` field
+  says which. An unknown status is not finished.
+- Timestamps are timezone-aware, in UTC.
+- `limit` defaults to 4 and each call is one request. Odoo.sh may return fewer builds than asked
+  for: it has only been seen to return up to four, and older builds are out of reach. A `limit`
+  under 1 raises `ValueError`, and a branch, build or limit that is not an integer `TypeError`.
+- `client.latest_build(branch)` returns the newest build, or `None` for a branch with none.
+- `client.build(branch, build_id)` returns one build. Odoo.sh has no request for a build by its
+  number, so it is looked for among the branch's latest and raises `NotFoundError` when it is not
+  there.
+- A branch the user cannot reach raises `NotFoundError`. Odoo.sh gives no reason.
+- A commit's `author` is another person's name. Treat it as personal data.
 
 ## Errors
 
