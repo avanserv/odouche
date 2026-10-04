@@ -3,7 +3,7 @@
 # lockstep with theirs because Release Please writes it, not because anything installs it.
 [project]
 name = "odouche-workspace"
-version = "0.1.0"
+version = "0.2.0"
 description = "Workspace root for odouche, the unofficial Odoo.sh toolkit"
 readme = "README.md"
 license = "MIT"
