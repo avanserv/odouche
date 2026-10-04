@@ -1,5 +1,5 @@
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 import click
@@ -21,30 +21,6 @@ SSH = "git@github.com:acme/odoo.git"
 TOKEN = "ghp_sentinel"
 
 runner = CliRunner()
-
-
-@pytest.fixture(autouse=True)
-def isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Run in an empty directory, with neither variable set and no git configuration of the user's."""
-    monkeypatch.delenv(PROJECT_ENV, raising=False)
-    monkeypatch.delenv(BRANCH_ENV, raising=False)
-    monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
-    monkeypatch.setenv("GIT_CONFIG_SYSTEM", "/dev/null")
-    # A stray repository above `tmp_path` is not this test's checkout.
-    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
-    monkeypatch.chdir(tmp_path)
-
-
-def git(*args: str) -> None:
-    subprocess.run(["git", "-c", "user.name=test", "-c", "user.email=test@example.com", *args], check=True)  # noqa: S603, S607
-
-
-def checkout(branch: str = "feature-x", **remotes: str) -> None:
-    """Make the current directory a repository on `branch`, with one commit and these remotes."""
-    git("init", "--quiet", "--initial-branch", branch)
-    git("commit", "--quiet", "--allow-empty", "--message", "first")
-    for name, url in remotes.items():
-        git("remote", "add", name, url)
 
 
 def run(*args: str, projects: Sequence[odouche.Project] = (ACME, GLOBEX)) -> tuple[Result, list[str]]:
@@ -104,7 +80,7 @@ def test_any_other_remote_is_nothing(url: str):
     assert _context._github_repository(url) is None  # pyright: ignore[reportPrivateUsage]
 
 
-def test_a_checkout_gives_the_project_and_the_branch():
+def test_a_checkout_gives_the_project_and_the_branch(checkout: Callable[..., None]):
     checkout("feature-x", origin=SSH)
 
     project, lookups = run("project")
@@ -115,7 +91,9 @@ def test_a_checkout_gives_the_project_and_the_branch():
     assert (branch.exit_code, branch.stdout) == (0, "feature-x\n")
 
 
-def test_the_remote_is_the_upstream_of_the_branch_before_origin():
+def test_the_remote_is_the_upstream_of_the_branch_before_origin(
+    checkout: Callable[..., None], git: Callable[..., None]
+):
     checkout("main", origin="https://github.com/globex/erp.git", fork=SSH)
     git("config", "branch.main.remote", "fork")
 
@@ -124,7 +102,7 @@ def test_the_remote_is_the_upstream_of_the_branch_before_origin():
     assert result.stdout == "acme\n"
 
 
-def test_a_branch_tracking_a_local_one_falls_back_to_origin():
+def test_a_branch_tracking_a_local_one_falls_back_to_origin(checkout: Callable[..., None], git: Callable[..., None]):
     checkout("main", origin=SSH)
     git("config", "branch.main.remote", ".")
 
@@ -133,7 +111,9 @@ def test_a_branch_tracking_a_local_one_falls_back_to_origin():
     assert result.stdout == "acme\n"
 
 
-def test_the_flag_wins_over_the_variable_and_the_checkout(monkeypatch: pytest.MonkeyPatch):
+def test_the_flag_wins_over_the_variable_and_the_checkout(
+    monkeypatch: pytest.MonkeyPatch, checkout: Callable[..., None]
+):
     checkout("feature-x", origin=SSH)
     monkeypatch.setenv(PROJECT_ENV, "from-env")
     monkeypatch.setenv(BRANCH_ENV, "env-branch")
@@ -146,7 +126,7 @@ def test_the_flag_wins_over_the_variable_and_the_checkout(monkeypatch: pytest.Mo
     assert branch.stdout == "flag-branch\n"
 
 
-def test_the_variable_wins_over_the_checkout(monkeypatch: pytest.MonkeyPatch):
+def test_the_variable_wins_over_the_checkout(monkeypatch: pytest.MonkeyPatch, checkout: Callable[..., None]):
     checkout("feature-x", origin=SSH)
     monkeypatch.setenv(PROJECT_ENV, "from-env")
     monkeypatch.setenv(BRANCH_ENV, "env-branch")
@@ -159,7 +139,7 @@ def test_the_variable_wins_over_the_checkout(monkeypatch: pytest.MonkeyPatch):
     assert branch.stdout == "env-branch\n"
 
 
-def test_an_empty_variable_is_not_a_value(monkeypatch: pytest.MonkeyPatch):
+def test_an_empty_variable_is_not_a_value(monkeypatch: pytest.MonkeyPatch, checkout: Callable[..., None]):
     checkout("feature-x", origin=SSH)
     monkeypatch.setenv(PROJECT_ENV, "")
     monkeypatch.setenv(BRANCH_ENV, "")
@@ -171,7 +151,7 @@ def test_an_empty_variable_is_not_a_value(monkeypatch: pytest.MonkeyPatch):
     assert branch.stdout == "feature-x\n"
 
 
-def test_an_empty_flag_is_a_usage_error_and_not_the_checkout():
+def test_an_empty_flag_is_a_usage_error_and_not_the_checkout(checkout: Callable[..., None]):
     checkout("feature-x", origin=SSH)
 
     project, lookups = run("project", "--project", "")
@@ -182,7 +162,7 @@ def test_an_empty_flag_is_a_usage_error_and_not_the_checkout():
     assert (branch.exit_code, branch.stdout) == (2, "")
 
 
-def test_a_tag_named_as_the_branch_does_not_change_its_name():
+def test_a_tag_named_as_the_branch_does_not_change_its_name(checkout: Callable[..., None], git: Callable[..., None]):
     checkout("feature-x", origin=SSH)
     git("tag", "feature-x")
 
@@ -191,7 +171,7 @@ def test_a_tag_named_as_the_branch_does_not_change_its_name():
     assert result.stdout == "feature-x\n"
 
 
-def test_a_repository_of_two_projects_is_an_error_that_lists_them():
+def test_a_repository_of_two_projects_is_an_error_that_lists_them(checkout: Callable[..., None]):
     checkout("feature-x", origin=SSH)
 
     result, lookups = run("project", projects=(ACME, ACME_TEST, GLOBEX))
@@ -203,7 +183,7 @@ def test_a_repository_of_two_projects_is_an_error_that_lists_them():
     assert lookups == ["projects"]
 
 
-def test_a_repository_of_no_project_exits_4():
+def test_a_repository_of_no_project_exits_4(checkout: Callable[..., None]):
     checkout("feature-x", origin="git@github.com:other/thing.git")
 
     result, _ = run("project")
@@ -213,7 +193,7 @@ def test_a_repository_of_no_project_exits_4():
     assert "other/thing" in result.stderr
 
 
-def test_a_detached_head_is_no_branch_and_still_a_project():
+def test_a_detached_head_is_no_branch_and_still_a_project(checkout: Callable[..., None], git: Callable[..., None]):
     checkout("feature-x", origin=SSH)
     git("checkout", "--quiet", "--detach")
 
@@ -239,7 +219,7 @@ def test_outside_a_repository_exits_2_and_names_the_three_sources():
         assert source in click.unstyle(branch.stderr)
 
 
-def test_a_remote_that_is_not_on_github_is_no_project():
+def test_a_remote_that_is_not_on_github_is_no_project(checkout: Callable[..., None]):
     checkout("feature-x", origin="git@gitlab.com:acme/odoo.git")
 
     result, lookups = run("project")
@@ -248,7 +228,9 @@ def test_a_remote_that_is_not_on_github_is_no_project():
     assert lookups == []
 
 
-def test_without_git_installed_there_is_no_value(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+def test_without_git_installed_there_is_no_value(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, checkout: Callable[..., None]
+):
     checkout("feature-x", origin=SSH)
     monkeypatch.setenv("PATH", str(tmp_path))
 
@@ -282,7 +264,11 @@ def test_a_git_that_does_not_answer_is_no_value(monkeypatch: pytest.MonkeyPatch)
     ],
 )
 def test_debug_names_the_source_and_never_the_address(
-    monkeypatch: pytest.MonkeyPatch, args: tuple[str, ...], env: dict[str, str], said: str
+    monkeypatch: pytest.MonkeyPatch,
+    args: tuple[str, ...],
+    env: dict[str, str],
+    said: str,
+    checkout: Callable[..., None],
 ):
     checkout("feature-x", origin=f"https://{TOKEN}@github.com/acme/odoo.git")
     for name, value in env.items():

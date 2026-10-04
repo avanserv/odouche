@@ -82,7 +82,7 @@ def resolve_branch(ctx: typer.Context, value: str | None) -> str:
         _refuse_empty(ctx, value, "--branch")
         _debug(ctx, f"Branch {value}, from {_given(ctx, 'branch', '--branch', BRANCH_ENV)}.")
         return value
-    branch = _checkout_branch()
+    branch = checkout_branch()
     if branch is None:
         msg = f"No branch. Give one with --branch or {BRANCH_ENV}, or run from a checkout that is on a branch."
         raise ContextError(msg, ctx=ctx)
@@ -109,14 +109,14 @@ def _debug(ctx: typer.Context, line: str) -> None:
         typer.echo(line, err=True)
 
 
-def _checkout_branch() -> str | None:
+def checkout_branch() -> str | None:
     """Return the current branch, or `None` on a detached HEAD or outside a repository."""
     return _git("branch", "--show-current")
 
 
 def _checkout_repository() -> str | None:
     """Return the GitHub repository of the current branch's remote, or of `origin`, as `owner/name`."""
-    branch = _checkout_branch()
+    branch = checkout_branch()
     remote = _git("config", "--get", f"branch.{branch}.remote") if branch else None
     # `.` is a branch that tracks a local one.
     if remote is None or remote == ".":

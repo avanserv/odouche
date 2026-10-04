@@ -44,6 +44,22 @@ osh projects list
   the address of the project's page. As JSON it is the whole
   [`Project`](reference.md) model.
 
+## Branches
+
+```bash
+osh branches list
+osh branches list --stage staging --stage production
+```
+
+- `list` shows the branches of the [project](#project-and-branch) with their stage: production
+  first, then staging, then development, each sorted by name. As JSON it is the whole
+  [`Branch`](reference.md) model, in the same order.
+- `--stage` keeps one stage and can be given more than once. A value that is not a stage exits 2.
+- A stage `osh` does not know is shown as Odoo.sh names it, after the others. `--stage unknown`
+  lists those.
+- In the table, `*` marks the branch checked out locally, when the project comes from the
+  checkout.
+
 ## Project and branch
 
 A command that works on a project or a branch takes them from the first of these that gives a
