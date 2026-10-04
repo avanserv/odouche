@@ -3,16 +3,26 @@
 import json
 import logging
 import re
+import socket
 import threading
 import time
 from collections.abc import Callable, Generator, Iterator, Mapping
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager, suppress
 from dataclasses import dataclass
 from http.cookiejar import DefaultCookiePolicy
 from importlib.metadata import version
 from typing import Self, cast
 
 import httpx2
+from httpx2.websockets import (
+    WebSocketDisconnect,
+    WebSocketInvalidTypeReceived,
+    WebSocketNetworkError,
+    WebSocketSession,
+    WebSocketUpgradeError,
+)
+from wsproto.events import CloseConnection
+from wsproto.utilities import LocalProtocolError
 
 from odouche.errors import (
     NotFoundError,
@@ -28,6 +38,11 @@ from odouche.secret import Secret
 HOST = "www.odoo.sh"
 
 _LOGIN_PATH = "/web/login"
+_BUS_PATH = "/websocket"
+# The `v` of the page's worker script. With another, the socket opens and sends nothing.
+_BUS_VERSION = "18.0-7"
+# One frame can hold several whole builds.
+_BUS_MESSAGE = 1048576
 _SESSION_EXPIRED = "odoo.http.SessionExpiredException"
 _ACCESS_DENIED = "odoo.exceptions.AccessError"
 _UNEXPLAINED = "builtins.Exception"
@@ -83,6 +98,45 @@ class Part:
 
     chunks: Iterator[bytes]
     """Its bytes as they arrive. Raises `UpstreamUnavailableError` when the connection drops."""
+
+
+class Socket:
+    """The bus socket, once Odoo.sh has opened it. It gives no sign of a missing or expired session."""
+
+    def __init__(self, operation: str, session: WebSocketSession) -> None:
+        self._operation = operation
+        self._session = session
+
+    def send(self, text: str) -> None:
+        """Send one text frame."""
+        self._write(lambda: self._session.send_text(text))
+
+    def idle(self) -> None:
+        """Send the frame the page sends when it has nothing to say."""
+        self._write(lambda: self._session.send_bytes(b"\x00"))
+
+    def receive(self, timeout: float) -> str | None:
+        """Return the next text frame, or `None` when none came in `timeout` seconds.
+
+        Raises `UpstreamUnavailableError` when the socket is closed or drops.
+        """
+        try:
+            return self._session.receive_text(timeout)
+        except (TimeoutError, WebSocketInvalidTypeReceived):
+            return None
+        except (WebSocketDisconnect, WebSocketNetworkError) as error:
+            failure = type(error).__name__
+        raise _unavailable(self._operation, failure)
+
+    def _write(self, write: Callable[[], None]) -> None:
+        try:
+            write()
+        # A socket that has closed refuses the frame before it is written.
+        except (WebSocketNetworkError, LocalProtocolError) as error:
+            failure = type(error).__name__
+        else:
+            return
+        raise _unavailable(self._operation, failure)
 
 
 def is_unauthenticated(status: int, location: str | None, body: object) -> bool:
@@ -169,8 +223,9 @@ class Transport:
     """Sends requests to Odoo.sh with the session, one at a time and to `HOST` only.
 
     A worker is asked with the project's token and never gets the session. A redirect is never
-    followed. `on_rejected` is called when Odoo.sh rejects the session, before
-    `SessionExpiredError` is raised.
+    followed. The bus socket is opened here too, so it goes to `HOST` like a request.
+    `on_rejected` is called when Odoo.sh rejects the session, before `SessionExpiredError` is
+    raised.
     """
 
     def __init__(
@@ -284,6 +339,35 @@ class Transport:
         finally:
             response.close()
 
+    @contextmanager
+    def bus(self, operation: str) -> Generator[Socket]:
+        """Open the bus socket with the session. It is not repeated, and holds no other request back."""
+        url = _url(_BUS_PATH)
+        session = status = failure = None
+        with ExitStack() as stack:
+            try:
+                session = stack.enter_context(
+                    self._client.websocket(
+                        url,
+                        params={"version": _BUS_VERSION},
+                        headers={"Origin": f"https://{HOST}", "Cookie": f"session_id={self._session.expose_secret()}"},
+                        max_message_size_bytes=_BUS_MESSAGE,
+                        # No bound: the thread that reads waits on a full queue, and closing waits on it.
+                        queue_size=0,
+                        # The page keeps the socket open with a frame of its own: see `Socket.idle`.
+                        keepalive_ping_interval_seconds=None,
+                    )
+                )
+            except WebSocketUpgradeError as error:
+                status = error.response.status_code
+            except httpx2.RequestError as error:
+                failure = type(error).__name__
+            _logger.debug("GET %s: %s", url.path, failure or status or httpx2.codes.SWITCHING_PROTOCOLS.value)
+            if session is None:
+                raise _not_opened(operation, status, failure)
+            stack.callback(_hang_up, session)
+            yield Socket(operation, session)
+
     def _attempt(
         self, operation: str, method: str, url: httpx2.URL, params: Mapping[str, object] | None, *, retry: bool
     ) -> _Answer:
@@ -329,6 +413,22 @@ class Transport:
         elapsed = (time.perf_counter() - started) * 1000
         _logger.debug("%s %s: %s in %.0f ms", method, url.path, answer.status or answer.failure, elapsed)
         return answer
+
+
+def _hang_up(session: WebSocketSession) -> None:
+    """End the read a socket is left in: closing does not, and Odoo.sh may never answer."""
+    with suppress(WebSocketNetworkError, LocalProtocolError):
+        session.send(CloseConnection(1000))
+    connection = session.stream.get_extra_info("socket")
+    if isinstance(connection, socket.socket):
+        with suppress(OSError):
+            connection.shutdown(socket.SHUT_RDWR)
+
+
+def _not_opened(operation: str, status: int | None, failure: str | None) -> OdoucheError:
+    if status == httpx2.codes.OK:
+        return UpstreamChangedError(operation, "status", status=status)
+    return cast("OdoucheError", _error(operation, _Answer(status, failure=failure), None))
 
 
 def _part(operation: str, response: httpx2.Response) -> Part | None:

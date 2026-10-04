@@ -9,8 +9,8 @@ uv add odouche
 
 !!! note "Being built"
 
-    Logging in and out, the session's user, listing projects, branches and builds, and build logs
-    work. Watching a build and rebuilding are not implemented yet; this page documents the client
+    Logging in and out, the session's user, listing projects, branches and builds, watching a
+    build and build logs work. Rebuilding is not implemented yet; this page documents the client
     as it lands.
 
 ## What it is designed to be
@@ -209,6 +209,29 @@ with odouche.Client() as client:
 - A branch the user cannot reach raises `NotFoundError`. Odoo.sh gives no reason.
 - A commit's `author` is another person's name. Treat it as personal data.
 
+`client.watch_build(project, build, timeout=...)` yields the build as it is now, then again at
+each change, and ends once it has finished. `project` is a `Project` or a project's name.
+
+```python
+with odouche.Client() as client:
+    build = client.latest_build(branch)
+    for build in client.watch_build("acme-shop", build, timeout=1800):
+        print(build.status, build.status_info)
+    print(build.result)
+```
+
+- A change is one of `status`, `result` or `status_info`. The last build yielded is the finished
+  one, and a build that has already finished is yielded once, with no wait.
+- The watch stays on its build. A newer build on the branch ends it as `DROPPED`.
+- After `timeout` seconds it raises `StreamTimeoutError`: the build is still running, which is not
+  Odoo.sh being unavailable.
+- Changes come over a websocket to `www.odoo.sh`. Odoo.sh is also asked for the build at the
+  start, when the connection is opened again and after a minute with no news of the build, which
+  is what detects a rejected session.
+- A connection that fails is opened again twice. Then `UpstreamUnavailableError` is raised.
+- Closing the iterator closes the connection.
+- A build that is no longer among its branch's latest raises `NotFoundError`.
+
 ### Logs
 
 `client.logs(project, build)` returns the logs a build has, as a list of `Log`. `project` is a
@@ -274,7 +297,7 @@ HTTP client exception has to be imported.
 | `PermissionDeniedError` | The session is not allowed to do this. |
 | `UpstreamChangedError` | Odoo.sh answered in a shape the library does not read. Please report it. |
 | `UpstreamUnavailableError` | Odoo.sh could not be reached, or answered with a server error. |
-| `StreamTimeoutError` | A log was still being followed at its timeout. |
+| `StreamTimeoutError` | A build was still being watched, or a log followed, at its timeout. |
 | `KeyringUnavailableError` | No accepted keyring backend is available to store the session. |
 | `LoginError` | The login ended without a session, or the pasted one was refused. |
 | `LoginTimeoutError` | Nobody completed the browser login before its timeout. |
