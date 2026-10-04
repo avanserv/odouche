@@ -7,11 +7,6 @@ on. It is meant to be used directly in your own tools as well.
 uv add odouche
 ```
 
-!!! note "Being built"
-
-    Logging in and out, the session's user, listing projects, branches and builds, watching a
-    build, build logs and rebuilding work. This page documents the client as it lands.
-
 ## What it is designed to be
 
 - **Typed.** The library returns typed models rather than raw Odoo.sh payloads, and ships type
@@ -27,6 +22,9 @@ uv add odouche
 
 The session is taken from the `ODOUCHE_SESSION` environment variable when it is set, and from the
 OS keyring otherwise. [Security](security.md) says where it is stored and for how long.
+
+For headless use, such as CI, set `ODOUCHE_SESSION` to the `session_id` cookie of `www.odoo.sh`
+from the job's secrets. The keyring is then neither read nor written, and nothing below changes.
 
 ## Logging in
 
@@ -67,6 +65,9 @@ odouche.login(ask=ask, notify=lambda step: print(step.value), timeout=300)
 from the keyring.
 
 ```python
+import odouche
+
+
 result = odouche.logout()
 if result.failure is not None:
     print("Deleted here, but Odoo.sh could not be asked to end it:", result.failure)
@@ -171,8 +172,12 @@ holds the session itself.
 `branch` is a `Branch` or a branch's number.
 
 ```python
+import odouche
+
+
 with odouche.Client() as client:
-    branch = client.branches("acme-shop")[0]
+    branches = {branch.name: branch for branch in client.branches("acme-shop")}
+    branch = branches["feature-invoicing"]
     for build in client.builds(branch, limit=2):
         print(build.id, build.status, build.result, build.commit.hash)
     latest = client.latest_build(branch)
@@ -212,11 +217,22 @@ with odouche.Client() as client:
 each change, and ends once it has finished. `project` is a `Project` or a project's name.
 
 ```python
+import odouche
+
+
 with odouche.Client() as client:
+    branches = {branch.name: branch for branch in client.branches("acme-shop")}
+    branch = branches["feature-invoicing"]
     build = client.latest_build(branch)
-    for build in client.watch_build("acme-shop", build, timeout=1800):
-        print(build.status, build.status_info)
-    print(build.result)
+    if build is None:
+        raise SystemExit("The branch has no build yet.")
+    try:
+        for build in client.watch_build("acme-shop", build, timeout=1800):
+            print(build.status, build.status_info)
+    except odouche.StreamTimeoutError:
+        print("Still running after half an hour.")
+    else:
+        print(build.result)
 ```
 
 - A change is one of `status`, `result` or `status_info`. The last build yielded is the finished
@@ -248,12 +264,24 @@ with odouche.Client() as client:
 `LogKind` or a log's name.
 
 ```python
+import odouche
+
+
 with odouche.Client() as client:
+    branches = {branch.name: branch for branch in client.branches("acme-shop")}
+    branch = branches["feature-invoicing"]
     build = client.latest_build(branch)
+    if build is None:
+        raise SystemExit("The branch has no build yet.")
+    for log in client.logs("acme-shop", build):
+        print(log.name, log.size)
     for line in client.read_log("acme-shop", build, odouche.LogKind.INSTALL, tail=20):
-        print(line.text)
-    for line in client.follow_log("acme-shop", build, odouche.LogKind.ODOO, timeout=600):
-        print(line.text)
+        print(repr(line.text))
+    try:
+        for line in client.follow_log("acme-shop", build, odouche.LogKind.ODOO, timeout=600):
+            print(repr(line.text))
+    except odouche.StreamTimeoutError:
+        print("Followed for ten minutes.")
 ```
 
 Each line is a `LogLine`:
@@ -292,7 +320,12 @@ Every other call of the client only reads. These are the calls that change somet
 | `client.rebuild(branch)` | Starts a new build of the branch, which replaces its latest one. |
 
 ```python
+import odouche
+
+
 with odouche.Client() as client:
+    branches = {branch.name: branch for branch in client.branches("acme-shop")}
+    branch = branches["feature-invoicing"]
     build = client.rebuild(branch)
     for build in client.watch_build("acme-shop", build, timeout=1800):
         print(build.status, build.status_info)
@@ -315,6 +348,20 @@ with odouche.Client() as client:
 Everything the library raises is an `OdoucheError`, so one `except` catches any failure and no
 HTTP client exception has to be imported.
 
+```python
+import odouche
+
+
+try:
+    with odouche.Client() as client:
+        names = [project.name for project in client.projects()]
+except (odouche.NoSessionError, odouche.SessionExpiredError):
+    raise SystemExit("Log in to Odoo.sh first.") from None
+except odouche.OdoucheError as error:
+    raise SystemExit(str(error)) from None
+print(names)
+```
+
 | Error | Meaning |
 | --- | --- |
 | `NoSessionError` | There is no session. Log in. |
@@ -334,4 +381,17 @@ HTTP client exception has to be imported.
 An error carries `operation`, `status` and a message. It never carries a session value, request
 headers or a response body.
 
-The generated [API reference](reference.md) lists everything the library exports.
+## Stability
+
+- **The public API is what `odouche` exports**: the names in `odouche.__all__`, which the
+  [API reference](reference.md) lists one by one. A module or a name with a leading underscore,
+  `odouche._upstream` included, is not, and changes without notice.
+- **Below 1.0, a minor release can break the public API** and a patch release does not. The
+  [changelog](https://github.com/avanserv/odouche/blob/main/CHANGELOG.md) marks each breaking
+  change.
+- **Odoo.sh can break the library in any release**, since it has no public API. A caller sees
+  that as `UpstreamChangedError`, whose `operation` and `field` name the request and what could
+  not be read in its answer. No retry helps, and the input is not at fault.
+- **Report one** on the [issue tracker](https://github.com/avanserv/odouche/issues) with the
+  error's message, which holds no session value. Leave out the answer itself: it holds your
+  projects' data.

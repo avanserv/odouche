@@ -3,11 +3,6 @@
 odouche acts on your Odoo.sh projects with your access, so what it does with that access is a
 design constraint rather than a guideline.
 
-!!! note "Logging in is in the library only"
-
-    The `osh auth` commands are not implemented yet. This page states the model the implementation
-    is held to.
-
 ## What odouche holds
 
 - Your **password** and your **GitHub token** are never seen, stored or logged. You sign in through
@@ -31,6 +26,10 @@ odouche opens a browser window of its own, in which you sign in to Odoo.sh with 
 With another browser, on Windows, or with no display (over SSH, in a container), sign in to
 Odoo.sh in your own browser and paste the `session_id` cookie into a prompt that does not echo it.
 
+The browser is one launched for the login, not the one you use every day: that one's cookie store
+holds your session on every other site. For the same reason there is no browser extension, no
+profile kept between logins and no debugging port, which any program on the machine could open.
+
 The profile is deleted when the login is interrupted or the program is terminated, too. A program
 that is killed outright cannot delete it. If the profile cannot be deleted, the login fails, the
 session is not kept and the error names the directory to delete.
@@ -48,7 +47,8 @@ odouche accepts three keyrings and nothing else:
 | Container, CI | The environment, in memory only |
 
 Any other keyring backend is refused with an error, including the plain-text ones from
-`keyrings.alt`.
+`keyrings.alt`. odouche picks among the three itself, so a keyring configured or installed
+elsewhere on the machine cannot become where the session goes.
 
 The entry is named `session`, under the service `odouche`, so you can find it and delete it by
 hand.
@@ -90,6 +90,17 @@ session.
 - Log content is untrusted. It is whatever a process printed, which can include terminal escape
   sequences and your instance's own secrets. The library returns it unchanged and never writes it
   to its own log.
+
+## What odouche can change
+
+One call changes something on Odoo.sh: a rebuild, which starts a new build of a development or a
+staging branch. Every other call only reads.
+
+- The request is sent once and never repeated.
+- A client opened read-only refuses it before anything is sent.
+- The library asks for no confirmation: the tool that calls it does.
+
+[State-changing operations](library.md#state-changing-operations) has the details.
 
 ## The MCP server
 
