@@ -2,7 +2,7 @@
 
 PACKAGES := odouche odouche-cli odouche-mcp
 
-.PHONY: help install format lint type-check deps deadcode test coverage docs docs-serve build hooks check clean
+.PHONY: help install format lint type-check deps deadcode test coverage live-check docs docs-serve build hooks check clean
 
 help: ## List available targets with their descriptions
 	@grep -hE '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) \
@@ -38,6 +38,10 @@ test: ## Run the test suite
 
 coverage: ## Run the test suite with coverage (terminal, xml and html reports)
 	uv run pytest --cov --cov-report=term-missing --cov-report=xml --cov-report=html
+
+# Never part of `check`: it asks the real Odoo.sh, with the session of whoever runs it.
+live-check: ## Check the read path against the real Odoo.sh: make live-check PROJECT=<name>
+	uv run python scripts/live_check.py $(PROJECT)
 
 docs: ## Build the documentation site into site/, failing on warnings
 	uv run zensical build --clean --strict

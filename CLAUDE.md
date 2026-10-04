@@ -130,6 +130,7 @@ make type-check     # basedpyright
 make deps           # deptry, once per package
 make test           # pytest
 make coverage       # pytest with coverage; fail_under = 90
+make live-check PROJECT=<name>   # read path against the real Odoo.sh; by hand, never in CI
 make docs           # zensical build --strict, into site/
 make build          # wheel + sdist of each package, into dist/
 make hooks          # every prek hook over every tracked file

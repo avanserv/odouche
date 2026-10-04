@@ -26,7 +26,9 @@ odouche-cli = { workspace = true }
 odouche-mcp = { workspace = true }
 
 [tool.pytest.ini_options]
-testpaths = ["packages"]
+testpaths = ["packages", "scripts"]
+# Importlib mode puts no directory on the path, and `scripts` is not a package.
+pythonpath = ["scripts"]
 # Three `tests/` trees with no `__init__.py` between them: under the default import mode two files
 # sharing a basename collide, and importlib mode is what lets each package keep the obvious names.
 addopts = ["--import-mode=importlib", "--strict-markers", "--strict-config"]
@@ -53,7 +55,7 @@ exclude_lines = [
 ]
 
 [tool.ruff]
-src = ["packages/*/src"]
+src = ["packages/*/src", "scripts"]
 target-version = "py312"
 fix = true
 show-fixes = true
@@ -196,7 +198,7 @@ line-ending = "lf"
 skip = "uv.lock,./.git,./.venv,./.cache,./site,./dist,./build,./htmlcov,./coverage.xml,*.har"
 
 [tool.vulture]
-paths = ["packages"]
+paths = ["packages", "scripts"]
 min_confidence = 80
 
 [dependency-groups]
