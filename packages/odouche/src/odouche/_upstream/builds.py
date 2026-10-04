@@ -24,8 +24,37 @@ _logger = logging.getLogger("odouche")
 
 def builds(transport: Transport, branch_id: int, limit: int = DEFAULT_LIMIT) -> list[Build]:
     """List the latest builds of a branch, newest first and at most `limit` of them."""
-    _number("branch", branch_id)
-    if _number("limit", limit) < 1:
+    listed = [_build(build) for build in _listed(transport, branch_id, limit)]
+    return sorted(listed, key=lambda build: build.id, reverse=True)[:limit]
+
+
+def build(transport: Transport, branch_id: int, build_id: int) -> Build:
+    """Return one of the latest builds of a branch. Odoo.sh has no request for a build by its number."""
+    number("build", build_id)
+    for listed in builds(transport, branch_id):
+        if listed.id == build_id:
+            return listed
+    raise _not_listed(branch_id, build_id)
+
+
+def worker(transport: Transport, branch_id: int, build_id: int) -> str | None:
+    """Return the address of the worker that holds a build, or `None` while it waits for one."""
+    number("build", build_id)
+    for listed in _listed(transport, branch_id, DEFAULT_LIMIT):
+        if listed.integer("id") == build_id:
+            return listed.optional_text("worker_url")
+    raise _not_listed(branch_id, build_id)
+
+
+def _not_listed(branch_id: int, build_id: int) -> NotFoundError:
+    return NotFoundError(
+        f"Build {build_id} is not among the latest builds of branch {branch_id}.", operation=_OPERATION
+    )
+
+
+def _listed(transport: Transport, branch_id: int, limit: int) -> list[Reader]:
+    number("branch", branch_id)
+    if number("limit", limit) < 1:
         raise ValueError("A limit is at least 1")
     answer = Reader(
         _OPERATION,
@@ -40,20 +69,10 @@ def builds(transport: Transport, branch_id: int, limit: int = DEFAULT_LIMIT) -> 
     branches = answer.items("result")
     if len(branches) != 1:
         raise answer.changed("result")
-    listed = [_build(build) for build in branches[0].items("builds")]
-    return sorted(listed, key=lambda build: build.id, reverse=True)[:limit]
+    return branches[0].items("builds")
 
 
-def build(transport: Transport, branch_id: int, build_id: int) -> Build:
-    """Return one of the latest builds of a branch. Odoo.sh has no request for a build by its number."""
-    _number("build", build_id)
-    for listed in builds(transport, branch_id):
-        if listed.id == build_id:
-            return listed
-    raise NotFoundError(f"Build {build_id} is not among the latest builds of branch {branch_id}.", operation=_OPERATION)
-
-
-def _number(what: str, value: int) -> int:
+def number(what: str, value: int) -> int:
     """Refuse what is not an integer: a number goes into the address of the request as it is."""
     if type(value) is not int:
         raise TypeError(f"A {what} is given as an integer")
@@ -74,7 +93,7 @@ def _build(build: Reader) -> Build:
             hash=_commit_hash(build),
             message=build.text("head_commit_msg"),
             author=build.text("head_commit_author"),
-            timestamp=_timestamp(build, "head_commit_timestamp", build.text("head_commit_timestamp")),
+            timestamp=timestamp(build, "head_commit_timestamp", build.text("head_commit_timestamp")),
             url=build.text("head_commit_url"),
         ),
         status=_known(_STATUSES, status, BuildStatus.UNKNOWN, "status"),
@@ -82,7 +101,7 @@ def _build(build: Reader) -> Build:
         result=None if result is None else _known(_RESULTS, result, BuildResult.UNKNOWN, "result"),
         result_name=result,
         status_info=build.optional_text("status_info"),
-        started_at=None if started is None else _timestamp(build, "start_datetime", started),
+        started_at=None if started is None else timestamp(build, "start_datetime", started),
         url=build.optional_text("url"),
     )
 
@@ -95,7 +114,7 @@ def _known[T](known: dict[str, T], name: str, unknown: T, kind: str) -> T:
     return member
 
 
-def _timestamp(build: Reader, key: str, value: str) -> datetime:
+def timestamp(build: Reader, key: str, value: str) -> datetime:
     try:
         return datetime.strptime(value, _TIMESTAMP).replace(tzinfo=UTC)
     except ValueError:

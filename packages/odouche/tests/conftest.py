@@ -113,7 +113,7 @@ class Upstream:
     """Answers each request with the body of its path, and keeps the requests and the transports it was reached through.
 
     The logout is answered as Odoo.sh does. A path in `failures` answers that status, or raises
-    that error.
+    that error. A body that is a function answers the request itself.
     """
 
     def __init__(self):
@@ -122,6 +122,8 @@ class Upstream:
             "/app/project/acme-corp-odoo-addons-4217/branches": self.load("branches.json"),
             "/app/branch/51044/builds": self.load("builds.json"),
             "/app/user/profile": self.load("user_profile.json"),
+            "/app/project/acme-shop/get_info": self.load("project_info.json"),
+            "/paas/build/88212/logs/list": self.load("build_logs_list.json"),
         }
         self.failures = {}
         self.requests = []
@@ -142,12 +144,15 @@ class Upstream:
         if failure is KeyboardInterrupt:
             raise failure
         if isinstance(failure, type):
-            raise failure(f"failed, Cookie: {request.headers['Cookie']}", request=request)
+            raise failure(f"failed, Cookie: {request.headers.get('Cookie')}", request=request)
         if failure is not None:
             return httpx2.Response(failure)
         if request.url.path == LOGOUT:
             return httpx2.Response(303, headers={"Location": "/"})
-        return httpx2.Response(200, json=self.bodies[request.url.path])
+        body = self.bodies[request.url.path]
+        if isinstance(body, dict):
+            return httpx2.Response(200, json=body)
+        return body(request)
 
 
 @pytest.fixture

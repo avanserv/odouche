@@ -1,12 +1,12 @@
 """The client: the one object a caller asks Odoo.sh through."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from typing import Self
 
 from odouche._session import SessionStore
-from odouche._upstream import branches, builds, projects, user
+from odouche._upstream import branches, builds, logs, projects, user
 from odouche._upstream.transport import Transport
-from odouche.models import Branch, Build, Identity, Project, SessionInfo
+from odouche.models import Branch, Build, Identity, Log, LogKind, LogLine, Project, SessionInfo
 from odouche.secret import Secret
 
 
@@ -64,8 +64,7 @@ class Client:
         or not it exists, and `PermissionDeniedError` when Odoo.sh lists it but refuses its
         branches. Asks Odoo.sh twice, for the projects and then for the branches.
         """
-        name = project.name if isinstance(project, Project) else project
-        return branches.branches(self._transport, name)
+        return branches.branches(self._transport, _project_name(project))
 
     def builds(self, branch: Branch | int, *, limit: int = builds.DEFAULT_LIMIT) -> list[Build]:
         """List the latest builds of a branch, given as a `Branch` or by its number, newest first.
@@ -88,6 +87,54 @@ class Client:
         """Return the newest build of a branch, or `None` when it has none."""
         latest = builds.builds(self._transport, _branch_id(branch), 1)
         return latest[0] if latest else None
+
+    def logs(self, project: Project | str, build: Build) -> list[Log]:
+        """List the logs a build of a project has, which is none while it waits for a worker.
+
+        Raises `NotFoundError` when the build is not among its branch's latest, or the project is
+        not one the session's user can reach.
+        """
+        return logs.logs(self._transport, _project_name(project), build)
+
+    def read_log(
+        self, project: Project | str, build: Build, kind: LogKind | str, *, tail: int | None = None
+    ) -> Iterator[LogLine]:
+        """Yield the lines of one log of a build, given as a `LogKind` or by its name.
+
+        Log content is untrusted: it is whatever a process printed, terminal escape sequences and
+        secrets of the instance included, and it is returned unchanged.
+
+        With `tail`, only the last lines are yielded, out of the log's last mebibyte. A line
+        longer than 64 KiB is cut. Raises `NotFoundError` when the build has no such log.
+        """
+        return logs.read(self._transport, _project_name(project), build, kind, tail)
+
+    def follow_log(
+        self,
+        project: Project | str,
+        build: Build,
+        kind: LogKind | str,
+        *,
+        timeout: float,
+        tail: int = 0,
+        offset: int | None = None,
+    ) -> Iterator[LogLine]:
+        """Yield the lines of one log of a build as they are written, until the iterator is closed.
+
+        Log content is untrusted, as in `read_log`.
+
+        It starts after the log's last `tail` lines, or at `offset`, which is the `offset` of a
+        line read before. Odoo.sh is asked every second. Raises `StreamTimeoutError` after
+        `timeout` seconds, `UpstreamUnavailableError` when a failed request is not answered after
+        two more tries, and `NotFoundError` when the build has no such log.
+        """
+        return logs.follow(
+            self._transport, _project_name(project), build, kind, timeout=timeout, tail=tail, offset=offset
+        )
+
+
+def _project_name(project: Project | str) -> str:
+    return project.name if isinstance(project, Project) else project
 
 
 def _branch_id(branch: Branch | int) -> int:

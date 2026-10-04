@@ -9,8 +9,8 @@ uv add odouche
 
 !!! note "Being built"
 
-    Logging in and out, the session's user and listing projects, branches and builds work.
-    Watching a build, logs and rebuilding are not implemented yet; this page documents the client
+    Logging in and out, the session's user, listing projects, branches and builds, and build logs
+    work. Watching a build and rebuilding are not implemented yet; this page documents the client
     as it lands.
 
 ## What it is designed to be
@@ -209,6 +209,58 @@ with odouche.Client() as client:
 - A branch the user cannot reach raises `NotFoundError`. Odoo.sh gives no reason.
 - A commit's `author` is another person's name. Treat it as personal data.
 
+### Logs
+
+`client.logs(project, build)` returns the logs a build has, as a list of `Log`. `project` is a
+`Project` or a project's name, and `build` a `Build`.
+
+| Field | Meaning |
+| --- | --- |
+| `kind` | A `LogKind`: `INSTALL`, `PIP`, `ODOO`, `UPDATE`, `NEUTRALIZE`, `UPGRADE` or `UNKNOWN`. |
+| `name` | What Odoo.sh calls the log. |
+| `modified_at` | When it was last written to, in UTC. |
+| `size` | Its size in Odoo.sh's own words, such as `156 KB`. |
+
+`client.read_log(project, build, kind)` yields the lines of one log, and
+`client.follow_log(project, build, kind, timeout=...)` the lines written from now on. `kind` is a
+`LogKind` or a log's name.
+
+```python
+with odouche.Client() as client:
+    build = client.latest_build(branch)
+    for line in client.read_log("acme-shop", build, odouche.LogKind.INSTALL, tail=20):
+        print(line.text)
+    for line in client.follow_log("acme-shop", build, odouche.LogKind.ODOO, timeout=600):
+        print(line.text)
+```
+
+Each line is a `LogLine`:
+
+| Field | Meaning |
+| --- | --- |
+| `text` | The line without its newline. |
+| `offset` | The byte just past the line. |
+| `truncated` | Whether the line was cut. |
+
+!!! warning "Log content is untrusted"
+
+    A line is whatever a process printed, unchanged: it can hold terminal escape sequences and
+    secrets of the instance. Neutralise it before showing it.
+
+- A build has only some of the logs, and none while it waits for a worker. A log it does not have
+  raises `NotFoundError`.
+- `tail=N` yields the last N lines, out of the log's last mebibyte.
+- A line longer than 64 KiB is cut to that and marked `truncated`. Bytes that are not UTF-8 are
+  replaced.
+- `follow_log` starts after the last `tail` lines, none by default, or at `offset`: pass the
+  `offset` of the last line read to carry on from it.
+- A follow asks Odoo.sh every second and ends when the iterator is closed. After `timeout` seconds
+  it raises `StreamTimeoutError`.
+- A request that fails is sent again twice, from where the last one stopped, so no line is lost
+  or repeated. Then `UpstreamUnavailableError` is raised.
+- Each call asks Odoo.sh for the build's worker and the project's access token before the log.
+  [Security](security.md#build-logs) says what happens to the token.
+
 ## Errors
 
 Everything the library raises is an `OdoucheError`, so one `except` catches any failure and no
@@ -218,10 +270,11 @@ HTTP client exception has to be imported.
 | --- | --- |
 | `NoSessionError` | There is no session. Log in. |
 | `SessionExpiredError` | Odoo.sh rejected the session, or it passed its max age. Log in again. |
-| `NotFoundError` | The project, branch or build is not one the session's user can reach. |
+| `NotFoundError` | The project, branch, build or log is not one the session's user can reach. |
 | `PermissionDeniedError` | The session is not allowed to do this. |
 | `UpstreamChangedError` | Odoo.sh answered in a shape the library does not read. Please report it. |
 | `UpstreamUnavailableError` | Odoo.sh could not be reached, or answered with a server error. |
+| `StreamTimeoutError` | A log was still being followed at its timeout. |
 | `KeyringUnavailableError` | No accepted keyring backend is available to store the session. |
 | `LoginError` | The login ended without a session, or the pasted one was refused. |
 | `LoginTimeoutError` | Nobody completed the browser login before its timeout. |

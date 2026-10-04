@@ -77,6 +77,20 @@ neither read nor deleted, and the one from the environment is never stored.
 Session values do not appear in logs, exceptions, object representations, command output or MCP
 tool results.
 
+## Build logs
+
+Odoo.sh serves build logs from its worker hosts, which take a project's access token and not the
+session.
+
+- The session is sent to `www.odoo.sh` only, never to a worker.
+- The token is asked from Odoo.sh for each call and kept in memory for that call. It is never
+  stored, logged or shown.
+- It is sent over HTTPS to the worker Odoo.sh names, and only when that is a host directly under
+  `odoo.com`. Odoo.sh takes it in the address of the request.
+- Log content is untrusted. It is whatever a process printed, which can include terminal escape
+  sequences and your instance's own secrets. The library returns it unchanged and never writes it
+  to its own log.
+
 ## The MCP server
 
 The server is read-only by default. Tools that change state on Odoo.sh are opt-in, and every tool

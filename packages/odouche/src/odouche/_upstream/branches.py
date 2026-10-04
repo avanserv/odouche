@@ -1,7 +1,6 @@
 """The branches request."""
 
 import logging
-from urllib.parse import quote
 
 from odouche._upstream import projects
 from odouche._upstream.reader import Reader
@@ -21,8 +20,7 @@ def branches(transport: Transport, project: str) -> list[Branch]:
     technical_name = projects.technical_name(transport, project)
     if technical_name is None:
         raise NotFoundError(f"The session's user can reach no project named {project!r}.", operation=_OPERATION)
-    # A dot is quoted too: the client resolves `..` as a path segment.
-    path = f"/app/project/{quote(technical_name, safe='').replace('.', '%2E')}/branches"
+    path = f"/app/project/{projects.segment(technical_name)}/branches"
     answer = Reader(_OPERATION, transport.call(_OPERATION, path, retry=True))
     return [
         Branch(

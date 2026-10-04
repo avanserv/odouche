@@ -148,6 +148,50 @@ class Build:
         return self.status in _FINISHED
 
 
+class LogKind(StrEnum):
+    """The logs Odoo.sh keeps of a build. A build has only some of them."""
+
+    INSTALL = "install"
+    PIP = "pip"
+    ODOO = "odoo"
+    UPDATE = "update"
+    NEUTRALIZE = "neutralize"
+    UPGRADE = "upgrade"
+    UNKNOWN = "unknown"
+    """A log the library does not know. The log's `name` holds what Odoo.sh calls it."""
+
+
+@dataclass(frozen=True, slots=True)
+class Log:
+    """One of the logs a build has."""
+
+    kind: LogKind
+    """Which log it is."""
+
+    name: str
+    """What Odoo.sh calls it, such as `install`."""
+
+    modified_at: datetime
+    """When it was last written to, in UTC."""
+
+    size: str
+    """Its size in Odoo.sh's own words, such as `156 KB`."""
+
+
+@dataclass(frozen=True, slots=True)
+class LogLine:
+    """A line of a build's log. It is untrusted: whatever a process printed, unchanged."""
+
+    text: str
+    """The line without its newline. Bytes that are not UTF-8 are replaced."""
+
+    offset: int
+    """The byte just past the line, which is where a follow can start again."""
+
+    truncated: bool
+    """Whether the line was longer than the library reads, and was cut."""
+
+
 class SessionSource(StrEnum):
     """Where a session came from."""
 
