@@ -10,7 +10,7 @@ environment.
     notice. It acts with your own Odoo.sh access and nothing more, and staying within your
     agreement with Odoo is your responsibility. See [Unofficial status](unofficial.md).
 
-    The three packages install today, and the library logs in, lists projects, branches and builds, watches a build, reads build logs and triggers a rebuild. The CLI logs in and out with `osh auth`, lists projects with `osh projects list` and branches with `osh branches list`. Nothing else is
+    The three packages install today, and the library logs in, lists projects, branches and builds, watches a build, reads build logs and triggers a rebuild. The CLI logs in and out with `osh auth`, lists projects with `osh projects list` and branches with `osh branches list`, and lists and shows builds with `osh builds list` and `osh builds show`. Nothing else is
     implemented yet. These pages describe what each package is for; they will describe how to use
     it as the features land.
 

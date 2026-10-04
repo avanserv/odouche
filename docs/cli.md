@@ -60,6 +60,30 @@ osh branches list --stage staging --stage production
 - In the table, `*` marks the branch checked out locally, when the project comes from the
   checkout.
 
+## Builds
+
+```bash
+osh builds list
+osh builds list --branch staging --limit 2
+osh builds show
+osh builds show 1234
+```
+
+- Both work on a branch of the [project](#project-and-branch). A branch the project does not have
+  exits 4.
+- As JSON both give the whole [`Build`](reference.md) model: `show` one object, `list` an array.
+- `list` shows the branch's latest builds, newest first: the number, the status, the result, the
+  short commit hash, the first line of the commit message and how long ago the build started.
+- `--limit` is the most builds to list, 4 by default and at least 1. Odoo.sh has only been seen
+  to answer up to four, whatever is asked: older builds are out of reach.
+- `show` shows one build with its commit, its author and the address of its database: the
+  branch's latest, or the one whose number is given. A number that is not among the branch's
+  latest builds exits 4, and so does a branch that has no build.
+- Both exit 0 whatever the build's result: a failed build is shown, not reported as a failure.
+- A status or a result `osh` does not know is shown as Odoo.sh names it.
+- On a terminal the result is coloured, and it is always written out.
+- A table shows times as how long ago they were.
+
 ## Project and branch
 
 A command that works on a project or a branch takes them from the first of these that gives a
@@ -87,6 +111,8 @@ written to stdout, so `osh --format json ... | jq` receives nothing else.
 - JSON keys are the attribute names of the library's models in the [reference](reference.md).
   Datetimes are ISO 8601 with an offset. A stream is one object per line.
 - A table has no colour and no box drawing when stdout is not a terminal or `NO_COLOR` is set.
+- A table has the control characters removed from every cell, and a tab or a line break made a
+  space, so a commit message cannot drive the terminal. JSON has them escaped.
 - An empty result is `[]` as JSON, and one line on stderr as a table. Both exit 0.
 
 ## Exit codes
