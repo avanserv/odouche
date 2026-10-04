@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 import odouche
-from odouche_cli import __version__
+from odouche_cli import __version__, auth
 from odouche_cli._errors import DebugOption, OshGroup
 from odouche_cli._output import Format, FormatOption, Output
 
@@ -19,6 +19,7 @@ app = typer.Typer(
     # A locals dump is where a session would surface.
     pretty_exceptions_show_locals=False,
 )
+app.add_typer(auth.app)
 
 
 @dataclass(frozen=True, slots=True)

@@ -13,7 +13,7 @@ design constraint rather than a guideline.
 
 ## How you sign in
 
-odouche opens a browser window of its own, in which you sign in to Odoo.sh with GitHub.
+`osh auth login` opens a browser window of its own, in which you sign in to Odoo.sh with GitHub.
 
 - The browser is a Chromium-family one already on your machine (Chrome, Chromium, Edge, Brave).
   odouche does not download one.
@@ -50,8 +50,8 @@ Any other keyring backend is refused with an error, including the plain-text one
 `keyrings.alt`. odouche picks among the three itself, so a keyring configured or installed
 elsewhere on the machine cannot become where the session goes.
 
-The entry is named `session`, under the service `odouche`, so you can find it and delete it by
-hand.
+`osh auth logout` ends the session on Odoo.sh and deletes the entry. It is named `session`, under
+the service `odouche`, so you can also find it and delete it by hand.
 
 When none of the three is available, odouche does not keep the session. It says so and names the
 two ways out: install a Secret Service provider, or supply the session through the environment. It

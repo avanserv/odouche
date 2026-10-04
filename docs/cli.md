@@ -6,11 +6,6 @@
 uv tool install odouche-cli
 ```
 
-!!! note "Not implemented yet"
-
-    The command installs and reports its version. No Odoo.sh commands exist yet; this page will
-    document them as they land.
-
 ```bash
 osh --version
 osh --help
@@ -18,6 +13,26 @@ osh --help
 
 `osh` is built on the [`odouche` library](library.md) and adds nothing of its own beyond
 presentation: every command is a call into the library, rendered for a terminal.
+
+## Signing in
+
+```bash
+osh auth login
+osh auth status
+osh auth logout
+```
+
+- `login` opens a browser for you to sign in to Odoo.sh with GitHub, stores the session in the
+  keyring and names the account. Where no browser can be launched it asks for the `session_id`
+  cookie in a prompt that does not echo it. [Security](security.md) has what is kept and where.
+- `status` shows where the session comes from, how long ago it was stored and when it expires,
+  without asking Odoo.sh. It exits 3 when there is no usable session, so a script can test for
+  one. `status --check` asks Odoo.sh whether it still accepts the session, and adds the user.
+- `logout` removes the session from the keyring and says whether Odoo.sh ended it. With nothing
+  to log out of it exits 0.
+- No option takes a session: arguments show in the process list and in the shell history. With
+  `ODOUCHE_SESSION` set, that session is the one in use: `login` still stores the one it gets,
+  and `logout` leaves the variable for you to unset.
 
 ## Output
 
