@@ -56,6 +56,27 @@ capture, which is never committed.
 - Nothing checks the rest, so scrub by hand: project names, repository names, commit authors and
   messages, build hostnames.
 
+## Checking against the real Odoo.sh
+
+Since no test contacts Odoo.sh, nothing in CI notices that it changed. One command does, by hand:
+
+```bash
+make live-check PROJECT=<name>
+```
+
+It asks Odoo.sh, with your stored session, for who you are, your projects, that project's
+branches, the builds of its production branch (the first branch when it has none), one build, its
+logs and the end of one log. Each step reports whether the answer still has the shape the library
+reads, and names the field when it does not. A step with nothing to read, such as the logs of a
+build still waiting for a worker, is skipped. It changes nothing on Odoo.sh, and it refuses to run
+when `CI` is set.
+
+The report holds counts and field names only, no project, branch, commit or log text, so it can be
+pasted into an issue. Run it:
+
+- before merging a release pull request;
+- when someone reports an "Unexpected answer from Odoo.sh" error.
+
 ## Commits and pull requests
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org):
@@ -84,7 +105,7 @@ Merging the release pull request tags the release and publishes the three packag
 One thing to know before merging one: wait for the
 `chore: sync uv.lock with the release version` commit to land on the release branch, and for CI
 to pass on it. Release Please does not know about `uv.lock`; the Release workflow adds that
-commit.
+commit. Run `make live-check` as well, since CI cannot.
 
 ## Security
 
