@@ -10,8 +10,9 @@ environment.
     notice. It acts with your own Odoo.sh access and nothing more, and staying within your
     agreement with Odoo is your responsibility. See [Unofficial status](unofficial.md).
 
-    The three packages install today, but the Odoo.sh client itself is not implemented yet. These
-    pages describe what each package is for; they will describe how to use it as the features land.
+    The three packages install today, and the library logs in and lists projects. Nothing else is
+    implemented yet. These pages describe what each package is for; they will describe how to use
+    it as the features land.
 
 ## Three packages, one library
 
