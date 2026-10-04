@@ -44,6 +44,25 @@ osh projects list
   the address of the project's page. As JSON it is the whole
   [`Project`](reference.md) model.
 
+## Project and branch
+
+A command that works on a project or a branch takes them from the first of these that gives a
+value:
+
+| Order | Project | Branch |
+| --- | --- | --- |
+| 1 | `--project` | `--branch` |
+| 2 | `OSH_PROJECT` | `OSH_BRANCH` |
+| 3 | The git checkout's remote, when it is a GitHub repository | The git checkout's current branch |
+
+- The project is given by its name, as `osh projects list` shows it.
+- The remote is the upstream of the current branch, and `origin` otherwise. A detached HEAD
+  gives no branch.
+- A repository that several of your projects build is never guessed between: the command exits 2
+  and lists them. One that none of them builds exits 4.
+- With no source giving a value, or an empty `--project` or `--branch`, the command exits 2.
+- `--debug` says on stderr which source was used.
+
 ## Output
 
 `--format table` (the default) or `--format json`, given before the command. Only the result is
