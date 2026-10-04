@@ -234,11 +234,47 @@ def test_reports_an_answer_the_reference_does_not_describe(connect, answer, fiel
     assert upstream.rejected == 0
 
 
+UNEXPLAINED = {"error": {"data": {"name": "builtins.Exception", "message": "error code: SH-5ecr3t"}}}
+
+
+def test_an_unexplained_error_is_not_found_where_the_request_says_so(connect):
+    transport, upstream = connect(httpx2.Response(200, json=UNEXPLAINED))
+
+    with pytest.raises(NotFoundError, match="No such branch") as raised:
+        transport.call(OPERATION, PATH, not_found="No such branch.")
+
+    assert (raised.value.operation, raised.value.status) == (OPERATION, 200)
+    assert upstream.rejected == 0
+
+
+@pytest.mark.parametrize(
+    ("answer", "cls", "rejected"),
+    [
+        (fixture("access_error.json"), PermissionDeniedError, 0),
+        (fixture("unauthenticated.json"), SessionExpiredError, 1),
+        (
+            httpx2.Response(200, json={"error": {"data": {"name": "odoo.exceptions.UserError"}}}),
+            UpstreamChangedError,
+            0,
+        ),
+        (httpx2.Response(500, json=UNEXPLAINED), UpstreamUnavailableError, 0),
+    ],
+)
+def test_any_other_error_is_what_it_is_without_the_option(connect, answer, cls, rejected):
+    transport, upstream = connect(answer)
+
+    with pytest.raises(cls):
+        transport.call(OPERATION, PATH, not_found="No such branch.")
+
+    assert upstream.rejected == rejected
+
+
 @pytest.mark.parametrize(
     "answer",
     [
         fixture("unauthenticated.json"),
         fixture("access_error.json"),
+        httpx2.Response(200, json=UNEXPLAINED),
         redirect("https://evil.example.com/"),
         httpx2.Response(404),
         httpx2.Response(502),
@@ -250,7 +286,7 @@ def test_an_error_carries_nothing_of_the_request(connect, answer):
     transport, _ = connect(answer)
 
     with pytest.raises(OdoucheError) as raised:
-        transport.call(OPERATION, PATH)
+        transport.call(OPERATION, PATH, not_found="No such branch.")
 
     assert raised.value.__context__ is None
     assert raised.value.__cause__ is None
@@ -258,6 +294,7 @@ def test_an_error_carries_nothing_of_the_request(connect, answer):
         assert SESSION not in text
         assert "Cookie" not in text
         assert "octo-dev" not in text
+        assert "SH-5ecr3t" not in text
 
 
 def test_logs_the_request_without_the_session(connect, caplog):

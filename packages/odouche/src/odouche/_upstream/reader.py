@@ -26,6 +26,23 @@ class Reader:
         """Return an integer field. A boolean is not one."""
         return self._read(key, int)
 
+    def optional_text(self, key: str) -> str | None:
+        """Return a string field, or `None` when Odoo.sh answers `false` for an absent value."""
+        if self._fields.get(key) is False:
+            return None
+        return self._read(key, str)
+
+    def pair(self, key: str) -> tuple[int, str]:
+        """Return a many-to-one field, which is a list of an id and a name."""
+        value = self._read(key, list)
+        if len(value) != 2 or type(value[0]) is not int or type(value[1]) is not str:  # noqa: PLR2004
+            raise UpstreamChangedError(self._operation, self._path(key))
+        return value[0], value[1]
+
+    def changed(self, key: str) -> UpstreamChangedError:
+        """Return the error for a field whose value is of the right type and still not readable."""
+        return UpstreamChangedError(self._operation, self._path(key))
+
     def child(self, key: str) -> Self:
         """Return the reader of an object field."""
         return self._object(self._path(key), self._fields.get(key))
