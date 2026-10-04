@@ -4,12 +4,16 @@ on:
   pull_request:
     # This list is load-bearing: naming any type replaces the implied set.
     types: [opened, synchronize, reopened]
+  # The run the README badge reports.
+  push:
+    branches:
+      - main
 
-# CI verifies pull requests only, so a push to main re-runs nothing. A superseded push should not
-# keep burning minutes, so in-progress runs are cancelled when a newer commit lands.
+# A superseded push to a pull request should not keep burning minutes, so its in-progress runs are
+# cancelled when a newer commit lands. A run on main is left to finish.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # Read-only by default, so a job gets write access only by asking for it in its own block and
 # saying there what it needs it for. No job in this file does.

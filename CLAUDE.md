@@ -153,7 +153,7 @@ tools through `uv run`, so they use the versions `uv.lock` pins.
   versioned in lockstep, and the `# x-release-please-version` markers in the package manifests are
   what it rewrites (including the `odouche==X` pin in the two frontends).
 - Merging the release PR tags the release and publishes to PyPI by trusted publishing
-  (`.github/workflows/release.yml`). CONTRIBUTING.md has the two things to check before merging one.
+  (`.github/workflows/release.yml`). CONTRIBUTING.md has what to wait for before merging one.
 
 ## Testing
 

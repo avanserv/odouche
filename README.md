@@ -1,6 +1,6 @@
 # odouche
 
-[![CI](https://github.com/avanserv/odouche/actions/workflows/ci.yml/badge.svg)](https://github.com/avanserv/odouche/actions/workflows/ci.yml)
+[![CI](https://github.com/avanserv/odouche/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/avanserv/odouche/actions/workflows/ci.yml?query=branch%3Amain)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 An unofficial toolkit for working with [Odoo.sh](https://www.odoo.sh) from your development
