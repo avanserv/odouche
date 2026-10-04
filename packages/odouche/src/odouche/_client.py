@@ -4,7 +4,7 @@ from collections.abc import Callable, Iterator
 from typing import Self
 
 from odouche._session import SessionStore
-from odouche._upstream import branches, builds, logs, projects, user
+from odouche._upstream import branches, builds, logs, projects, user, watch
 from odouche._upstream.transport import Transport
 from odouche.models import Branch, Build, Identity, Log, LogKind, LogLine, Project, SessionInfo
 from odouche.secret import Secret
@@ -87,6 +87,21 @@ class Client:
         """Return the newest build of a branch, or `None` when it has none."""
         latest = builds.builds(self._transport, _branch_id(branch), 1)
         return latest[0] if latest else None
+
+    def watch_build(self, project: Project | str, build: Build, *, timeout: float) -> Iterator[Build]:
+        """Yield a build of a project as it is now, then at each change, and end once it has finished.
+
+        A change is one of `status`, `result` or `status_info`. The last build yielded is the
+        finished one, and a build that has already finished is yielded once. The watch stays on
+        this build: a newer one on the branch ends it as `DROPPED`. Closing the iterator closes the
+        connection.
+
+        Raises `StreamTimeoutError` after `timeout` seconds, `UpstreamUnavailableError` when the
+        connection fails three times in a row or Odoo.sh cannot be asked for the build, and
+        `NotFoundError` when the build is not among its
+        branch's latest, or the project is not one the session's user can reach.
+        """
+        return watch.watch(self._transport, project, build, timeout=timeout)
 
     def logs(self, project: Project | str, build: Build) -> list[Log]:
         """List the logs a build of a project has, which is none while it waits for a worker.

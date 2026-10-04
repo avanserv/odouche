@@ -9,8 +9,8 @@ official public API; this project is an **unofficial** client for what the Odoo.
 
 Status: the workspace, tooling and CI exist; the packages are skeletons (`osh --version`, an MCP
 server with no tools). The library has its transport, session store, login, logout and a client
-that reports the session's user, lists projects, branches and builds, and reads and follows a
-build's logs; watching a build and rebuild are not implemented.
+that reports the session's user, lists projects, branches and builds, watches a build, and reads
+and follows a build's logs; rebuild is not implemented.
 The architecture and security sections below are the design the implementation is held to.
 
 ## Architecture

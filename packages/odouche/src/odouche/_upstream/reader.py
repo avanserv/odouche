@@ -32,6 +32,10 @@ class Reader:
             return None
         return self._read(key, str)
 
+    def has(self, key: str) -> bool:
+        """Tell whether a field is there, whatever it holds."""
+        return key in self._fields
+
     def pair(self, key: str) -> tuple[int, str]:
         """Return a many-to-one field, which is a list of an id and a name."""
         value = self._read(key, list)

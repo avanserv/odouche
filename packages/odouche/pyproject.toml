@@ -24,8 +24,9 @@ classifiers = [
 # Declared with the code that imports them, never ahead of it: deptry fails on a dependency
 # nothing imports, and on an import nothing declares.
 dependencies = [
-    "httpx2>=2.13.1",
+    "httpx2[ws]>=2.13.1",
     "keyring>=25.7.0",
+    "wsproto>=1.2",
 ]
 
 [project.urls]

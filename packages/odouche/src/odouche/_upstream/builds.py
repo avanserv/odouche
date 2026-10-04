@@ -2,7 +2,9 @@
 
 import logging
 import re
+from dataclasses import replace
 from datetime import UTC, datetime
+from typing import TypedDict
 
 from odouche._upstream.reader import Reader
 from odouche._upstream.transport import Transport
@@ -24,7 +26,7 @@ _logger = logging.getLogger("odouche")
 
 def builds(transport: Transport, branch_id: int, limit: int = DEFAULT_LIMIT) -> list[Build]:
     """List the latest builds of a branch, newest first and at most `limit` of them."""
-    listed = [_build(build) for build in _listed(transport, branch_id, limit)]
+    listed = [whole(build) for build in _listed(transport, branch_id, limit)]
     return sorted(listed, key=lambda build: build.id, reverse=True)[:limit]
 
 
@@ -79,10 +81,9 @@ def number(what: str, value: int) -> int:
     return value
 
 
-def _build(build: Reader) -> Build:
+def whole(build: Reader) -> Build:
+    """Read a build from all its fields, as the builds request and the bus give them."""
     branch_id, branch_name = build.pair("branch_id")
-    status = build.text("status")
-    result = build.optional_text("result")
     started = build.optional_text("start_datetime")
     return Build(
         id=build.integer("id"),
@@ -96,14 +97,35 @@ def _build(build: Reader) -> Build:
             timestamp=timestamp(build, "head_commit_timestamp", build.text("head_commit_timestamp")),
             url=build.text("head_commit_url"),
         ),
-        status=_known(_STATUSES, status, BuildStatus.UNKNOWN, "status"),
-        status_name=status,
-        result=None if result is None else _known(_RESULTS, result, BuildResult.UNKNOWN, "result"),
-        result_name=result,
+        **_outcome(build),
         status_info=build.optional_text("status_info"),
         started_at=None if started is None else timestamp(build, "start_datetime", started),
         url=build.optional_text("url"),
     )
+
+
+def short(build: Build, values: Reader) -> Build:
+    """Return `build` as the short form of a bus event says it is now."""
+    info = values.optional_text("status_info") if values.has("status_info") else build.status_info
+    return replace(build, **_outcome(values), status_info=info)
+
+
+class _Outcome(TypedDict):
+    status: BuildStatus
+    status_name: str
+    result: BuildResult | None
+    result_name: str | None
+
+
+def _outcome(build: Reader) -> _Outcome:
+    status = build.text("status")
+    result = build.optional_text("result")
+    return {
+        "status": _known(_STATUSES, status, BuildStatus.UNKNOWN, "status"),
+        "status_name": status,
+        "result": None if result is None else _known(_RESULTS, result, BuildResult.UNKNOWN, "result"),
+        "result_name": result,
+    }
 
 
 def _known[T](known: dict[str, T], name: str, unknown: T, kind: str) -> T:

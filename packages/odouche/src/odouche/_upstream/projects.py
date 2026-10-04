@@ -35,6 +35,14 @@ def technical_name(transport: Transport, name: str) -> str | None:
     return None
 
 
+def project_id(transport: Transport, name: str) -> int | None:
+    """Return the number of the project named `name`, or `None` when it is not listed."""
+    for repo in _repos(transport):
+        if repo.text("project_name") == name:
+            return repo.integer("id")
+    return None
+
+
 def segment(name: str) -> str:
     """Quote a name for the address of a request. A dot is quoted too: the client resolves `..`."""
     return quote(name, safe="").replace(".", "%2E")
