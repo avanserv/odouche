@@ -26,16 +26,17 @@ def branches(transport: Transport, project: str) -> list[Branch]:
         Branch(
             id=branch.integer("id"),
             name=branch.text("name"),
-            stage=_stage(branch.text("stage")),
+            stage=stage(branch.text("stage")),
             stage_name=branch.text("stage"),
         )
         for branch in answer.items("result")
     ]
 
 
-def _stage(name: str) -> Stage:
-    stage = _STAGES.get(name)
-    if stage is None:
+def stage(name: str) -> Stage:
+    """Return the stage Odoo.sh calls `name`."""
+    known = _STAGES.get(name)
+    if known is None:
         _logger.debug("Unknown branch stage: %r", name)
         return Stage.UNKNOWN
-    return stage
+    return known

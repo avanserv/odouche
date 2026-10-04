@@ -9,9 +9,10 @@ import time
 from collections.abc import Callable, Generator, Iterator, Mapping
 from contextlib import ExitStack, contextmanager, suppress
 from dataclasses import dataclass
+from functools import wraps
 from http.cookiejar import DefaultCookiePolicy
 from importlib.metadata import version
-from typing import Self, cast
+from typing import Concatenate, Self, cast
 
 import httpx2
 from httpx2.websockets import (
@@ -27,7 +28,9 @@ from wsproto.utilities import LocalProtocolError
 from odouche.errors import (
     NotFoundError,
     OdoucheError,
+    OutcomeUnknownError,
     PermissionDeniedError,
+    ReadOnlyError,
     SessionExpiredError,
     UpstreamChangedError,
     UpstreamUnavailableError,
@@ -52,6 +55,8 @@ _CONTENT_RANGE = re.compile(r"bytes (\d+)-\d+/\d+")
 _TIMEOUT = httpx2.Timeout(connect=10, read=30, write=10, pool=10)
 _BACKOFF = (1.0, 2.0)
 _TRANSIENT = frozenset({502, 503, 504})
+# The failures of a connection that was never opened: the request did not leave.
+_NOT_SENT = frozenset({"ConnectError", "ConnectTimeout", "PoolTimeout"})
 _DENIED = "Odoo.sh does not allow this to the session's user."
 _REFUSED: dict[int, tuple[type[OdoucheError], str]] = {
     404: (NotFoundError, "Odoo.sh has nothing at this address."),
@@ -233,10 +238,12 @@ class Transport:
         session: Secret,
         *,
         on_rejected: Callable[[], None] = lambda: None,
+        read_only: bool = False,
         transport: httpx2.BaseTransport | None = None,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self._session = session
+        self._read_only = read_only
         self._on_rejected = on_rejected
         self._sleep = sleep
         self._lock = threading.Lock()
@@ -259,6 +266,11 @@ class Transport:
         """Close the connections."""
         self._client.close()
 
+    @property
+    def read_only(self) -> bool:
+        """Whether a state-changing request is refused."""
+        return self._read_only
+
     def call(
         self,
         operation: str,
@@ -270,8 +282,8 @@ class Transport:
     ) -> dict[str, object]:
         """Send one JSON-RPC request and return the answer, which holds no `error`.
 
-        `retry` repeats a request that failed in transit or on a gateway error. It is for reads
-        only: a state-changing request sent twice is done twice.
+        `retry` repeats a request that failed in transit or on a gateway error. A state-changing
+        request goes through `change`.
 
         `not_found` is the message of the `NotFoundError` raised for the error Odoo.sh gives no
         reason for, which is its answer to a branch that does not exist. Without it that answer
@@ -282,6 +294,30 @@ class Transport:
         if error is not None:
             raise error
         return cast("dict[str, object]", answer.body)
+
+    def change(self, operation: str, path: str) -> None:
+        """Send one state-changing JSON-RPC request, once: sent twice, it is done twice.
+
+        Raises `ReadOnlyError` before sending when the transport is read-only, and
+        `OutcomeUnknownError` when the request left and nothing says what Odoo.sh did with it:
+        no answer, a server error, or the error Odoo.sh gives no reason for.
+        """
+        if self._read_only:
+            raise _read_only(operation)
+        answer = self._attempt(operation, "POST", _url(path), None, retry=False)
+        if answer.status is None:
+            unknown = answer.failure not in _NOT_SENT
+        else:
+            unknown = httpx2.codes.is_server_error(answer.status) or _error_name(answer.body) == _UNEXPLAINED
+        if unknown:
+            raise OutcomeUnknownError(
+                f"Odoo.sh did not confirm the {operation}, which may have been done. Look before trying again.",
+                operation=operation,
+                status=answer.status,
+            )
+        error = _error(operation, answer, None)
+        if error is not None:
+            raise error
 
     def leave(
         self, operation: str, path: str, params: Mapping[str, str] | None = None, *, to: str, retry: bool = False
@@ -413,6 +449,27 @@ class Transport:
         elapsed = (time.perf_counter() - started) * 1000
         _logger.debug("%s %s: %s in %.0f ms", method, url.path, answer.status or answer.failure, elapsed)
         return answer
+
+
+def state_changing[**P, R](
+    function: Callable[Concatenate[Transport, P], R],
+) -> Callable[Concatenate[Transport, P], R]:
+    """Mark an endpoint function as one that changes state on Odoo.sh.
+
+    With a read-only transport it raises `ReadOnlyError` before anything is sent, its reads included.
+    """
+
+    @wraps(function)
+    def guarded(transport: Transport, *args: P.args, **kwargs: P.kwargs) -> R:
+        if transport.read_only:
+            raise _read_only(function.__name__)
+        return function(transport, *args, **kwargs)
+
+    return guarded
+
+
+def _read_only(operation: str) -> ReadOnlyError:
+    return ReadOnlyError(f"This client is read-only: it does not send a {operation}.", operation=operation)
 
 
 def _hang_up(session: WebSocketSession) -> None:

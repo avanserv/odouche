@@ -8,7 +8,7 @@ as typed models, for use in your own tools.
 > It acts with your own Odoo.sh access and nothing more, and staying within your agreement with
 > Odoo is your responsibility. See [Unofficial status](https://avanserv.github.io/odouche/unofficial/).
 
-**Status: pre-alpha.** Logging in, listing projects, branches and builds, watching a build and reading build logs work; rebuilding is not implemented yet.
+**Status: pre-alpha.** Logging in, listing projects, branches and builds, watching a build, reading build logs and rebuilding work.
 
 ```bash
 uv add odouche

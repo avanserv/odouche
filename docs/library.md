@@ -10,8 +10,7 @@ uv add odouche
 !!! note "Being built"
 
     Logging in and out, the session's user, listing projects, branches and builds, watching a
-    build and build logs work. Rebuilding is not implemented yet; this page documents the client
-    as it lands.
+    build, build logs and rebuilding work. This page documents the client as it lands.
 
 ## What it is designed to be
 
@@ -284,6 +283,33 @@ Each line is a `LogLine`:
 - Each call asks Odoo.sh for the build's worker and the project's access token before the log.
   [Security](security.md#build-logs) says what happens to the token.
 
+## State-changing operations
+
+Every other call of the client only reads. These are the calls that change something on Odoo.sh:
+
+| Call | What it changes |
+| --- | --- |
+| `client.rebuild(branch)` | Starts a new build of the branch, which replaces its latest one. |
+
+```python
+with odouche.Client() as client:
+    build = client.rebuild(branch)
+    for build in client.watch_build("acme-shop", build, timeout=1800):
+        print(build.status, build.status_info)
+```
+
+- `odouche.Client(read_only=True)` refuses them: the call raises `ReadOnlyError` and nothing is
+  sent, not even the reads the call starts with. `client.read_only` tells which a client is.
+- The request is sent once and never repeated. When it left and Odoo.sh did not confirm it, or
+  the new build cannot be found, the call raises `OutcomeUnknownError`: look at the branch before
+  calling again, since a second call can start a second build.
+- `rebuild` takes a `Branch` or a branch's number and returns the new `Build`. It asks Odoo.sh
+  three times: for the branch's latest build, for the rebuild, then for the new build.
+- Only a development or a staging branch is rebuilt. Any other stage raises `StageRefusedError`
+  before the rebuild is sent, and before any request when a `Branch` in that stage is passed.
+  A rebuild has only been observed on a development branch.
+- The library asks for no confirmation. That is the caller's to do.
+
 ## Errors
 
 Everything the library raises is an `OdoucheError`, so one `except` catches any failure and no
@@ -297,6 +323,9 @@ HTTP client exception has to be imported.
 | `PermissionDeniedError` | The session is not allowed to do this. |
 | `UpstreamChangedError` | Odoo.sh answered in a shape the library does not read. Please report it. |
 | `UpstreamUnavailableError` | Odoo.sh could not be reached, or answered with a server error. |
+| `ReadOnlyError` | A read-only client was asked to change state. Nothing was sent. |
+| `StageRefusedError` | The branch is in a stage the library does not change. |
+| `OutcomeUnknownError` | A state-changing request was sent and Odoo.sh did not confirm it. Look before trying again. |
 | `StreamTimeoutError` | A build was still being watched, or a log followed, at its timeout. |
 | `KeyringUnavailableError` | No accepted keyring backend is available to store the session. |
 | `LoginError` | The login ended without a session, or the pasted one was refused. |
