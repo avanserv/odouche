@@ -19,18 +19,31 @@ jobs:
     name: Release PR
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The job's own token writes nothing: everything below goes through the release App's token.
     permissions:
-      contents: write # the tag and the GitHub release, and the lockfile commit on the release branch
-      pull-requests: write # opens and updates the release pull request
+      contents: read
     outputs:
       release_created: ${{ steps.release.outputs.release_created }}
       tag_name: ${{ steps.release.outputs.tag_name }}
     steps:
-      # Runs on the job's own token, so no App key or personal token is stored for releases. The
-      # cost is that GitHub starts no workflow for anything this token pushes: CI does not run on
-      # the release pull request until someone closes and reopens it. CONTRIBUTING.md has the step.
+      # The release App rather than the job's own token: GitHub holds the workflows of a pull
+      # request that token opens until someone approves them, so the release pull request would
+      # never get its CI unattended.
+      - name: Generate the release App token
+        uses: actions/create-github-app-token@v3.2.0
+        id: app-token
+        with:
+          client-id: ${{ secrets.RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+          # Named rather than left blank, because blank means every permission the installation
+          # holds. A permission it does not hold fails the token request itself.
+          permission-contents: write # the tag, the GitHub release, the lockfile commit
+          permission-pull-requests: write # opens and updates the release pull request
+
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
+        with:
+          token: ${{ steps.app-token.outputs.token }}
 
       # Release Please rewrites the version in the four manifests and knows nothing of uv.lock,
       # which records the same versions. Left alone the release branch fails `uv sync --locked`,
@@ -39,6 +52,7 @@ jobs:
         if: ${{ steps.release.outputs.pr }}
         uses: actions/checkout@v7
         with:
+          token: ${{ steps.app-token.outputs.token }}
           ref: ${{ steps.release.outputs.pr && fromJSON(steps.release.outputs.pr).headBranchName || '' }}
           # The push below is the whole reason for this checkout, so the credential stays.
           persist-credentials: true # zizmor: ignore[artipacked]
@@ -47,7 +61,7 @@ jobs:
         if: ${{ steps.release.outputs.pr }}
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
-          # No cache in a workflow that can write to the repository and publish: a cache is
+          # No cache in a workflow that holds the release App's key and publishes: a cache is
           # writable by any job that can reach the same key.
           enable-cache: false
 

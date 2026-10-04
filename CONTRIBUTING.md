@@ -79,14 +79,12 @@ commits on `main` and keeps a release pull request open with the next version an
 The three packages are versioned together and always released together.
 
 Merging the release pull request tags the release and publishes the three packages to PyPI, using
-[trusted publishing](https://docs.pypi.org/trusted-publishers/): no token is stored anywhere.
+[trusted publishing](https://docs.pypi.org/trusted-publishers/): no PyPI token is stored anywhere.
 
-Two things to know before merging one:
-
-- Wait for the `chore: sync uv.lock with the release version` commit to land on the release branch.
-  Release Please does not know about `uv.lock`; the Release workflow adds that commit.
-- CI does not start by itself on the release pull request, because GitHub starts no workflow for
-  what a workflow's own token pushes. **Close and reopen the pull request** to run it.
+One thing to know before merging one: wait for the
+`chore: sync uv.lock with the release version` commit to land on the release branch, and for CI
+to pass on it. Release Please does not know about `uv.lock`; the Release workflow adds that
+commit.
 
 ## Security
 
