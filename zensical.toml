@@ -9,6 +9,7 @@ nav = [
     { "Overview" = "index.md" },
     { "Library" = "library.md" },
     { "CLI" = "cli.md" },
+    { "CLI reference" = "cli-reference.md" },
     { "MCP server" = "mcp.md" },
     { "Security" = "security.md" },
     { "Unofficial status" = "unofficial.md" },

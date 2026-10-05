@@ -74,19 +74,27 @@ _RESULT_EXITS = {
 
 LimitOption = Annotated[
     int,
-    typer.Option("--limit", min=1, help="The most builds to list. Odoo.sh may answer fewer."),
+    typer.Option(
+        "--limit",
+        min=1,
+        help="The most builds to list. Odoo.sh has only been seen to answer up to 4: older builds are out of reach.",
+    ),
 ]
 BuildArgument = Annotated[
     int | None,
-    typer.Argument(metavar="BUILD_ID", min=1, help="The build's number. Default: the branch's latest build."),
+    typer.Argument(
+        metavar="BUILD_ID",
+        min=1,
+        help="The build's number, among the branch's latest builds. Default: the latest one.",
+    ),
 ]
 WatchedArgument = Annotated[
     int | None,
     typer.Argument(
         metavar="BUILD_ID",
         min=1,
-        help="The build's number. Default: the build of HEAD when the project and the branch are the checkout's, "
-        "the latest build otherwise.",
+        help="The build's number, among the branch's latest builds. "
+        "Default: the build of HEAD when the project and the branch are the checkout's, the latest build otherwise.",
     ),
 ]
 
@@ -100,7 +108,9 @@ def _hash(value: str | None) -> str | None:
 
 TimeoutOption = Annotated[
     int,
-    typer.Option("--timeout", min=1, metavar="SECONDS", help="The longest to wait for the build to finish."),
+    typer.Option(
+        "--timeout", min=1, metavar="SECONDS", help="The longest to wait for the build to appear and to finish."
+    ),
 ]
 CommitOption = Annotated[
     str | None,
@@ -108,8 +118,9 @@ CommitOption = Annotated[
         "--commit",
         metavar="SHA",
         callback=_hash,
-        help="Wait for a build of this commit, given as 7 to 64 digits of its hash. "
-        "Default: the git checkout's HEAD, when the project and the branch are the checkout's.",
+        help="Wait for a build of this commit, given as the first 7 to 64 digits of its hash. "
+        "Default: the git checkout's HEAD, when the project and the branch are the checkout's. "
+        "Goes with neither BUILD_ID nor `--no-wait`.",
     ),
 ]
 NoWaitOption = Annotated[
@@ -127,7 +138,10 @@ WatchOption = Annotated[
 WatchTimeoutOption = Annotated[
     int,
     typer.Option(
-        "--timeout", min=1, metavar="SECONDS", help="The longest to wait for the new build to finish, with `--watch`."
+        "--timeout",
+        min=1,
+        metavar="SECONDS",
+        help="The longest to wait for the new build to finish. Goes with `--watch` only.",
     ),
 ]
 
@@ -139,7 +153,7 @@ def list_(
     branch: BranchOption = None,
     limit: LimitOption = _DEFAULT_LIMIT,
 ) -> None:
-    """List a branch's latest builds, newest first."""
+    """List a branch's latest builds, newest first, with their status, result and commit."""
     output: Output = ctx.obj
     name = resolve_branch(ctx, branch)
     with open_client() as client:
@@ -163,7 +177,7 @@ def show(
     project: ProjectOption = None,
     branch: BranchOption = None,
 ) -> None:
-    """Show one build of a branch: its latest, or the one numbered BUILD_ID."""
+    """Show one build of a branch, with its commit and the address of its database: its latest, or BUILD_ID."""
     output: Output = ctx.obj
     name = resolve_branch(ctx, branch)
     with open_client() as client:

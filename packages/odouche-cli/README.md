@@ -8,11 +8,26 @@
 > with your own Odoo.sh access and nothing more, and staying within your agreement with Odoo is
 > your responsibility. See [Unofficial status](https://avanserv.github.io/odouche/unofficial/).
 
-**Status: pre-alpha.** `osh auth` logs in to Odoo.sh, logs out and shows the session in use, `osh projects list` and `osh branches list` list your projects and their branches, `osh builds list`, `osh builds show` and `osh builds watch` list, show and watch a branch's builds, `osh builds rebuild` starts a new one, and `osh logs` prints and follows a build's log; no other command exists yet.
+**Status: pre-alpha.** `osh` logs in, lists projects, branches and builds, watches a build, prints
+and follows its logs and starts a rebuild.
 
 ```bash
 uv tool install odouche-cli
-osh --help
 ```
 
-Documentation: <https://avanserv.github.io/odouche/>
+From a checkout of the repository an Odoo.sh project builds:
+
+```bash
+osh auth login        # sign in with GitHub in a browser; the session goes to the keyring
+osh branches list     # the project's branches, with their stage
+git push
+osh builds watch      # follow the build of the pushed commit, and exit with its result
+osh logs              # the end of that build's log
+```
+
+Anywhere else, name the project and the branch:
+`osh builds watch --project acme --branch feature-x`.
+
+The [guide](https://avanserv.github.io/odouche/cli/) has the exit codes, the JSON output, the
+environment variables and shell completion, and the
+[reference](https://avanserv.github.io/odouche/cli-reference/) every command and option.

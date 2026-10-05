@@ -35,7 +35,12 @@ _PRINTING = {
 
 BuildOption = Annotated[
     int | None,
-    typer.Option("--build", metavar="BUILD_ID", min=1, help="The build's number. Default: the branch's latest build."),
+    typer.Option(
+        "--build",
+        metavar="BUILD_ID",
+        min=1,
+        help="The build's number, among the branch's latest builds. Default: the latest one.",
+    ),
 ]
 KindOption = Annotated[
     str | None,
@@ -48,19 +53,31 @@ KindOption = Annotated[
 ]
 KindsOption = Annotated[
     bool,
-    typer.Option("--kinds", help="List the logs the build has, and print none."),
+    typer.Option(
+        "--kinds",
+        help="List the logs the build has, and print none. Goes with none of the options that print a log.",
+    ),
 ]
 TailOption = Annotated[
     int,
-    typer.Option("--tail", min=1, metavar="LINES", help="Print the last lines, out of the log's last mebibyte."),
+    typer.Option(
+        "--tail",
+        min=1,
+        metavar="LINES",
+        help="Print the last lines, out of the log's last mebibyte: a large tail can print fewer.",
+    ),
 ]
 AllOption = Annotated[
     bool,
-    typer.Option("--all", help="Print the whole log."),
+    typer.Option("--all", help="Print the whole log. Does not go with `--tail`."),
 ]
 FollowOption = Annotated[
     bool,
-    typer.Option("--follow", "-f", help="Keep printing the lines as they are written, until interrupted."),
+    typer.Option(
+        "--follow",
+        "-f",
+        help="Keep printing the lines as they are written, until interrupted. With `--all`, from the first line.",
+    ),
 ]
 StripOption = Annotated[
     bool | None,
@@ -76,7 +93,7 @@ TimeoutOption = Annotated[
         "--timeout",
         min=1,
         metavar="SECONDS",
-        help="The longest to follow the log, with `--follow`. Default: no limit.",
+        help="The longest to follow the log: the command then exits 8. Goes with `--follow` only. Default: no limit.",
     ),
 ]
 

@@ -7,10 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `odouche` helps Odoo developers work with Odoo.sh from their dev environment. Odoo.sh has no
 official public API; this project is an **unofficial** client for what the Odoo.sh web UI uses.
 
-Status: the workspace, tooling and CI exist; the CLI has `osh auth`, `osh projects list`,
-`osh branches list`, `osh builds list`, `osh builds show`, `osh builds watch`,
-`osh builds rebuild` and `osh logs` and nothing else yet, and the MCP server has no tools. The
-library has its transport, session store, login, logout and a client that reports the session's
+Status: the workspace, tooling and CI exist. The CLI has the commands of its first milestone:
+`osh auth`, `osh projects list`, `osh branches list`, `osh builds list`, `show`, `watch` and
+`rebuild`, and `osh logs`, with a reference page generated from them. The MCP server has no tools.
+The library has its transport, session store, login, logout and a client that reports the session's
 user, lists projects, branches and builds, watches a build, reads and follows a build's logs, and
 triggers a rebuild. The architecture and security sections below are the design the
 implementation is held to.
@@ -136,6 +136,7 @@ make test           # pytest
 make coverage       # pytest with coverage; fail_under = 90
 make live-check PROJECT=<name>   # read path against the real Odoo.sh; by hand, never in CI
 make docs           # zensical build --strict, into site/
+make docs-cli       # write docs/cli-reference.md from the commands of osh
 make build          # wheel + sdist of each package, into dist/
 make hooks          # every prek hook over every tracked file
 
