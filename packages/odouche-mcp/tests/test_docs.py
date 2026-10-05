@@ -21,7 +21,7 @@ def sections() -> dict[str, str]:
 
 
 def test_the_guide_has_a_section_for_every_tool_and_no_other():
-    registered = [tool.name for tool in asyncio.run(create_server().list_tools())]
+    registered = [tool.name for tool in asyncio.run(create_server(allow_changes=True).list_tools())]
 
     assert list(sections()) == registered
 

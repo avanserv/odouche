@@ -105,7 +105,9 @@ staging branch. Every other call only reads.
 ## The MCP server
 
 The server is read-only by default. Tools that change state on Odoo.sh are opt-in, and every tool
-documents what it does and what it can touch.
+documents what it does and what it can touch. The one such tool, a rebuild, is registered only when
+the server is started with [`--allow-changes`](mcp.md#changing-state), and each call of it writes a
+line to the server's stderr.
 
 ## Reporting a vulnerability
 

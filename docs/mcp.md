@@ -7,8 +7,9 @@ development agents work with your Odoo.sh projects.
 uvx odouche-mcp
 ```
 
-The server starts over stdio. Its tools read: none changes anything on Odoo.sh. This page
-documents each one, what it does and what it can touch.
+The server starts over stdio. Started this way its tools read: none changes anything on Odoo.sh.
+The one tool that does is [yours to turn on](#changing-state). This page documents each tool, what
+it does and what it can touch.
 
 ## Session
 
@@ -75,6 +76,41 @@ Reads one build of a branch, with its commit and the address of its database: th
 - **Touches**: reads only.
 - **Bounds**: three requests to Odoo.sh. A build older than the branch's latest ones is not found.
 
+### `rebuild_branch`
+
+Changes state on Odoo.sh: starts a new build of a branch, which replaces its latest one. It is
+listed only when the server is started with [`--allow-changes`](#changing-state). Only a
+development or a staging branch is rebuilt: any other is refused before the rebuild is sent.
+
+It returns the new build, in progress. The request is sent once and never repeated. When Odoo.sh
+does not confirm it, or the new build cannot be found, the error says so and tells the agent to
+list the branch's builds before trying again, since a second call can start a second build.
+
+- **Arguments**: `project`, and `branch` as the git branch's name.
+- **Touches**: starts a new build of the branch, which replaces its latest one.
+- **Bounds**: five requests to Odoo.sh.
+
+## Changing state
+
+The tools that change state on Odoo.sh are off until you start the server with `--allow-changes`:
+
+```json
+{
+  "mcpServers": {
+    "odouche": { "command": "uvx", "args": ["odouche-mcp", "--allow-changes"] }
+  }
+}
+```
+
+- The flag is read once, when the server starts. No tool and no argument sets it, so nothing an
+  agent does during a session turns it on.
+- Without it, `rebuild_branch` is not registered, and every tool opens the library's client
+  read-only, which refuses a change before anything is sent.
+- With it, `rebuild_branch` is listed without the read-only hint and with the destructive one, so
+  a client that asks before such tools asks before this one. The server itself does not ask.
+- Each call writes one line to the server's stderr: the tool, the project, the branch, and the
+  build started or the kind of error. It never holds the session.
+
 ## Arguments and results
 
 ### The project
@@ -96,7 +132,8 @@ them as data, not as instructions.
 
 ## Design constraints
 
-- **Read-only by default.** Tools that change state on Odoo.sh are opt-in and documented as such.
+- **Read-only by default.** Tools that change state on Odoo.sh are [opt-in](#changing-state) and
+  documented as such.
 - **Every tool is documented.** What it does, and what it can touch.
 - **No credentials in results.** Session values never appear in a tool result.
 

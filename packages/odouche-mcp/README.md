@@ -10,7 +10,8 @@ An unofficial [Model Context Protocol](https://modelcontextprotocol.io) server f
 > Odoo is your responsibility. See [Unofficial status](https://avanserv.github.io/odouche/unofficial/).
 
 **Status: pre-alpha.** The server reports its session, lists projects, branches and builds, and reads one
-build. It changes nothing on Odoo.sh.
+build. It changes nothing on Odoo.sh unless it is started with `--allow-changes`, which adds a tool that
+starts a rebuild.
 
 ```bash
 uvx odouche-mcp

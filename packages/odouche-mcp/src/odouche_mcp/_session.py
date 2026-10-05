@@ -10,12 +10,12 @@ import odouche
 from odouche_mcp._errors import login_step
 
 
-def open_client() -> odouche.Client:
-    """Return a read-only client on the session in the environment, then the stored one.
+def open_client(*, changes: bool = False) -> odouche.Client:
+    """Return a client on the session in the environment, then the stored one, read-only unless `changes`.
 
     A tool opens one per call, so a login made while the server runs is picked up.
     """
-    return odouche.Client(read_only=True)
+    return odouche.Client(read_only=not changes)
 
 
 @dataclass(frozen=True)
