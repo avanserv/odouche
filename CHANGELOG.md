@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.0](https://github.com/avanserv/odouche/compare/v0.2.0...v0.3.0) (2026-10-05)
+
+
+### Features
+
+* **cli:** Add osh auth login, logout and status ([#36](https://github.com/avanserv/odouche/issues/36)) ([afcf3a0](https://github.com/avanserv/odouche/commit/afcf3a0c420c955caaf353a01b5bb0e644cb84ed))
+* **cli:** Add osh branches list ([#39](https://github.com/avanserv/odouche/issues/39)) ([220311f](https://github.com/avanserv/odouche/commit/220311f015c87bc151a8d634626dbbffeef04467))
+* **cli:** Add osh builds list and osh builds show ([#40](https://github.com/avanserv/odouche/issues/40)) ([83dcc52](https://github.com/avanserv/odouche/commit/83dcc5299a21777857e71bce50b9af405c7cb341))
+* **cli:** Add osh builds rebuild ([#45](https://github.com/avanserv/odouche/issues/45)) ([610039c](https://github.com/avanserv/odouche/commit/610039cd61b32b2aceca970876a4c6e2d6c7413e))
+* **cli:** Add osh builds watch ([#41](https://github.com/avanserv/odouche/issues/41)) ([30f2807](https://github.com/avanserv/odouche/commit/30f2807b0ad2f6f050c307b6d930e0fcc618eb98))
+* **cli:** Add osh logs ([#42](https://github.com/avanserv/odouche/issues/42)) ([c70ec57](https://github.com/avanserv/odouche/commit/c70ec578b82522e898cf8ce53b8e6e15498569af))
+* **cli:** Add osh projects list ([#37](https://github.com/avanserv/odouche/issues/37)) ([1788bcb](https://github.com/avanserv/odouche/commit/1788bcbeb46d08bc8b4849b1e0d98fdf4c4663d1))
+* **cli:** Map library errors to messages and exit codes ([#33](https://github.com/avanserv/odouche/issues/33)) ([1b74c7e](https://github.com/avanserv/odouche/commit/1b74c7e793364ef415ff74bf45a2c6350ce2d9bd))
+* **cli:** Render results as a table or JSON through one output layer ([#35](https://github.com/avanserv/odouche/issues/35)) ([7e9924b](https://github.com/avanserv/odouche/commit/7e9924b4801857f01b6be5536a6558a19aa2838d))
+* **cli:** Resolve the project and branch from a flag, the environment or the git checkout ([#38](https://github.com/avanserv/odouche/issues/38)) ([215a1f3](https://github.com/avanserv/odouche/commit/215a1f3a7d8170dd8b0841bd5742f06357e3e5a7))
+
+
+### Documentation
+
+* **cli:** Generate the command reference and write the guide ([#44](https://github.com/avanserv/odouche/issues/44)) ([7b1cca1](https://github.com/avanserv/odouche/commit/7b1cca1f97636684141a854fc6891195213d0a5b))
+
 ## [0.2.0](https://github.com/avanserv/odouche/compare/v0.1.0...v0.2.0) (2026-10-04)
 
 
