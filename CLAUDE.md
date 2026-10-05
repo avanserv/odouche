@@ -10,7 +10,9 @@ official public API; this project is an **unofficial** client for what the Odoo.
 Status: the workspace, tooling and CI exist. The CLI has the commands of its first milestone:
 `osh auth`, `osh projects list`, `osh branches list`, `osh builds list`, `show`, `watch` and
 `rebuild`, and `osh logs`, with a reference page generated from them. The MCP server has five read-only
-tools: `get_session`, `list_projects`, `list_branches`, `list_builds` and `get_build`. The library has its transport, session store, login, logout and a client that
+tools: `get_session`, `list_projects`, `list_branches`, `list_builds` and `get_build`. A sixth,
+`rebuild_branch`, changes state and is registered only with `--allow-changes`. The library has its transport, session
+store, login, logout and a client that
 reports the session's user, lists projects, branches and builds, watches a build, reads and
 follows a build's logs, and triggers a rebuild. The architecture and security sections below are
 the design the implementation is held to.

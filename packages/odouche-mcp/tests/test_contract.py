@@ -65,6 +65,7 @@ RESULTS: dict[str, object] = {
     "branches": [BRANCH],
     "builds": [BUILD],
     "latest_build": BUILD,
+    "rebuild": BUILD,
 }
 
 # One of each error the library raises.
@@ -195,12 +196,20 @@ def add(server: MCPServer[Any], fn: Callable[..., object], **changes: Any) -> No
     add_tool(server, fn, **{"returns": "the projects.", "bounds": "one request.", **changes})
 
 
-def test_the_server_meets_the_contract():
-    assert violations(create_server()) == []
+@pytest.mark.parametrize("allow_changes", [False, True])
+def test_the_server_meets_the_contract(*, allow_changes: bool):
+    assert violations(create_server(allow_changes=allow_changes)) == []
 
 
-def test_the_server_leaks_no_session():
-    assert leaks(create_server()) == []
+@pytest.mark.parametrize("allow_changes", [False, True])
+def test_the_server_leaks_no_session(*, allow_changes: bool):
+    assert leaks(create_server(allow_changes=allow_changes)) == []
+
+
+def test_every_tool_is_read_only_unless_changes_are_allowed():
+    tools = asyncio.run(_tools(create_server()))
+
+    assert [tool.name for tool in tools if not (tool.annotations and tool.annotations.read_only_hint)] == []
 
 
 def test_a_tool_registered_through_the_helper_meets_the_contract():

@@ -1,5 +1,8 @@
 """The MCP server and its entry point."""
 
+import argparse
+from collections.abc import Sequence
+
 from mcp.server import MCPServer
 
 from odouche_mcp import __version__
@@ -15,10 +18,14 @@ from odouche_mcp._read import (
     list_projects,
 )
 from odouche_mcp._session import get_session
+from odouche_mcp._write import CHANGING, changing_tool
 
 
-def create_server() -> MCPServer:
-    """Build the server. Tools are registered here, through `_contract.add_tool`."""
+def create_server(*, allow_changes: bool = False) -> MCPServer:
+    """Build the server. Tools are registered here, through `_contract.add_tool`.
+
+    The tool that changes state on Odoo.sh is registered only with `allow_changes`.
+    """
     server = MCPServer(name="odouche", version=__version__)
     add_tool(
         server,
@@ -54,9 +61,27 @@ def create_server() -> MCPServer:
         returns="the build, with its commit and the address of its database.",
         bounds="three requests to Odoo.sh; a build older than the branch's latest ones is not found.",
     )
+    if allow_changes:
+        add_tool(
+            server,
+            changing_tool(allow_changes=allow_changes),
+            returns="the new build, which is in progress.",
+            touches="starts a new build of the branch, which replaces its latest one.",
+            bounds="five requests to Odoo.sh; the rebuild is sent once and never retried.",
+            annotations=CHANGING,
+        )
     return server
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     """Run the server over stdio."""
-    create_server().run(transport="stdio")
+    parser = argparse.ArgumentParser(
+        prog="odouche-mcp", description="An unofficial MCP server for Odoo.sh.", allow_abbrev=False
+    )
+    parser.add_argument(
+        "--allow-changes",
+        action="store_true",
+        help="also register `rebuild_branch`, the tool that changes state on Odoo.sh",
+    )
+    options = parser.parse_args(argv)
+    create_server(allow_changes=options.allow_changes).run(transport="stdio")

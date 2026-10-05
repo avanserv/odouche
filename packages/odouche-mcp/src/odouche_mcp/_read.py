@@ -65,14 +65,14 @@ def list_builds(project: str, branch: str, limit: int = DEFAULT_BUILDS) -> Build
     limit = _capped(limit, MAX_BUILDS)
     with open_client() as client:
         # One more than asked for tells whether there are more.
-        found = client.builds(_branch(client, project, branch), limit=limit + 1)
+        found = client.builds(find_branch(client, project, branch), limit=limit + 1)
     return Builds(found[:limit], truncated=len(found) > limit)
 
 
 def get_build(project: str, branch: str, build_id: int | None = None) -> BuildRead:
     """Read one build of a branch of a project: the build of that number, or the latest one when none is given."""
     with open_client() as client:
-        found = _branch(client, project, branch)
+        found = find_branch(client, project, branch)
         if build_id is not None:
             return BuildRead(client.build(found, build_id))
         latest = client.latest_build(found)
@@ -89,7 +89,7 @@ def _capped(limit: int, cap: int) -> int:
     return min(limit, cap)
 
 
-def _branch(client: odouche.Client, project: str, name: str) -> odouche.Branch:
+def find_branch(client: odouche.Client, project: str, name: str) -> odouche.Branch:
     for branch in client.branches(project):
         if branch.name == name:
             return branch
