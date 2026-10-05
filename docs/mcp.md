@@ -7,10 +7,39 @@ development agents work with your Odoo.sh projects.
 uvx odouche-mcp
 ```
 
-!!! note "Not implemented yet"
+!!! note "One tool so far"
 
-    The server starts over stdio and exposes no tools. This page will document each tool, what it
-    does and what it can touch, as the tools land.
+    The server starts over stdio and has one tool, `get_session`. This page documents each tool,
+    what it does and what it can touch, as the tools land.
+
+## Session
+
+The server cannot log in, and has no tool that does: a browser opened because an agent asked is
+a phishing surface. It uses the session you already have:
+
+1. `ODOUCHE_SESSION`, when it is set in the server's environment. It is kept in memory only.
+2. The session `osh auth login` stored in the keyring.
+
+The session is looked up on each call, not when the server starts. The server starts and lists
+its tools while you are logged out, and an `osh auth login` made while it runs is used by the
+next call, with no restart. No tool takes a session as an argument.
+
+With no session, an expired one or no usable keyring, a tool's error tells the agent to stop and
+ask you to run `osh auth login` in a terminal, or to restart the server with `ODOUCHE_SESSION`
+set where there is no keyring. When the session comes from `ODOUCHE_SESSION`, it says to restart
+the server with a current value or without the variable, since a login would not be read.
+
+## Tools
+
+### `get_session`
+
+Reports whether the server has a session, whether it came from the environment or the keyring,
+the user it belongs to and the seconds left before its [max age](security.md). It never returns
+the session. With none, `available` is false and `problem` says what to do. A session Odoo.sh
+rejects is an error, as from any other tool.
+
+- **Touches**: reads only.
+- **Bounds**: one request to Odoo.sh, none when there is no session.
 
 ## Design constraints
 
