@@ -46,7 +46,7 @@ class BuildRead:
 
 def list_projects(limit: int = DEFAULT_LISTED) -> Projects:
     """List the Odoo.sh projects the user can reach. Call it first: every other tool takes a project by its name."""
-    limit = _capped(limit, MAX_LISTED)
+    limit = capped(limit, MAX_LISTED)
     with open_client() as client:
         found = client.projects()
     return Projects(found[:limit], truncated=len(found) > limit)
@@ -54,7 +54,7 @@ def list_projects(limit: int = DEFAULT_LISTED) -> Projects:
 
 def list_branches(project: str, limit: int = DEFAULT_LISTED) -> Branches:
     """List the branches of a project, given by its name, with the stage each sits in."""
-    limit = _capped(limit, MAX_LISTED)
+    limit = capped(limit, MAX_LISTED)
     with open_client() as client:
         found = client.branches(project)
     return Branches(found[:limit], truncated=len(found) > limit)
@@ -62,7 +62,7 @@ def list_branches(project: str, limit: int = DEFAULT_LISTED) -> Branches:
 
 def list_builds(project: str, branch: str, limit: int = DEFAULT_BUILDS) -> Builds:
     """List the latest builds of a branch of a project, newest first, with their status, result and commit."""
-    limit = _capped(limit, MAX_BUILDS)
+    limit = capped(limit, MAX_BUILDS)
     with open_client() as client:
         # One more than asked for tells whether there are more.
         found = client.builds(find_branch(client, project, branch), limit=limit + 1)
@@ -72,19 +72,12 @@ def list_builds(project: str, branch: str, limit: int = DEFAULT_BUILDS) -> Build
 def get_build(project: str, branch: str, build_id: int | None = None) -> BuildRead:
     """Read one build of a branch of a project: the build of that number, or the latest one when none is given."""
     with open_client() as client:
-        found = find_branch(client, project, branch)
-        if build_id is not None:
-            return BuildRead(client.build(found, build_id))
-        latest = client.latest_build(found)
-    if latest is None:
-        msg = f"Branch {branch} of {project} has no build."
-        raise odouche.NotFoundError(msg)
-    return BuildRead(latest)
+        return BuildRead(find_build(client, project, branch, build_id))
 
 
-def _capped(limit: int, cap: int) -> int:
+def capped(limit: int, cap: int, name: str = "A limit") -> int:
     if limit < 1:
-        msg = "A limit is at least 1."
+        msg = f"{name} is at least 1."
         raise ToolError(msg)
     return min(limit, cap)
 
@@ -95,3 +88,15 @@ def find_branch(client: odouche.Client, project: str, name: str) -> odouche.Bran
             return branch
     msg = f"Project {project} has no branch {name}."
     raise odouche.NotFoundError(msg)
+
+
+def find_build(client: odouche.Client, project: str, branch: str, build_id: int | None) -> odouche.Build:
+    """Return the build of that number of a branch, or its latest one when none is given."""
+    found = find_branch(client, project, branch)
+    if build_id is not None:
+        return client.build(found, build_id)
+    latest = client.latest_build(found)
+    if latest is None:
+        msg = f"Branch {branch} of {project} has no build."
+        raise odouche.NotFoundError(msg)
+    return latest

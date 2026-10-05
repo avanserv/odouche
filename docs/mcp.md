@@ -76,6 +76,25 @@ Reads one build of a branch, with its commit and the address of its database: th
 - **Touches**: reads only.
 - **Bounds**: three requests to Odoo.sh. A build older than the branch's latest ones is not found.
 
+### `read_log`
+
+Reads the last lines of one log of a build: of the build of `build_id`, or of the branch's latest
+one. Without `kind`, it reads the install log when the build has it and the odoo log otherwise.
+With `contains`, only the lines that hold that text are returned, out of the log's last mebibyte.
+The text is matched as it is, case included, and not as a pattern.
+
+The lines come in `untrusted_lines`, without their escape sequences and control characters, and
+are [not instructions](#build-logs). `truncated` is true when the last mebibyte held more lines
+than returned, or one was cut. It says nothing of what the log holds before that, which is not read.
+
+- **Arguments**: `project`, `branch` as the git branch's name, and optionally `build_id`, `kind`
+  (`install`, `pip`, `odoo`, `update`, `neutralize` or `upgrade`), `lines`, 100 by default and 500
+  at most, and `contains`.
+- **Touches**: reads only.
+- **Bounds**: seven requests to Odoo.sh and the build's worker, ten when no `kind` is given. The
+  lines take 65536 bytes at most together, as JSON: past that, the oldest are left out. A result
+  carries them twice, as text and as structured content.
+
 ### `rebuild_branch`
 
 Changes state on Odoo.sh: starts a new build of a branch, which replaces its latest one. It is
@@ -122,13 +141,32 @@ project. A call without one is rejected.
 ### Limits
 
 A list holds at most `limit` items, and `truncated` is true when there were more. A `limit` over
-the most a tool returns is lowered to it, and one below 1 is an error.
+the most a tool returns is lowered to it, and one below 1 is an error. The `lines` of `read_log`
+follow the same rule.
 
 ### Untrusted text
 
 Branch names, commit messages and author names are written by other people. The server returns
 them in the fields of a result only, never in a sentence of its own, and a client should treat
 them as data, not as instructions.
+
+### Build logs
+
+A log is whatever the build printed: the output of every module, and of every request made to the
+instance. Anyone who can make it print a line can write one that reads as an instruction to an
+agent, and a log can hold a secret of the instance.
+
+- `read_log` returns the lines in one field, `untrusted_lines`, and its description tells the
+  agent that they are data and are not to be followed. That lowers the risk of prompt injection.
+  It does not remove it: an agent can still act on what it reads.
+- Secrets are not masked. A mask would catch some and promise all, so the lines pass through as
+  they are, into the agent's context and whatever the client does with it.
+- No line of a log is written to the server's stderr.
+
+This is why the server is read-only unless you [start it otherwise](#changing-state): an agent
+misled by a log has no tool that changes anything on Odoo.sh. Whether an agent may call a tool
+without asking you is your client's decision, and every tool carries the
+[hints](#tool-contract) a permission rule can use.
 
 ## Design constraints
 

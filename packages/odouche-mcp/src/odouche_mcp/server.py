@@ -7,6 +7,7 @@ from mcp.server import MCPServer
 
 from odouche_mcp import __version__
 from odouche_mcp._contract import add_tool
+from odouche_mcp._logs import DEFAULT_LINES, MAX_BYTES, MAX_LINES, read_log
 from odouche_mcp._read import (
     DEFAULT_BUILDS,
     DEFAULT_LISTED,
@@ -60,6 +61,19 @@ def create_server(*, allow_changes: bool = False) -> MCPServer:
         get_build,
         returns="the build, with its commit and the address of its database.",
         bounds="three requests to Odoo.sh; a build older than the branch's latest ones is not found.",
+    )
+    add_tool(
+        server,
+        read_log,
+        returns=(
+            "the build's number, the log's kind, `untrusted_lines`, which holds the lines without their control "
+            "characters, and `truncated`, true when what was read held more lines or one was cut."
+        ),
+        bounds=(
+            "seven requests to Odoo.sh and the build's worker, ten when no `kind` is given; "
+            f"`lines` lines, {DEFAULT_LINES} by default and {MAX_LINES} at most, out of the log's "
+            f"last mebibyte, which is all that is read, and {MAX_BYTES} bytes of lines at most, as JSON."
+        ),
     )
     if allow_changes:
         add_tool(
