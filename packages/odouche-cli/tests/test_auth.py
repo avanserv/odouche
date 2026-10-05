@@ -9,7 +9,7 @@ import typer
 from typer.testing import CliRunner, Result
 
 import odouche
-from odouche_cli import auth
+from odouche_cli import _time, auth
 from odouche_cli.app import app
 
 
@@ -60,7 +60,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
 
     monkeypatch.delenv(odouche.SESSION_ENV, raising=False)
     monkeypatch.setattr(odouche, "Client", Client)
-    monkeypatch.setattr(auth, "_now", lambda: NOW)
+    monkeypatch.setattr(_time, "_now", lambda: NOW)
     return Client
 
 
@@ -214,19 +214,6 @@ def test_status_check_of_a_rejected_session_exits_3(client: type[StubClient]):
 
     assert result.exit_code == 3
     assert result.stdout == ""
-
-
-@pytest.mark.parametrize(
-    ("delta", "text"),
-    [
-        (timedelta(seconds=20), "less than a minute"),
-        (timedelta(minutes=1), "1 minute"),
-        (timedelta(hours=5, minutes=59), "5 hours"),
-        (timedelta(days=1, hours=23), "1 day"),
-    ],
-)
-def test_a_duration_is_said_in_its_largest_whole_unit(delta: timedelta, text: str):
-    assert auth._span(delta) == text  # pyright: ignore[reportPrivateUsage]
 
 
 LOGOUTS: list[tuple[odouche.LogoutResult, list[str]]] = [

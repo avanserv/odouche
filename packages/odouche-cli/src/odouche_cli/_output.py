@@ -6,6 +6,7 @@ library's reference documents the shape.
 
 import json
 import os
+import re
 import sys
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, fields, is_dataclass
@@ -23,6 +24,10 @@ from rich.text import Text
 # Wide enough that a piped table is never wrapped or truncated.
 _PLAIN_WIDTH = 100_000
 
+_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+_CONTROL_SPACE = re.compile(r"[\t\n\v\f\r\u2028\u2029]+")
+_JSON_UNESCAPED = re.compile(r"[\x7f-\x9f]")
+
 
 class Format(StrEnum):
     """How a result is printed."""
@@ -39,10 +44,20 @@ FormatOption = Annotated[
 
 @dataclass(frozen=True, slots=True)
 class Column[T]:
-    """One column of a table: its header and how to read the cell from a row."""
+    """One column of a table: its header, how to read the cell from a row, and how to style it."""
 
     header: str
     value: Callable[[T], object]
+    style: Callable[[T], str | None] | None = None
+    """The cell's Rich style, which shows on a terminal only. The cell's text has to say it too."""
+
+
+def strip_control(text: str) -> str:
+    """Remove the control characters, which are C0 with ESC, DEL and C1: they can drive a terminal.
+
+    A run of those that are whitespace, and of the Unicode line and paragraph separators, becomes one space.
+    """
+    return _CONTROL.sub("", _CONTROL_SPACE.sub(" ", text))
 
 
 def to_json(value: object) -> object:
@@ -87,7 +102,7 @@ class Output:
         for column in columns:
             table.add_column(Text(column.header))
         for item in items:
-            table.add_row(*(_cell(column.value(item)) for column in columns))
+            table.add_row(*(_cell(column, item) for column in columns))
         _print(table, plain=plain)
 
     def one[T](self, item: T, columns: Sequence[Column[T]]) -> None:
@@ -99,7 +114,7 @@ class Output:
         table.add_column(style="bold")
         table.add_column()
         for column in columns:
-            table.add_row(Text(column.header), _cell(column.value(item)))
+            table.add_row(Text(column.header), _cell(column, item))
         _print(table, plain=_plain())
 
     def stream[T](self, items: Iterable[T], line: Callable[[T], str]) -> None:
@@ -108,16 +123,20 @@ class Output:
             if self.format is Format.JSON:
                 _echo_json(item, indent=None)
             else:
-                typer.echo(line(item))
+                typer.echo(strip_control(line(item)))
 
 
 def _echo_json(value: object, *, indent: int | None) -> None:
-    typer.echo(json.dumps(to_json(value), indent=indent, ensure_ascii=False))
+    dumped = json.dumps(to_json(value), indent=indent, ensure_ascii=False)
+    # `json` escapes C0 and leaves DEL and C1 as they are.
+    typer.echo(_JSON_UNESCAPED.sub(lambda found: f"\\u{ord(found[0]):04x}", dumped))
 
 
-def _cell(value: object) -> Text:
-    """Make a cell of literal text, so a value holding `[bold]` is not read as markup."""
-    return Text("" if value is None else str(value))
+def _cell[T](column: Column[T], item: T) -> Text:
+    """Make a cell of literal text, so a value holding `[bold]` or an escape sequence is not obeyed."""
+    value = column.value(item)
+    style = column.style(item) if column.style else None
+    return Text("" if value is None else strip_control(str(value)), style=style or "")
 
 
 def _is_terminal() -> bool:
@@ -138,5 +157,5 @@ def _print(table: Table, *, plain: bool) -> None:
     with console.capture() as capture:
         console.print(table)
     # Rich pads every cell to its column's width.
-    for line in capture.get().splitlines():
+    for line in capture.get().removesuffix("\n").split("\n"):
         typer.echo(line.rstrip())

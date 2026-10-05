@@ -1,7 +1,7 @@
 """The project and the branch a command works on: the flag, the environment, then the git checkout.
 
-The first source that yields a value wins. Nothing here asks Odoo.sh: a command passes its own
-way to list the projects, and it is called only for a project read from the checkout.
+The first source that yields a value wins. Resolving a name asks Odoo.sh nothing but the projects,
+through the command's own way to list them, and only for a project read from the checkout.
 """
 
 import re
@@ -88,6 +88,15 @@ def resolve_branch(ctx: typer.Context, value: str | None) -> str:
         raise ContextError(msg, ctx=ctx)
     _debug(ctx, f"Branch {branch}, from the git checkout.")
     return branch
+
+
+def find_branch(client: odouche.Client, project: str, name: str) -> odouche.Branch:
+    """Return the project's branch of that name, as Odoo.sh knows it."""
+    for branch in client.branches(project):
+        if branch.name == name:
+            return branch
+    msg = f"Project {project} has no branch {name}."
+    raise odouche.NotFoundError(msg)
 
 
 def _refuse_empty(ctx: typer.Context, value: str, flag: str) -> None:

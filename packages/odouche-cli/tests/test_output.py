@@ -11,7 +11,7 @@ from typer.testing import CliRunner
 
 import odouche
 from odouche_cli import _output
-from odouche_cli._output import Column, Format, Output, to_json
+from odouche_cli._output import Column, Format, Output, strip_control, to_json
 from odouche_cli.app import app, root
 
 
@@ -55,12 +55,6 @@ COLUMNS = [
 ]
 
 runner = CliRunner()
-
-
-@pytest.fixture
-def terminal(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("NO_COLOR", raising=False)
-    monkeypatch.setattr(_output, "_is_terminal", lambda: True)
 
 
 def test_json_rows_are_the_models_and_nothing_else(capsys: pytest.CaptureFixture[str]):
@@ -206,3 +200,99 @@ def test_an_unknown_format_is_a_usage_error():
     result = runner.invoke(app, ["--format", "yaml", "--version"])
 
     assert result.exit_code == 2
+
+
+CONTROLS = "".join(map(chr, [*range(0x20), *range(0x7F, 0xA0)]))
+
+
+def test_strip_control_removes_c0_del_and_c1_and_nothing_else():
+    assert strip_control(f"a{CONTROLS}b é\xa0~") == "a b é\xa0~"
+
+
+def test_strip_control_makes_whitespace_and_line_separators_a_space():
+    assert strip_control("fix:\tthing\r\nnext\v\fone\u2028two\u2029three") == "fix: thing next one two three"
+
+
+@pytest.mark.parametrize("separator", ["\u2028", "\u2029", "\x85", "\x1c", "\n", "\r"])
+def test_a_line_separator_in_a_cell_does_not_add_a_row(separator: str, capsys: pytest.CaptureFixture[str]):
+    output = Output()
+    owner = Owner(f"ann{separator}2  bob")
+    columns = [Column[Owner]("Name", lambda owner: owner.name)]
+
+    output.rows([owner], columns, empty="")
+    rows = capsys.readouterr().out
+    output.one(owner, columns)
+    one = capsys.readouterr().out
+
+    assert len(rows.splitlines()) == 2
+    assert len(one.splitlines()) == 1
+
+
+def test_a_table_stream_line_has_no_control_character(capsys: pytest.CaptureFixture[str]):
+    Output().stream([Owner("\x1b[2Jann\nbob\x9b31m")], lambda owner: f"Logged in as {owner.name}.")
+
+    assert capsys.readouterr().out == "Logged in as [2Jann bob31m.\n"
+
+
+def test_a_table_cell_has_no_control_character(capsys: pytest.CaptureFixture[str]):
+    output = Output()
+    owner = Owner(f"\x1b[2Jann{CONTROLS}")
+    columns = [Column[Owner]("Name", lambda owner: owner.name)]
+
+    output.rows([owner], columns, empty="")
+    output.one(owner, columns)
+
+    assert capsys.readouterr().out == "Name\n[2Jann\nName  [2Jann\n"
+
+
+def test_json_escapes_every_control_character(capsys: pytest.CaptureFixture[str]):
+    owner = Owner(f"ann{CONTROLS}é")
+
+    Output(Format.JSON).one(owner, [])
+
+    out = capsys.readouterr().out
+    assert not set(out) & set(CONTROLS.replace("\n", ""))
+    assert "é" in out
+    assert json.loads(out) == {"name": owner.name}
+
+
+@pytest.mark.usefixtures("terminal")
+@pytest.mark.parametrize(("variable", "value"), [("TTY_COMPATIBLE", "0"), ("FORCE_COLOR", "")])
+def test_a_terminal_table_has_no_colour_where_the_environment_refuses_it(
+    variable: str, value: str, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    monkeypatch.delenv("TTY_COMPATIBLE")
+    monkeypatch.setenv(variable, value)
+
+    Output().one(THING, COLUMNS)
+
+    assert not ANSI.search(capsys.readouterr().out)
+
+
+STYLED = [Column[Owner]("Name", lambda owner: owner.name, lambda owner: "red" if owner.name == "bob" else None)]
+
+
+@pytest.mark.usefixtures("terminal")
+def test_a_styled_cell_is_coloured_on_a_terminal(capsys: pytest.CaptureFixture[str]):
+    Output().rows([Owner("ann"), Owner("bob")], STYLED, empty="")
+
+    out = capsys.readouterr().out
+    assert re.search(r"\x1b\[31mbob *\x1b\[0m", out)
+    assert not re.search(r"\x1b\[31mann", out)
+
+
+@pytest.mark.usefixtures("terminal")
+@pytest.mark.parametrize("no_color", [True, False])
+def test_a_styled_cell_is_its_text_alone_without_colour(
+    no_color: bool,  # noqa: FBT001
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+):
+    if no_color:
+        monkeypatch.setenv("NO_COLOR", "1")
+    else:
+        monkeypatch.setattr(_output, "_is_terminal", lambda: False)
+
+    Output().rows([Owner("bob")], STYLED, empty="")
+
+    assert capsys.readouterr().out == "Name\nbob\n"

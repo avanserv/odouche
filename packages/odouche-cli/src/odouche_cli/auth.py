@@ -3,7 +3,7 @@
 import os
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from typing import Annotated
 
 import typer
@@ -11,6 +11,7 @@ import typer
 import odouche
 from odouche_cli._client import open_client
 from odouche_cli._output import Column, Output
+from odouche_cli._time import ago, left
 
 
 app = typer.Typer(
@@ -30,13 +31,6 @@ _STEPS = {
 }
 
 _UNKNOWN = "unknown"
-
-_UNITS = (("day", timedelta(days=1)), ("hour", timedelta(hours=1)), ("minute", timedelta(minutes=1)))
-
-
-# What the tests replace: the time.
-def _now() -> datetime:
-    return datetime.now(UTC)
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,20 +123,11 @@ def _session_columns[T](session: Callable[[T], odouche.SessionInfo]) -> list[Col
 
 
 def _ago(moment: datetime | None) -> str:
-    return _UNKNOWN if moment is None else f"{_span(_now() - moment)} ago"
+    return _UNKNOWN if moment is None else ago(moment)
 
 
 def _left(moment: datetime | None) -> str:
-    return _UNKNOWN if moment is None else f"in {_span(moment - _now())}"
-
-
-def _span(delta: timedelta) -> str:
-    """Say a duration in its largest whole unit."""
-    for name, unit in _UNITS:
-        count = delta // unit
-        if count >= 1:
-            return f"{count} {name}{'' if count == 1 else 's'}"
-    return "less than a minute"
+    return _UNKNOWN if moment is None else left(moment)
 
 
 def _login_line(result: Login) -> str:

@@ -11,6 +11,7 @@ import typer
 from typer.core import TyperGroup
 
 import odouche
+from odouche_cli._output import strip_control
 
 
 ISSUES_URL = "https://github.com/avanserv/odouche/issues"
@@ -64,8 +65,12 @@ class OshGroup(TyperGroup):
 
 
 def _print_traceback(error: Exception) -> None:
-    """Print the standard traceback, which has no locals, with the environment's session masked."""
+    """Print the standard traceback, which has no locals, with the environment's session masked.
+
+    Each line loses its control characters first, so that one inside the session cannot hide it.
+    """
     text = "".join(traceback.format_exception(error))
+    text = "\n".join(strip_control(line) for line in text.split("\n"))
     if session := os.environ.get(odouche.SESSION_ENV):
         text = text.replace(session, str(odouche.Secret(session)))
     typer.echo(text, err=True, nl=False)
@@ -79,7 +84,7 @@ def _report(error: Exception, *, debug: bool) -> int:
             typer.echo("Run again with --debug for the traceback.", err=True)
         return EXIT_UNEXPECTED
     code, hint = next((code, hint) for kind, code, hint in EXIT_CODES if isinstance(error, kind))
-    typer.echo(str(error), err=True)
+    typer.echo(strip_control(str(error)), err=True)
     if hint:
         typer.echo(hint, err=True)
     return code

@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from odouche_cli import _output
 from odouche_cli._context import BRANCH_ENV, PROJECT_ENV
 
 
@@ -17,6 +18,15 @@ def isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # A stray repository above `tmp_path` is not this test's checkout.
     monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
     monkeypatch.chdir(tmp_path)
+
+
+@pytest.fixture
+def terminal(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make stdout a terminal that takes colour, for `osh` and for Rich."""
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setenv("TERM", "xterm")
+    monkeypatch.setenv("TTY_COMPATIBLE", "1")
+    monkeypatch.setattr(_output, "_is_terminal", lambda: True)
 
 
 def _git(*args: str) -> None:
