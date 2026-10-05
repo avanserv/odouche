@@ -4,7 +4,6 @@ The text comes from the command objects, never from a rendered `--help`, so the 
 depend on the terminal. `--check` writes nothing and fails when the page is stale.
 """
 
-import argparse
 import re
 import sys
 from collections.abc import Iterator, Sequence
@@ -15,6 +14,8 @@ from typing import Any
 import typer
 from typer.core import TyperArgument, TyperGroup, TyperOption
 
+import _reference
+from _reference import UnsupportedError
 from odouche_cli.app import app
 
 
@@ -40,10 +41,6 @@ _CODE = re.compile(r"`[^`]*`")
 _CONTROL = re.compile(r"[\x00-\x09\x0b-\x1f\x7f-\x9f]")
 
 
-class UnsupportedError(Exception):
-    """A command or a parameter the page has no rendering for."""
-
-
 def render(application: typer.Typer | None = None) -> str:
     """Return the page for an application, which is `osh` unless a test gives another."""
     root = typer.main.get_command(app if application is None else application)
@@ -55,21 +52,9 @@ def render(application: typer.Typer | None = None) -> str:
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Write the page, or with `--check` only tell whether it is the one in the tree."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="Write nothing, and fail when the page is stale.")
-    options = parser.parse_args(argv)
-    try:
-        page = render()
-    except UnsupportedError as error:
-        sys.stderr.write(f"{error}\n")
-        return 2
-    if not options.check:
-        PAGE.write_text(page, encoding="utf-8")
-        return 0
-    if PAGE.is_file() and PAGE.read_text(encoding="utf-8") == page:
-        return 0
-    sys.stderr.write(f"docs/{PAGE.name} is not what the commands of `osh` give. Run `{REGENERATE}`.\n")
-    return 1
+    return _reference.main(
+        argv, render, PAGE, description=__doc__ or "", source="the commands of `osh`", regenerate=REGENERATE
+    )
 
 
 def _walk(context: typer.Context) -> Iterator[typer.Context]:
@@ -115,10 +100,10 @@ def _command(context: typer.Context) -> list[str]:
     options = [parameter for parameter in parameters if isinstance(parameter, TyperOption)]
     if arguments:
         rows = [(f"`{_metavar(argument)}`", _description(argument)) for argument in arguments]
-        blocks.append(_table(("Argument", "Description"), rows))
+        blocks.append(_reference.table(("Argument", "Description"), rows))
     if options:
         rows = [(_flags(option), _description(option), _variable(option)) for option in options]
-        blocks.append(_table(("Option", "Description", "Environment"), rows))
+        blocks.append(_reference.table(("Option", "Description", "Environment"), rows))
     children = _children(context)
     epilog = _checked(command.epilog or "", f"The epilog of `{path}`")
     # A group's example is the one its command gives right below.
@@ -129,7 +114,7 @@ def _command(context: typer.Context) -> list[str]:
             (f"[`{child.command_path}`](#{child.command_path.replace(' ', '-')})", _summary(child.command.help))
             for child in children
         ]
-        blocks.append(_table(("Command", "Description"), rows))
+        blocks.append(_reference.table(("Command", "Description"), rows))
     return blocks
 
 
@@ -184,7 +169,7 @@ def _metavar(parameter: TyperArgument | TyperOption) -> str:
 
 def _description(parameter: TyperArgument | TyperOption) -> str:
     """Return a parameter's help, then what the help may not say: required, choices, range and default."""
-    text = _line(parameter.help or "")
+    text = _reference.line(parameter.help or "")
     said = [text]
     if parameter.required:
         said.append("Required.")
@@ -241,18 +226,7 @@ def _epilog(epilog: str) -> str:
 
 def _summary(text: str | None) -> str:
     """Return the first paragraph of a command's help."""
-    return _line((text or "").split("\n\n")[0])
-
-
-def _line(text: str) -> str:
-    """Make text one line that a table cell can hold."""
-    return " ".join(text.split()).replace("|", "\\|")
-
-
-def _table(headers: Sequence[str], rows: Sequence[Sequence[str]]) -> str:
-    lines = [headers, ["---"] * len(headers), *rows]
-    # An empty cell is one space wide, as markdownlint leaves it.
-    return "\n".join("|" + "|".join(f" {cell} " if cell else " " for cell in cells) + "|" for cells in lines)
+    return _reference.line((text or "").split("\n\n")[0])
 
 
 if __name__ == "__main__":

@@ -13,8 +13,21 @@ An unofficial [Model Context Protocol](https://modelcontextprotocol.io) server f
 build and its logs, whose lines reach the agent as the build printed them, secrets included. It changes
 nothing on Odoo.sh unless it is started with `--allow-changes`, which adds a tool that starts a rebuild.
 
-```bash
-uvx odouche-mcp
-```
+Log in with `osh auth login`, from [`odouche-cli`](https://pypi.org/project/odouche-cli/), then give
+your client the server's command:
 
-Documentation: <https://avanserv.github.io/odouche/>
+<!-- x-release-please-start-version -->
+```json
+{
+  "mcpServers": {
+    "odouche": { "command": "uvx", "args": ["odouche-mcp==0.3.0"] }
+  }
+}
+```
+<!-- x-release-please-end -->
+
+The version is pinned because an unpinned `uvx` can move to a newer release without you choosing
+it, and this process holds your Odoo.sh session.
+
+Documentation: the [guide](https://avanserv.github.io/odouche/mcp/), with the setup and the security
+measures, and the [tool reference](https://avanserv.github.io/odouche/mcp-reference/).

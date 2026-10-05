@@ -11,6 +11,7 @@ nav = [
     { "CLI" = "cli.md" },
     { "CLI reference" = "cli-reference.md" },
     { "MCP server" = "mcp.md" },
+    { "MCP reference" = "mcp-reference.md" },
     { "Security" = "security.md" },
     { "Unofficial status" = "unofficial.md" },
     { "Upstream reference" = "upstream.md" },

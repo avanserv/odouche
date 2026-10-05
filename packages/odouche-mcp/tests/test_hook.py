@@ -113,7 +113,7 @@ def test_the_script_runs_on_the_standard_library_alone(*, tool: str, approved: b
 
 
 def test_the_guide_sends_every_tool_of_the_server_to_the_hook():
-    section = GUIDE.read_text(encoding="utf-8").split("\n## Asking before a change\n", 1)[1].split("\n## ", 1)[0]
+    section = GUIDE.read_text(encoding="utf-8").split("\n### Asking before a change\n", 1)[1].split("\n##", 1)[0]
     snippet = json.loads(section.split("```json\n", 1)[1].split("```", 1)[0])
     (rule,) = snippet["hooks"]["PreToolUse"]
 

@@ -9,7 +9,9 @@
       "extra-files": [
         "packages/odouche/pyproject.toml",
         "packages/odouche-cli/pyproject.toml",
-        "packages/odouche-mcp/pyproject.toml"
+        "packages/odouche-mcp/pyproject.toml",
+        "packages/odouche-mcp/README.md",
+        "docs/mcp.md"
       ]
     }
   }

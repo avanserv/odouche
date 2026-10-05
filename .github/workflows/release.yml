@@ -45,7 +45,7 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
 
-      # Release Please rewrites the version in the four manifests and knows nothing of uv.lock,
+      # Release Please rewrites the version in the manifests and knows nothing of uv.lock,
       # which records the same versions. Left alone the release branch fails `uv sync --locked`,
       # so the lockfile is brought back in step on the branch before anyone merges it.
       - name: Checkout the release branch

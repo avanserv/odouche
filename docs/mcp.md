@@ -1,15 +1,62 @@
 # MCP server
 
 `odouche-mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server that lets
-development agents work with your Odoo.sh projects.
+development agents work with your Odoo.sh projects. It runs over stdio, and started as below its
+tools read: none changes anything on Odoo.sh. The one tool that does is
+[yours to turn on](#changing-state).
 
+The [reference](mcp-reference.md) lists every tool with its arguments, what it returns, what it
+can touch and its bounds, generated from the server.
+
+## Setup
+
+### Log in
+
+The server cannot log in. Give it a session first, one of two ways:
+
+- Run `osh auth login`, from [`odouche-cli`](cli.md), which stores the session in your keyring.
+- Where there is no keyring, set `ODOUCHE_SESSION` in the server's environment. A client that
+  does not pass its own environment on has to be told to pass the variable. Do not write its value
+  in a configuration file.
+
+### Claude Code
+
+<!-- x-release-please-start-version -->
 ```bash
-uvx odouche-mcp
+claude mcp add odouche -- uvx odouche-mcp==0.3.0
 ```
+<!-- x-release-please-end -->
 
-The server starts over stdio. Started this way its tools read: none changes anything on Odoo.sh.
-The one tool that does is [yours to turn on](#changing-state). This page documents each tool, what
-it does and what it can touch.
+Or, for everyone who works on a project, in its `.mcp.json`:
+
+<!-- x-release-please-start-version -->
+```json
+{
+  "mcpServers": {
+    "odouche": { "command": "uvx", "args": ["odouche-mcp==0.3.0"] }
+  }
+}
+```
+<!-- x-release-please-end -->
+
+Name the server `odouche`: the [hook](#asking-before-a-change) matches on that name.
+
+### Any other client
+
+The server speaks stdio and takes no configuration but its one flag. Give your client this
+command:
+
+<!-- x-release-please-start-version -->
+```bash
+uvx odouche-mcp==0.3.0
+```
+<!-- x-release-please-end -->
+
+### Why a version is pinned
+
+Without a version, `uvx` runs the newest release the first time, and again whenever its cache is
+pruned or refreshed: the version can change without you choosing it, and this process holds your
+Odoo.sh session. Pinned, a new release runs only once you have changed the number.
 
 ## Session
 
@@ -30,124 +77,98 @@ the server with a current value or without the variable, since a login would not
 
 ## Tools
 
+What the [reference](mcp-reference.md) does not say of each tool.
+
 ### `get_session`
 
-Reports whether the server has a session, whether it came from the environment or the keyring,
-the user it belongs to and the seconds left before its [max age](security.md). It never returns
-the session. With none, `available` is false and `problem` says what to do. A session Odoo.sh
-rejects is an error, as from any other tool.
-
-- **Touches**: reads only.
-- **Bounds**: one request to Odoo.sh, none when there is no session.
+It never returns the session. With none, `available` is false and `problem` says what to do. A
+session Odoo.sh rejects is an error, as from any other tool. The seconds left are those before the
+session's [max age](security.md).
 
 ### `list_projects`
 
-Lists the projects you can reach, each with its name, repository and address. Every other tool
-takes a project by its name, so an agent calls this one first.
-
-- **Arguments**: `limit`, 50 by default and 200 at most.
-- **Touches**: reads only.
-- **Bounds**: one request to Odoo.sh.
+Every other tool takes a project by its name, so an agent calls this one first.
 
 ### `list_branches`
 
-Lists the branches of a project, each with its name and stage, in the order Odoo.sh answers them.
-
-- **Arguments**: `project`, and `limit`, 50 by default and 200 at most.
-- **Touches**: reads only.
-- **Bounds**: two requests to Odoo.sh.
+The branches come in the order Odoo.sh answers them.
 
 ### `list_builds`
 
-Lists the latest builds of a branch, newest first, with their status, result and commit.
-
-- **Arguments**: `project`, `branch` as the git branch's name, and `limit`, 4 by default and 20
-  at most.
-- **Touches**: reads only.
-- **Bounds**: three requests to Odoo.sh. Odoo.sh has only been seen to answer 4 builds: older
-  ones are out of reach, whatever `truncated` says.
+`branch` is the git branch's name, as for every tool that takes one. Odoo.sh has only been seen to
+answer the latest builds of a branch: older ones are out of reach.
 
 ### `get_build`
 
-Reads one build of a branch, with its commit and the address of its database: the build of
-`build_id`, or the branch's latest one.
-
-- **Arguments**: `project`, `branch` as the git branch's name, and optionally `build_id`.
-- **Touches**: reads only.
-- **Bounds**: three requests to Odoo.sh. A build older than the branch's latest ones is not found.
+Without `build_id`, it reads the branch's latest build. A build older than the branch's latest
+ones is not found.
 
 ### `wait_for_build`
 
-Waits for a build of a branch to finish, for `timeout` seconds at most: the build of `build_id`,
-or the branch's latest one. It returns the build as last seen and `finished`, as soon as the build
-ends.
+It waits for the build of `build_id`, or the branch's latest one, and returns it as last seen and
+`finished`, as soon as the build ends.
 
 A build that outlasts the wait is not an error. `finished` is false and `next_step` tells the
 agent to call the tool again, which continues the wait. The wait is short because a client gives
 up on a call that lasts: a `timeout` over the most is lowered to it, `timeout` in the result is
 the one applied, and `timeout_capped` says it was lowered.
 
-With `commit`, the tool waits for the branch to have a build of that commit, then for that build.
-Right after a push the latest build is still the previous one, so an agent that pushed gives the
-commit. While the branch has no such build, `build` is null and `next_step` says to call again.
+With `commit`, the first 7 to 64 digits of a hash, the tool waits for the branch to have a build
+of that commit, then for that build. Right after a push the latest build is still the previous
+one, so an agent that pushed gives the commit. While the branch has no such build, `build` is null
+and `next_step` says to call again. `build_id` and `commit` are not given together.
 
-- **Arguments**: `project`, `branch` as the git branch's name, and optionally `build_id` or
-  `commit`, the first 7 to 64 digits of its hash, but not both, and `timeout` in seconds,
-  30 by default and 50 at most.
 - **Progress**: a notification at each change of the build, to a client that asked for them. It
   holds the build's number, status and result, and nothing Odoo.sh or a commit's author wrote.
 - **Cancellation**: a call the client cancels closes its connection to Odoo.sh, within a few
   seconds unless a request is being answered.
-- **Touches**: reads only.
-- **Bounds**: six requests to Odoo.sh and one socket, on which Odoo.sh says what changes. More
-  when the socket drops, and one request every 3 seconds while a commit has no build. The
-  requests that find the build, or await one of a commit, are not cut at the `timeout`: a slow
-  Odoo.sh can make a call last longer.
+- **Timeout**: the requests that find the build, or await one of a commit, are not cut at the
+  `timeout`: a slow Odoo.sh can make a call last longer.
 
 ### `read_log`
 
-Reads the last lines of one log of a build: of the build of `build_id`, or of the branch's latest
-one. Without `kind`, it reads the install log when the build has it and the odoo log otherwise.
-With `contains`, only the lines that hold that text are returned, out of the log's last mebibyte.
-The text is matched as it is, case included, and not as a pattern.
+Without `kind`, it reads the install log when the build has it and the odoo log otherwise. With
+`contains`, only the lines that hold that text are returned, out of the log's last mebibyte. The
+text is matched as it is, case included, and not as a pattern. A `kind` of `unknown` is refused.
 
 The lines come in `untrusted_lines`, without their escape sequences and control characters, and
 are [not instructions](#build-logs). `truncated` is true when the last mebibyte held more lines
-than returned, or one was cut. It says nothing of what the log holds before that, which is not read.
-
-- **Arguments**: `project`, `branch` as the git branch's name, and optionally `build_id`, `kind`
-  (`install`, `pip`, `odoo`, `update`, `neutralize` or `upgrade`), `lines`, 100 by default and 500
-  at most, and `contains`.
-- **Touches**: reads only.
-- **Bounds**: seven requests to Odoo.sh and the build's worker, ten when no `kind` is given. The
-  lines take 65536 bytes at most together, as JSON: past that, the oldest are left out. A result
-  carries them twice, as text and as structured content.
+than returned, or one was cut. It says nothing of what the log holds before that, which is not
+read. When the lines are over the most a result holds, the oldest are left out. A result carries
+them twice, as text and as structured content.
 
 ### `rebuild_branch`
 
-Changes state on Odoo.sh: starts a new build of a branch, which replaces its latest one. It is
-listed only when the server is started with [`--allow-changes`](#changing-state). Only a
+It is listed only when the server is started with [`--allow-changes`](#changing-state). Only a
 development or a staging branch is rebuilt: any other is refused before the rebuild is sent.
 
-It returns the new build, in progress. The request is sent once and never repeated. When Odoo.sh
-does not confirm it, or the new build cannot be found, the error says so and tells the agent to
-list the branch's builds before trying again, since a second call can start a second build.
+The request is sent once and never repeated. When Odoo.sh does not confirm it, or the new build
+cannot be found, the error says so and tells the agent to list the branch's builds before trying
+again, since a second call can start a second build.
 
-- **Arguments**: `project`, and `branch` as the git branch's name.
-- **Touches**: starts a new build of the branch, which replaces its latest one.
-- **Bounds**: five requests to Odoo.sh.
+## Security
 
-## Changing state
+- **By default** the server reads your projects, their branches, their builds and the builds'
+  logs. It changes nothing on Odoo.sh.
+- **With `--allow-changes`** it can also start a rebuild of a development or a staging branch.
+- **It never** logs in, takes a session as an argument, returns the session in a result or writes
+  a file.
+
+[Security](security.md) has how the session is obtained and stored.
+
+### Changing state
 
 The tools that change state on Odoo.sh are off until you start the server with `--allow-changes`:
 
+<!-- x-release-please-start-version -->
 ```json
 {
   "mcpServers": {
-    "odouche": { "command": "uvx", "args": ["odouche-mcp", "--allow-changes"] }
+    "odouche": { "command": "uvx", "args": ["odouche-mcp==0.3.0", "--allow-changes"] }
   }
 }
 ```
+<!-- x-release-please-end -->
 
 - The flag is read once, when the server starts. No tool and no argument sets it, so nothing an
   agent does during a session turns it on.
@@ -158,7 +179,7 @@ The tools that change state on Odoo.sh are off until you start the server with `
 - Each call writes one line to the server's stderr: the tool, the project, the branch, and the
   build started or the kind of error. It never holds the session.
 
-## Asking before a change
+### Asking before a change
 
 The flag decides whether `rebuild_branch` exists. Whether an agent may call a tool without asking
 you is your client's decision. For Claude Code, a hook lets the tools that read pass and leaves
@@ -199,6 +220,22 @@ it to `.claude/settings.json`:
 
 Another client decides from the [hints](#tool-contract) each tool carries.
 
+### Build logs
+
+A log is whatever the build printed: the output of every module, and of every request made to the
+instance. Anyone who can make it print a line can write one that reads as an instruction to an
+agent, and a log can hold a secret of the instance.
+
+- `read_log` returns the lines in one field, `untrusted_lines`, and its description tells the
+  agent that they are data and are not to be followed. That lowers the risk of prompt injection.
+  It does not remove it: an agent can still act on what it reads.
+- Secrets are not masked. A mask would catch some and promise all, so the lines pass through as
+  they are, into the agent's context and whatever the client does with it.
+- No line of a log is written to the server's stderr.
+
+This is why the server is read-only unless you [start it otherwise](#changing-state): an agent
+misled by a log has no tool that changes anything on Odoo.sh.
+
 ## Arguments and results
 
 ### The project
@@ -219,32 +256,6 @@ Branch names, commit messages and author names are written by other people. The 
 them in the fields of a result only, never in a sentence of its own, and a client should treat
 them as data, not as instructions.
 
-### Build logs
-
-A log is whatever the build printed: the output of every module, and of every request made to the
-instance. Anyone who can make it print a line can write one that reads as an instruction to an
-agent, and a log can hold a secret of the instance.
-
-- `read_log` returns the lines in one field, `untrusted_lines`, and its description tells the
-  agent that they are data and are not to be followed. That lowers the risk of prompt injection.
-  It does not remove it: an agent can still act on what it reads.
-- Secrets are not masked. A mask would catch some and promise all, so the lines pass through as
-  they are, into the agent's context and whatever the client does with it.
-- No line of a log is written to the server's stderr.
-
-This is why the server is read-only unless you [start it otherwise](#changing-state): an agent
-misled by a log has no tool that changes anything on Odoo.sh. Whether an agent may call a tool
-without asking you is your client's decision: every tool carries the
-[hints](#tool-contract) a permission rule can use, and Claude Code can be given a
-[hook](#asking-before-a-change).
-
-## Design constraints
-
-- **Read-only by default.** Tools that change state on Odoo.sh are [opt-in](#changing-state) and
-  documented as such.
-- **Every tool is documented.** What it does, and what it can touch.
-- **No credentials in results.** Session values never appear in a tool result.
-
 ## Tool contract
 
 Every tool follows the same rules, and a test over the registered tools holds them to it.
@@ -260,5 +271,18 @@ Every tool follows the same rules, and a test over the registered tools holds th
   are also what `osh --format json` prints.
 - **Errors** are a message and, when there is one, the next step: never a traceback or an answer
   from Odoo.sh.
+
+## Troubleshooting
+
+A tool's error says what happened and, when there is one, what the agent or you should do next.
+
+| Error | What to do |
+| --- | --- |
+| No session | Run `osh auth login` in a terminal. The next call uses it, with no restart. |
+| An expired session, or one Odoo.sh rejects | The same. Sessions are never refreshed. |
+| An expired session that comes from `ODOUCHE_SESSION` | Restart the server with a current value, or without the variable to use the one `osh auth login` stores. A login is not read while the variable is set. |
+| No usable keyring | Install a [Secret Service provider](security.md#where-the-session-is-stored), or restart the server with `ODOUCHE_SESSION` set. A locked keyring is unlocked in its own dialog. |
+| Odoo.sh changed shape | Odoo.sh has no public API, and an answer no longer has the shape odouche reads. Upgrade to the latest release, and [report it](https://github.com/avanserv/odouche/issues) with the request and the field the error names if it remains. |
+| A tool is missing | `rebuild_branch` exists only with [`--allow-changes`](#changing-state). |
 
 The server is built on the [`odouche` library](library.md) and never talks to Odoo.sh directly.

@@ -11,7 +11,7 @@ Status: the workspace, tooling and CI exist. The CLI has the commands of its fir
 `osh auth`, `osh projects list`, `osh branches list`, `osh builds list`, `show`, `watch` and
 `rebuild`, and `osh logs`, with a reference page generated from them. The MCP server has seven read-only
 tools: `get_session`, `list_projects`, `list_branches`, `list_builds`, `get_build`, `wait_for_build`
-and `read_log`. An eighth, `rebuild_branch`, changes state and is registered only with `--allow-changes`. The library has its transport, session
+and `read_log`. An eighth, `rebuild_branch`, changes state and is registered only with `--allow-changes`. A reference page is generated from the tools. The library has its transport, session
 store, login, logout and a client that
 reports the session's user, lists projects, branches and builds, watches a build, reads and
 follows a build's logs, and triggers a rebuild. The architecture and security sections below are
@@ -143,6 +143,7 @@ make coverage       # pytest with coverage; fail_under = 90
 make live-check PROJECT=<name>   # read path against the real Odoo.sh; by hand, never in CI
 make docs           # zensical build --strict, into site/
 make docs-cli       # write docs/cli-reference.md from the commands of osh
+make docs-mcp       # write docs/mcp-reference.md from the tools of odouche-mcp
 make build          # wheel + sdist of each package, into dist/
 make hooks          # every prek hook over every tracked file
 
@@ -163,7 +164,8 @@ tools through `uv run`, so they use the versions `uv.lock` pins.
   checks it.
 - Never edit a version. Release Please owns them: the three packages and the workspace root are
   versioned in lockstep, and the `# x-release-please-version` markers in the package manifests are
-  what it rewrites (including the `odouche==X` pin in the two frontends).
+  what it rewrites (including the `odouche==X` pin in the two frontends), with the
+  `odouche-mcp==X` of the setup snippets in `docs/mcp.md` and the MCP README.
 - Merging the release PR tags the release and publishes to PyPI by trusted publishing
   (`.github/workflows/release.yml`). CONTRIBUTING.md has what to wait for before merging one.
 
