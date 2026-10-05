@@ -41,8 +41,3 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 odouche = { workspace = true }
-
-# The server has no tools yet, so nothing in it imports the library it exists to expose. Delete
-# this block with the first tool: from then on an unused `odouche` would be a real finding.
-[tool.deptry.per_rule_ignores]
-DEP002 = ["odouche"]
