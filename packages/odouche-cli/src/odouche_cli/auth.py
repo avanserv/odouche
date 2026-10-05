@@ -53,7 +53,10 @@ class Logout:
 
 @app.command(epilog="Example: osh auth login")
 def login(ctx: typer.Context) -> None:
-    """Sign in with GitHub in a browser and store the session in the keyring."""
+    """Sign in with GitHub in a browser and store the session in the keyring.
+
+    Where no browser can be launched, it asks for the `session_id` cookie in a prompt that does not echo it.
+    """
     output: Output = ctx.obj
     odouche.login(ask=_ask, notify=lambda step: typer.echo(_STEPS[step], err=True))
     typer.echo("The session is stored in the keyring.", err=True)
@@ -75,7 +78,7 @@ def status(
         typer.Option("--check", help="Ask Odoo.sh whether it still accepts the session, and who it belongs to."),
     ] = False,
 ) -> None:
-    """Show where the session comes from and how long it lasts. Exits 3 when there is none."""
+    """Show where the session comes from and how long it lasts, without asking Odoo.sh. Exits 3 when there is none."""
     output: Output = ctx.obj
     with open_client() as client:
         if not check:
@@ -95,7 +98,7 @@ def status(
 
 @app.command(epilog="Example: osh auth logout")
 def logout(ctx: typer.Context) -> None:
-    """End the stored session on Odoo.sh and remove it from the keyring."""
+    """End the stored session on Odoo.sh and remove it from the keyring. Exits 0 when there is none."""
     output: Output = ctx.obj
     result = odouche.logout()
     failure = None if result.failure is None else str(result.failure)

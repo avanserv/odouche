@@ -2,7 +2,7 @@
 
 PACKAGES := odouche odouche-cli odouche-mcp
 
-.PHONY: help install format lint type-check deps deadcode test coverage live-check docs docs-serve build hooks check clean
+.PHONY: help install format lint type-check deps deadcode test coverage live-check docs docs-cli docs-serve build hooks check clean
 
 help: ## List available targets with their descriptions
 	@grep -hE '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) \
@@ -43,8 +43,13 @@ coverage: ## Run the test suite with coverage (terminal, xml and html reports)
 live-check: ## Check the read path against the real Odoo.sh: make live-check PROJECT=<name>
 	uv run python scripts/live_check.py $(PROJECT)
 
-docs: ## Build the documentation site into site/, failing on warnings
+# The check first, so that a site is never built from a CLI reference the commands no longer give.
+docs: ## Build the documentation site into site/, failing on warnings and on a stale CLI reference
+	uv run python scripts/cli_reference.py --check
 	uv run zensical build --clean --strict
+
+docs-cli: ## Write docs/cli-reference.md from the commands of osh
+	uv run python scripts/cli_reference.py
 
 docs-serve: ## Serve the documentation locally with live reload
 	uv run zensical serve

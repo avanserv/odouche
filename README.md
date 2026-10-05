@@ -10,8 +10,10 @@ environment: list branches, watch builds, stream logs, from a script, a terminal
 > Odoo.sh has no public API: odouche talks to what the Odoo.sh web interface uses, which can change
 > without notice.
 >
-> **Pre-alpha.** The three packages install, and the library logs in, lists projects, branches and builds, watches a build, reads build logs and triggers a rebuild. The CLI logs in and out with `osh auth`, lists projects with `osh projects list` and branches with `osh branches list`, lists, shows and watches builds with `osh builds list`, `osh builds show` and `osh builds watch`, starts a new build with `osh builds rebuild`, and prints and follows a build's log with `osh logs`. Nothing else is
-> implemented yet.
+> **Pre-alpha.** The library and the `osh` command log in, list projects, branches and builds,
+> watch a build, read and follow its logs and start a rebuild: the
+> [CLI guide](https://avanserv.github.io/odouche/cli/) has the commands. The MCP server has no
+> tools yet.
 
 ## Packages
 

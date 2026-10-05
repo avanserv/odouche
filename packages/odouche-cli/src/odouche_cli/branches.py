@@ -21,13 +21,20 @@ _STAGE_ORDER = {odouche.Stage.PRODUCTION: 0, odouche.Stage.STAGING: 1, odouche.S
 
 StageOption = Annotated[
     list[odouche.Stage] | None,
-    typer.Option("--stage", help="List only the branches in this stage. Can be given more than once."),
+    typer.Option(
+        "--stage",
+        help="List only the branches in this stage. Can be given more than once. "
+        "`unknown` is any stage `osh` does not know.",
+    ),
 ]
 
 
 @app.command("list", epilog="Example: osh branches list --stage staging")
 def list_(ctx: typer.Context, project: ProjectOption = None, stage: StageOption = None) -> None:
-    """List a project's branches with their stage: production, staging, then development."""
+    """List a project's branches with their stage: production, staging, then development, each sorted by name.
+
+    A stage `osh` does not know is shown as Odoo.sh names it, after the others. In the table, `*` marks the branch checked out, when the project comes from the git checkout.
+    """
     output: Output = ctx.obj
     with open_client() as client:
         found = client.branches(resolve_project(ctx, project, client.projects))
