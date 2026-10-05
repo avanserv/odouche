@@ -25,8 +25,16 @@ SENTINEL = "sentinel-session-value"
 
 PROJECT = odouche.Project(id=1, name="acme", repository="acme/odoo", url="https://www.odoo.sh/project/acme")
 
+IDENTITY = odouche.Identity(
+    user_id=7,
+    name="Ada",
+    username="ada",
+    email="ada@example.com",
+    session=odouche.SessionInfo(odouche.SessionSource.ENVIRONMENT, None, None),
+)
+
 # What the stand-in client answers, by method.
-RESULTS: dict[str, object] = {"projects": [PROJECT]}
+RESULTS: dict[str, object] = {"projects": [PROJECT], "identity": IDENTITY}
 
 # One of each error the library raises.
 FAILURES: list[odouche.OdoucheError] = [
@@ -87,6 +95,11 @@ def violations(server: MCPServer[Any]) -> list[str]:
             found.append(f"{tool.name}: the read-only hint and the `{TOUCHES}:` line disagree")
         if (tool.output_schema or {}).get("type") != "object":
             found.append(f"{tool.name}: no structured result")
+        found.extend(
+            f"{tool.name}: takes `{name}`, and a session is never an argument"
+            for name in tool.input_schema.get("properties", {})
+            if any(word in name.lower() for word in ("session", "cookie"))
+        )
     return found
 
 
@@ -225,6 +238,19 @@ def test_a_tool_with_no_schema_for_its_result_fails():
     server.add_tool(get_anything, description="Get.\n\nReturns: it.\nTouches: reads only\nBounds: none.")
 
     assert "get_anything: no structured result" in violations(server)
+
+
+def test_a_tool_that_takes_a_session_is_caught():
+    server = scratch()
+
+    def list_builds(session_id: str) -> Projects:
+        """List the builds."""
+        del session_id
+        return Projects([])
+
+    add(server, list_builds)
+
+    assert violations(server) == ["list_builds: takes `session_id`, and a session is never an argument"]
 
 
 @pytest.mark.parametrize(

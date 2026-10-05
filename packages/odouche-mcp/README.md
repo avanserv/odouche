@@ -9,7 +9,7 @@ An unofficial [Model Context Protocol](https://modelcontextprotocol.io) server f
 > It acts with your own Odoo.sh access and nothing more, and staying within your agreement with
 > Odoo is your responsibility. See [Unofficial status](https://avanserv.github.io/odouche/unofficial/).
 
-**Status: pre-alpha.** The server starts and exposes no tools yet.
+**Status: pre-alpha.** The server reports its session and has no other tool yet.
 
 ```bash
 uvx odouche-mcp

@@ -12,7 +12,7 @@ environment.
 
     The library and the `osh` command log in, list projects, branches and builds, watch a build,
     read and follow its logs and start a rebuild: see the [library](library.md) and the
-    [CLI](cli.md). The MCP server has no tools yet.
+    [CLI](cli.md). The MCP server reports its session and has no other tool yet.
 
 ## Three packages, one library
 

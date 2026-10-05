@@ -14,8 +14,8 @@ def test_server_identifies_itself():
     assert server.version == odouche_mcp.__version__
 
 
-def test_server_exposes_no_tools_yet():
-    assert asyncio.run(create_server().list_tools()) == []
+def test_server_exposes_its_tools():
+    assert [tool.name for tool in asyncio.run(create_server().list_tools())] == ["get_session"]
 
 
 def test_main_serves_over_stdio(monkeypatch: pytest.MonkeyPatch):

@@ -10,7 +10,7 @@ from odouche_mcp._errors import NEXT_STEPS, tool_error
 
 
 CASES: list[tuple[odouche.OdoucheError, str | None]] = [
-    (odouche.NoSessionError("No session."), "osh auth login"),
+    (odouche.NoSessionError("No session."), odouche.SESSION_ENV),
     (odouche.SessionExpiredError("The session has expired."), "osh auth login"),
     (odouche.NotFoundError("No such project."), None),
     (odouche.PermissionDeniedError("Not allowed."), None),
@@ -21,14 +21,17 @@ CASES: list[tuple[odouche.OdoucheError, str | None]] = [
     (odouche.ReadOnlyError("Read-only."), None),
     (odouche.StageRefusedError("A production branch."), None),
     (odouche.OutcomeUnknownError("Not confirmed."), "before trying again"),
-    (odouche.KeyringUnavailableError(), None),
+    (odouche.KeyringUnavailableError(), odouche.SESSION_ENV),
     (odouche.LoginError("No session captured."), None),
     (odouche.OdoucheError("Something else."), None),
 ]
 
 
 @pytest.mark.parametrize(("error", "step"), CASES, ids=lambda value: type(value).__name__)
-def test_a_library_error_is_its_message_and_the_next_step(error: odouche.OdoucheError, step: str | None):
+def test_a_library_error_is_its_message_and_the_next_step(
+    monkeypatch: pytest.MonkeyPatch, error: odouche.OdoucheError, step: str | None
+):
+    monkeypatch.delenv(odouche.SESSION_ENV, raising=False)
     mapped = tool_error(error)
 
     assert isinstance(mapped, ToolError)
