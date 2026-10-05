@@ -198,7 +198,7 @@ line-ending = "lf"
 skip = "uv.lock,./.git,./.venv,./.cache,./site,./dist,./build,./htmlcov,./coverage.xml,*.har"
 
 [tool.vulture]
-paths = ["packages", "scripts"]
+paths = ["packages", "scripts", "examples"]
 min_confidence = 80
 
 [dependency-groups]
