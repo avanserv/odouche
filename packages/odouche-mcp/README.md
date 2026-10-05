@@ -20,7 +20,7 @@ your client the server's command:
 ```json
 {
   "mcpServers": {
-    "odouche": { "command": "uvx", "args": ["odouche-mcp==0.3.0"] }
+    "odouche": { "command": "uvx", "args": ["odouche-mcp==0.4.0"] }
   }
 }
 ```

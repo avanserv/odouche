@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.4.0](https://github.com/avanserv/odouche/compare/v0.3.0...v0.4.0) (2026-10-05)
+
+
+### Features
+
+* **mcp:** Add a tool that reads a build's log, capped and marked as untrusted ([#51](https://github.com/avanserv/odouche/issues/51)) ([8c4c641](https://github.com/avanserv/odouche/commit/8c4c641ab394028891636247e8c3d1cb2d1358e5))
+* **mcp:** Add a tool that waits for a build for a bounded time and reports progress ([#52](https://github.com/avanserv/odouche/issues/52)) ([91b1227](https://github.com/avanserv/odouche/commit/91b1227f1db6a7b662d78b05c1b64f98e42e302a))
+* **mcp:** Add get_session and read the session on each call ([#47](https://github.com/avanserv/odouche/issues/47)) ([4ce04c5](https://github.com/avanserv/odouche/commit/4ce04c5018f37b2d20a78b5863c24cda9a24c93b))
+* **mcp:** Add the rebuild tool behind an opt-in switch that is off by default ([#50](https://github.com/avanserv/odouche/issues/50)) ([7f3edb1](https://github.com/avanserv/odouche/commit/7f3edb1b7afc8e7c1373088cff13b7943e8808a2))
+* **mcp:** Add tools to list projects, branches and builds, and to read one build ([#49](https://github.com/avanserv/odouche/issues/49)) ([6cc6033](https://github.com/avanserv/odouche/commit/6cc6033361cde0d353c58a70d3d02c048ff824f0))
+
+
+### Documentation
+
+* **mcp:** Add a Claude Code hook that approves the read-only tools ([#53](https://github.com/avanserv/odouche/issues/53)) ([896c282](https://github.com/avanserv/odouche/commit/896c282861807f7a13c362ed8e394911967f5b44))
+* **mcp:** Generate the tool reference from the server and add a setup guide ([#55](https://github.com/avanserv/odouche/issues/55)) ([15ef0c7](https://github.com/avanserv/odouche/commit/15ef0c7459b58875d9012975d8a0eb5e42184dbb))
+* Name the session and log tools of the MCP server in the README ([#56](https://github.com/avanserv/odouche/issues/56)) ([7fce31b](https://github.com/avanserv/odouche/commit/7fce31be3f2a9d29d0554b929a5145b74dc59cda))
+
 ## [0.3.0](https://github.com/avanserv/odouche/compare/v0.2.0...v0.3.0) (2026-10-05)
 
 

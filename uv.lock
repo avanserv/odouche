@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 5
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -803,7 +803,7 @@ wheels = [
 
 [[package]]
 name = "odouche"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/odouche" }
 dependencies = [
     { name = "httpx2", extra = ["ws"] },
@@ -820,7 +820,7 @@ requires-dist = [
 
 [[package]]
 name = "odouche-cli"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/odouche-cli" }
 dependencies = [
     { name = "odouche" },
@@ -837,7 +837,7 @@ requires-dist = [
 
 [[package]]
 name = "odouche-mcp"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/odouche-mcp" }
 dependencies = [
     { name = "anyio" },
@@ -854,7 +854,7 @@ requires-dist = [
 
 [[package]]
 name = "odouche-workspace"
-version = "0.3.0"
+version = "0.4.0"
 source = { virtual = "." }
 dependencies = [
     { name = "odouche" },
