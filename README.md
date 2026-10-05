@@ -12,8 +12,9 @@ environment: list branches, watch builds, stream logs, from a script, a terminal
 >
 > **Pre-alpha.** The library and the `osh` command log in, list projects, branches and builds,
 > watch a build, read and follow its logs and start a rebuild: the
-> [CLI guide](https://avanserv.github.io/odouche/cli/) has the commands. The MCP server lists
-> projects, branches and builds, reads one build and, when you allow it, starts a rebuild.
+> [CLI guide](https://avanserv.github.io/odouche/cli/) has the commands. The MCP server reports
+> its session, lists projects, branches and builds, reads one build and its logs and, when you
+> allow it, starts a rebuild.
 
 ## Packages
 
