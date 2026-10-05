@@ -6,7 +6,7 @@ from odouche_mcp import __version__
 
 
 def create_server() -> MCPServer:
-    """Build the server. Tools are registered here as the library gains capabilities."""
+    """Build the server. Tools are registered here, through `_contract.add_tool`."""
     return MCPServer(name="odouche", version=__version__)
 
 
