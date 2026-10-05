@@ -7,6 +7,7 @@ asks the client.
 import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any, Self
 
 import pytest
@@ -33,8 +34,38 @@ IDENTITY = odouche.Identity(
     session=odouche.SessionInfo(odouche.SessionSource.ENVIRONMENT, None, None),
 )
 
+# Named as the project, which is the one string a tool is called with.
+BRANCH = odouche.Branch(id=3, name="acme", stage=odouche.Stage.DEVELOPMENT, stage_name="dev")
+
+BUILD = odouche.Build(
+    id=5,
+    name="acme-acme-5",
+    branch_id=BRANCH.id,
+    branch_name=BRANCH.name,
+    commit=odouche.Commit(
+        hash="0" * 40,
+        message="Fix it",
+        author="Ada",
+        timestamp=datetime(2026, 1, 1, tzinfo=UTC),
+        url=f"https://github.com/acme/odoo/commit/{'0' * 40}",
+    ),
+    status=odouche.BuildStatus.DONE,
+    status_name="done",
+    result=odouche.BuildResult.SUCCESS,
+    result_name="success",
+    status_info=None,
+    started_at=None,
+    url=None,
+)
+
 # What the stand-in client answers, by method.
-RESULTS: dict[str, object] = {"projects": [PROJECT], "identity": IDENTITY}
+RESULTS: dict[str, object] = {
+    "projects": [PROJECT],
+    "identity": IDENTITY,
+    "branches": [BRANCH],
+    "builds": [BUILD],
+    "latest_build": BUILD,
+}
 
 # One of each error the library raises.
 FAILURES: list[odouche.OdoucheError] = [
@@ -311,15 +342,15 @@ def test_a_tool_that_hides_a_library_error_is_caught():
 def test_a_tool_with_no_stand_in_answer_is_caught():
     server = scratch()
 
-    def list_branches() -> Projects:
+    def list_logs() -> Projects:
         """List what the stand-in does not answer."""
         with odouche.Client() as client:
-            client.branches("acme")
+            client.logs("acme", BUILD)
         return Projects([])
 
-    add(server, list_branches)
+    add(server, list_logs)
 
-    assert "list_branches, answered: an error" in leaks(server)
+    assert "list_logs, answered: an error" in leaks(server)
 
 
 def get_undocumented() -> Projects:

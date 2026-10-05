@@ -15,7 +15,13 @@ def test_server_identifies_itself():
 
 
 def test_server_exposes_its_tools():
-    assert [tool.name for tool in asyncio.run(create_server().list_tools())] == ["get_session"]
+    assert [tool.name for tool in asyncio.run(create_server().list_tools())] == [
+        "get_session",
+        "list_projects",
+        "list_branches",
+        "list_builds",
+        "get_build",
+    ]
 
 
 def test_main_serves_over_stdio(monkeypatch: pytest.MonkeyPatch):
