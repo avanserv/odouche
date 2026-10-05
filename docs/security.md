@@ -109,6 +109,10 @@ documents what it does and what it can touch. The one such tool, a rebuild, is r
 the server is started with [`--allow-changes`](mcp.md#changing-state), and each call of it writes a
 line to the server's stderr.
 
+The tool that reads a build's log puts text the build printed into an agent's context. It is
+[labelled as untrusted and not masked](mcp.md#build-logs): a log can hold an instruction meant for
+the agent, or a secret of the instance.
+
 ## Reporting a vulnerability
 
 Please report vulnerabilities privately, through

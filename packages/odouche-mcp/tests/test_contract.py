@@ -66,6 +66,8 @@ RESULTS: dict[str, object] = {
     "builds": [BUILD],
     "latest_build": BUILD,
     "rebuild": BUILD,
+    "logs": [odouche.Log(odouche.LogKind.INSTALL, "install", datetime(2026, 1, 1, tzinfo=UTC), "1 KB")],
+    "read_log": [odouche.LogLine("Loading modules", offset=16, truncated=False)],
 }
 
 # One of each error the library raises.
@@ -351,15 +353,15 @@ def test_a_tool_that_hides_a_library_error_is_caught():
 def test_a_tool_with_no_stand_in_answer_is_caught():
     server = scratch()
 
-    def list_logs() -> Projects:
-        """List what the stand-in does not answer."""
+    def follow_log() -> Projects:
+        """Follow what the stand-in does not answer."""
         with odouche.Client() as client:
-            client.logs("acme", BUILD)
+            client.follow_log("acme", BUILD, odouche.LogKind.ODOO, timeout=1)
         return Projects([])
 
-    add(server, list_logs)
+    add(server, follow_log)
 
-    assert "list_logs, answered: an error" in leaks(server)
+    assert "follow_log, answered: an error" in leaks(server)
 
 
 def get_undocumented() -> Projects:

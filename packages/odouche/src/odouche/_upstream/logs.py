@@ -5,10 +5,10 @@ Nothing of a log goes to the library's logger.
 
 import re
 import time
-from collections import deque
 from collections.abc import Callable, Generator, Iterator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
+from itertools import islice
 
 from odouche._upstream import builds, projects
 from odouche._upstream.reader import Reader
@@ -61,10 +61,16 @@ class _File:
 class _Lines:
     """Cuts what arrives into lines, and holds no more than `MAX_LINE` of the one not ended yet."""
 
-    def __init__(self, consumed: int = 0, *, skipping: bool = False) -> None:
-        self.consumed = consumed
+    def __init__(self) -> None:
+        self.consumed = 0
         self._held = bytearray()
         # Whether what comes before the next newline belongs to a line that is not yielded.
+        self._skipping = False
+
+    def restart(self, consumed: int, *, skipping: bool = False) -> None:
+        """Start at that byte of the log, inside a line that is not yielded when `skipping`."""
+        self.consumed = consumed
+        self._held.clear()
         self._skipping = skipping
 
     def feed(self, chunk: bytes) -> Iterator[LogLine]:
@@ -169,17 +175,15 @@ def _read(file: _File, tail: int | None) -> Generator[LogLine]:
         yield from _fetch(file, lines)
         yield from lines.flush()
     else:
-        kept, lines = _tail(file, tail)
-        kept.extend(lines.flush())
-        yield from kept
+        yield from _last(*_tail(file, tail), tail, _Lines(), ended=True)
 
 
 def _follow(file: _File, deadline: float, tail: int, offset: int | None) -> Generator[LogLine]:
+    lines = _Lines()
     if offset is None:
-        kept, lines = _tail(file, tail)
-        yield from kept
+        yield from _last(*_tail(file, tail), tail, lines, ended=False)
     else:
-        lines = _Lines(offset)
+        lines.restart(offset)
         yield from _fetch(file, lines)
     while True:
         remaining = deadline - _monotonic()
@@ -189,8 +193,8 @@ def _follow(file: _File, deadline: float, tail: int, offset: int | None) -> Gene
         yield from _fetch(file, lines)
 
 
-def _tail(file: _File, count: int) -> tuple[deque[LogLine], _Lines]:
-    """Read the end of a log: its last `count` lines, and where the next read starts."""
+def _tail(file: _File, count: int) -> tuple[bytes, int]:
+    """Read the end of a log: its bytes, and where the first of them is in the log."""
     for delay in (*_RETRIES, None):
         try:
             return _suffix(file, count)
@@ -201,18 +205,40 @@ def _tail(file: _File, count: int) -> tuple[deque[LogLine], _Lines]:
     raise AssertionError
 
 
-def _suffix(file: _File, count: int) -> tuple[deque[LogLine], _Lines]:
-    kept: deque[LogLine] = deque(maxlen=count)
+def _suffix(file: _File, count: int) -> tuple[bytes, int]:
     # With no line to keep, the last byte tells where the log ends.
     byte_range = f"bytes=-{TAIL_BYTES if count else 1}"
     with file.open(byte_range) as part:
         if part is None:
-            return kept, _Lines()
-        # A part that starts inside the log starts inside a line.
-        lines = _Lines(part.first, skipping=part.first > 0)
+            return b"", 0
+        held = bytearray()
+        first = part.first
         for chunk in part.chunks:
-            kept.extend(lines.feed(chunk))
-    return kept, lines
+            held += chunk
+            # A part longer than asked for is held to its end.
+            extra = len(held) - TAIL_BYTES
+            if extra > 0:
+                del held[:extra]
+                first += extra
+    return bytes(held), first
+
+
+def _last(held: bytes, first: int, count: int, lines: _Lines, *, ended: bool) -> Iterator[LogLine]:
+    """Yield the last `count` lines of the end of a log, and leave `lines` where it ends.
+
+    The lines are made one at a time: an end of only newlines is a mebibyte of them.
+    """
+    total = sum(1 for _ in _cut(held, first, _Lines(), ended=ended))
+    return islice(_cut(held, first, lines, ended=ended), max(total - count, 0), None)
+
+
+def _cut(held: bytes, first: int, lines: _Lines, *, ended: bool) -> Iterator[LogLine]:
+    # An end that starts inside the log starts inside a line.
+    lines.restart(first, skipping=first > 0)
+    for start in range(0, len(held), MAX_LINE):
+        yield from lines.feed(held[start : start + MAX_LINE])
+    if ended:
+        yield from lines.flush()
 
 
 def _fetch(file: _File, lines: _Lines) -> Iterator[LogLine]:

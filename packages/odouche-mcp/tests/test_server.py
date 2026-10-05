@@ -14,7 +14,7 @@ def test_server_identifies_itself():
     assert server.version == odouche_mcp.__version__
 
 
-READS = ["get_session", "list_projects", "list_branches", "list_builds", "get_build"]
+READS = ["get_session", "list_projects", "list_branches", "list_builds", "get_build", "read_log"]
 
 
 def _names(server: MCPServer) -> list[str]:

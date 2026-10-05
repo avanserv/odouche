@@ -2,6 +2,7 @@ import dataclasses
 import logging
 import math
 import traceback
+import tracemalloc
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -54,6 +55,8 @@ class File:
     def __init__(self, content=CONTENT, chunk=None):
         self.content = content
         self.chunk = chunk
+        # Whether the end of the log is answered from its first byte, however little was asked for.
+        self.whole = False
         self.ranges = []
         # What the next requests do in place of answering: a status, an error, or a count of bytes to drop after.
         self.failures = []
@@ -70,6 +73,8 @@ class File:
         if not size:
             return httpx2.Response(200)
         first = max(size - int(asked[7:]), 0) if asked.startswith("bytes=-") else int(asked[6:-1])
+        if self.whole and asked.startswith("bytes=-"):
+            first = 0
         headers = {"Content-Range": f"bytes {first}-{size - 1}/{size}", "Set-Cookie": "session_id=w0rk3r; Path=/"}
         body = self.content[first:]
         if failure is not None:
@@ -206,6 +211,29 @@ def test_a_tail_leaves_out_the_line_the_last_mebibyte_starts_inside(client, buil
     monkeypatch.setattr(logs, "TAIL_BYTES", len(CONTENT) - 10)
 
     assert texts(client.read_log(PROJECT, build, LogKind.INSTALL, tail=50)) == LINES[1:]
+
+
+def test_a_part_longer_than_asked_for_is_read_from_its_last_mebibyte(client, build, file, monkeypatch):
+    monkeypatch.setattr(logs, "TAIL_BYTES", len(CONTENT) - 10)
+    file.whole = True
+
+    lines = list(client.read_log(PROJECT, build, LogKind.INSTALL, tail=50))
+
+    assert texts(lines) == LINES[1:]
+    assert lines[-1].offset == len(CONTENT)
+
+
+def test_a_tail_of_a_log_of_newlines_holds_no_line_for_each(client, build, file):
+    file.content = b"\n" * 200_000
+    tracemalloc.start()
+    try:
+        count = sum(1 for _ in client.read_log(PROJECT, build, LogKind.INSTALL, tail=len(file.content)))
+        _, most = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    assert count == len(file.content)
+    assert most < 16 * len(file.content)
 
 
 def test_reads_a_line_that_no_newline_ends(client, build, file):
