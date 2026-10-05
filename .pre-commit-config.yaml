@@ -136,7 +136,7 @@ repos:
         name: python   | type check (basedpyright)
         entry: uv run basedpyright
         language: system
-        files: ^(packages/.*\.pyi?|pyrightconfig\.json|uv\.lock)$
+        files: ^((packages|examples)/.*\.pyi?|pyrightconfig\.json|uv\.lock)$
         pass_filenames: false
         require_serial: true
 

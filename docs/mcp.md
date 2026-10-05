@@ -158,6 +158,47 @@ The tools that change state on Odoo.sh are off until you start the server with `
 - Each call writes one line to the server's stderr: the tool, the project, the branch, and the
   build started or the kind of error. It never holds the session.
 
+## Asking before a change
+
+The flag decides whether `rebuild_branch` exists. Whether an agent may call a tool without asking
+you is your client's decision. For Claude Code, a hook lets the tools that read pass and leaves
+the rest to the usual prompt:
+[`examples/claude-code/odouche_read_only_hook.py`](https://github.com/avanserv/odouche/blob/main/examples/claude-code/odouche_read_only_hook.py).
+It needs Python and nothing else. Read it, copy it into your project's `.claude/hooks/`, and add
+it to `.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__odouche__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/.claude/hooks/odouche_read_only_hook.py",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+- It approves a call to a tool on its list, which a test holds to the tools the server registers
+  with the read-only hint. For any other tool, and for any input it does not understand, it
+  prints nothing and Claude Code asks you as it would without the hook.
+- Claude Code names a tool `mcp__<server>__<tool>`, where `<server>` is the name the server has
+  in your configuration. Under another name than `odouche`, change `SERVER` in the script and the
+  matcher above.
+- It does not read a call's arguments, and it never denies a call.
+- `read_log` is one of the tools it approves, so the lines of a [build log](#build-logs) reach
+  the agent without a prompt.
+- It does not replace `--allow-changes`: without the flag there is no tool to ask about.
+
+Another client decides from the [hints](#tool-contract) each tool carries.
+
 ## Arguments and results
 
 ### The project
@@ -193,8 +234,9 @@ agent, and a log can hold a secret of the instance.
 
 This is why the server is read-only unless you [start it otherwise](#changing-state): an agent
 misled by a log has no tool that changes anything on Odoo.sh. Whether an agent may call a tool
-without asking you is your client's decision, and every tool carries the
-[hints](#tool-contract) a permission rule can use.
+without asking you is your client's decision: every tool carries the
+[hints](#tool-contract) a permission rule can use, and Claude Code can be given a
+[hook](#asking-before-a-change).
 
 ## Design constraints
 
