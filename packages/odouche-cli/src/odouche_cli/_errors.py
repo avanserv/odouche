@@ -4,7 +4,9 @@ Scripts branch on the codes, so changing one is a breaking change. `docs/cli.md`
 """
 
 import os
+import sys
 import traceback
+from contextlib import suppress
 from typing import Annotated, Any, override
 
 import typer
@@ -26,6 +28,9 @@ EXIT_BUILD_FAILED = 20
 EXIT_BUILD_WARNING = 21
 EXIT_BUILD_NO_RESULT = 22
 EXIT_BUILD_TIMEOUT = 23
+
+# What a shell reports for a command that SIGPIPE ended.
+EXIT_CLOSED_PIPE = 141
 
 # The first row an error is an instance of wins, so the base class comes last. 1 and 2 are the
 # unexpected error and click's usage error.
@@ -55,19 +60,37 @@ DebugOption = Annotated[
 class OshGroup(TyperGroup):
     """The root group: a failed command ends with a message on stderr and an exit code."""
 
+    @override
+    def list_commands(self, ctx: typer.Context) -> list[str]:  # pyright: ignore[reportIncompatibleMethodOverride]
+        """List the commands by name: typer lists a command before every group."""
+        return sorted(super().list_commands(ctx))
+
     # The base names typer's vendored click context, which is not public. Typer passes its own.
     @override
     def invoke(self, ctx: typer.Context) -> Any:  # pyright: ignore[reportIncompatibleMethodOverride]
         try:
             return super().invoke(ctx)
-        # A closed pipe, as under `| head`, is typer's to end quietly.
-        except (typer.Exit, typer.Abort, typer.TyperException, BrokenPipeError):
+        except (typer.Exit, typer.Abort, typer.TyperException):
             raise
+        # A pipe closed under a command's output, as by `| head`, ends the command quietly.
+        except BrokenPipeError:
+            _discard_stdout()
+            ctx.exit(EXIT_CLOSED_PIPE)
         except Exception as error:  # noqa: BLE001 - the root reports every failure
             debug = bool(ctx.params.get("debug"))
             if debug:
                 _print_traceback(error)
             ctx.exit(_report(error, debug=debug))
+
+
+def _discard_stdout() -> None:
+    """Point stdout at the null device, so that the flush at exit does not fail on the closed pipe."""
+    # A stdout that is not a file has nothing to flush there.
+    with suppress(OSError, ValueError):
+        descriptor = sys.stdout.fileno()
+        null = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(null, descriptor)
+        os.close(null)
 
 
 def _print_traceback(error: Exception) -> None:

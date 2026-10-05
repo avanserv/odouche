@@ -300,12 +300,13 @@ Each line is a `LogLine`:
 - A build has only some of the logs, and none while it waits for a worker. A log it does not have
   raises `NotFoundError`.
 - `tail=N` yields the last N lines, out of the log's last mebibyte.
+- Closing the iterator of a read closes the connection.
 - A line longer than 64 KiB is cut to that and marked `truncated`. Bytes that are not UTF-8 are
   replaced.
 - `follow_log` starts after the last `tail` lines, none by default, or at `offset`: pass the
   `offset` of the last line read to carry on from it.
 - A follow asks Odoo.sh every second and ends when the iterator is closed. After `timeout` seconds
-  it raises `StreamTimeoutError`.
+  it raises `StreamTimeoutError`. `timeout=math.inf` sets no limit.
 - A request that fails is sent again twice, from where the last one stopped, so no line is lost
   or repeated. Then `UpstreamUnavailableError` is raised.
 - Each call asks Odoo.sh for the build's worker and the project's access token before the log.

@@ -1,5 +1,6 @@
 import dataclasses
 import logging
+import math
 import traceback
 from datetime import UTC, datetime
 from pathlib import Path
@@ -536,7 +537,26 @@ def test_a_log_still_followed_at_the_timeout_raises_the_timeout_error(client, bu
     assert len(file.ranges) == 4
 
 
-def test_closing_early_closes_the_connection_and_asks_nothing_more(client, build, file, time):
+def test_a_follow_with_no_limit_asks_every_second_and_raises_nothing(client, build, file, time):
+    file.content = b"old\n"
+    time.during = lambda: setattr(file, "content", file.content + b"new\n")
+
+    following = client.follow_log(PROJECT, build, LogKind.INSTALL, timeout=math.inf)
+
+    assert texts(next(following) for _ in range(3)) == ["new"] * 3
+    following.close()
+    assert time.sleeps == [1.0, 1.0, 1.0]
+
+
+@pytest.mark.parametrize(
+    "opened",
+    [
+        lambda client, build: client.read_log(PROJECT, build, LogKind.INSTALL),
+        lambda client, build: client.follow_log(PROJECT, build, LogKind.INSTALL, timeout=60, offset=0),
+    ],
+    ids=["read", "follow"],
+)
+def test_closing_early_closes_the_connection_and_asks_nothing_more(client, build, file, time, opened):
     file.chunk = 20
     closed = []
     answer = file.__call__
@@ -547,11 +567,11 @@ def test_closing_early_closes_the_connection_and_asks_nothing_more(client, build
         return response
 
     file.__class__ = type("Watched", (File,), {"__call__": lambda self, request: watched(request)})
-    following = client.follow_log(PROJECT, build, LogKind.INSTALL, timeout=60, offset=0)
+    lines = opened(client, build)
 
-    assert next(following).text == LINES[0]
+    assert next(lines).text == LINES[0]
     assert closed == []
-    following.close()
+    lines.close()
 
     assert closed == [True]
     assert file.ranges == ["bytes=0-"]

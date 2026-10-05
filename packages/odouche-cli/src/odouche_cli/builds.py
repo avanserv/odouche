@@ -21,9 +21,9 @@ from odouche_cli._context import (
     checkout_branch,
     checkout_head,
     checkout_is_of,
-    find_branch,
+    find_build,
+    project_branch,
     resolve_branch,
-    resolve_project,
 )
 from odouche_cli._errors import EXIT_BUILD_FAILED, EXIT_BUILD_NO_RESULT, EXIT_BUILD_TIMEOUT, EXIT_BUILD_WARNING
 from odouche_cli._output import Column, Format, Output, strip_control
@@ -120,7 +120,7 @@ def list_(
     output: Output = ctx.obj
     name = resolve_branch(ctx, branch)
     with open_client() as client:
-        _, found = _branch(ctx, client, project, name)
+        _, found = project_branch(ctx, client, project, name)
         builds = client.builds(found, limit=limit)
     columns = [
         Column[odouche.Build]("ID", lambda build: build.id),
@@ -144,8 +144,8 @@ def show(
     output: Output = ctx.obj
     name = resolve_branch(ctx, branch)
     with open_client() as client:
-        project_name, found = _branch(ctx, client, project, name)
-        build = _build(client, project_name, found, build_id)
+        project_name, found = project_branch(ctx, client, project, name)
+        build = find_build(client, project_name, found, build_id)
     columns = [
         Column[odouche.Build]("ID", lambda build: build.id),
         Column[odouche.Build]("Name", lambda build: build.name),
@@ -182,7 +182,7 @@ def watch(
     name = resolve_branch(ctx, branch)
     deadline = _monotonic() + timeout
     with open_client() as client:
-        project_name, found = _branch(ctx, client, project, name)
+        project_name, found = project_branch(ctx, client, project, name)
         awaited = commit
         # A project read from the checkout is the checkout's: only one that was named is asked about.
         if (
@@ -196,7 +196,7 @@ def watch(
             if awaited is None:
                 typer.echo("HEAD could not be read: watching the branch's latest build.", err=True)
         if awaited is None:
-            build = _build(client, project_name, found, build_id)
+            build = find_build(client, project_name, found, build_id)
         else:
             build = _await_build(client, found, awaited.lower(), min(deadline, _monotonic() + _COMMIT_WAIT))
             if build is None:
@@ -295,27 +295,6 @@ def _stderr_is_terminal() -> bool:
 def _redraws(console: Console) -> bool:
     """Tell whether a `Live` on that console draws: Rich needs the three, and the environment sets each."""
     return _stderr_is_terminal() and console.is_terminal and not console.is_dumb_terminal and console.is_interactive
-
-
-def _branch(ctx: typer.Context, client: odouche.Client, project: str | None, name: str) -> tuple[str, odouche.Branch]:
-    """Return the project's name and its branch of that name."""
-    project_name = resolve_project(ctx, project, client.projects)
-    return project_name, find_branch(client, project_name, name)
-
-
-def _build(client: odouche.Client, project: str, branch: odouche.Branch, build_id: int | None) -> odouche.Build:
-    """Return the branch's build of that number, or its latest."""
-    if build_id is not None:
-        for build in client.builds(branch):
-            if build.id == build_id:
-                return build
-        msg = f"Build {build_id} is not among the latest builds of branch {branch.name} of {project}."
-        raise odouche.NotFoundError(msg)
-    latest = client.latest_build(branch)
-    if latest is None:
-        msg = f"Branch {branch.name} of {project} has no build."
-        raise odouche.NotFoundError(msg)
-    return latest
 
 
 def _status(build: odouche.Build) -> str:

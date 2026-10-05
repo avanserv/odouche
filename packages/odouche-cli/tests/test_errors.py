@@ -1,9 +1,13 @@
+import os
+import sys
+
 import click
 import pytest
 import typer
 from typer.testing import CliRunner, Result
 
 import odouche
+from odouche_cli import _errors
 from odouche_cli._errors import (
     EXIT_BUILD_FAILED,
     EXIT_BUILD_NO_RESULT,
@@ -170,11 +174,24 @@ def test_an_interrupt_exits_130_in_silence():
     assert result.output == ""
 
 
-def test_a_closed_pipe_is_not_reported_as_a_bug():
+def test_a_closed_pipe_ends_in_silence_as_sigpipe_would():
     result = run(BrokenPipeError())
 
-    assert result.exit_code == 1
+    assert result.exit_code == 141
     assert result.stderr == ""
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="a closed pipe is another error there")
+def test_after_a_closed_pipe_what_stdout_still_holds_is_flushed_without_an_error(monkeypatch: pytest.MonkeyPatch):
+    reader, writer = os.pipe()
+    os.close(reader)
+    with os.fdopen(writer, "w") as stdout:
+        monkeypatch.setattr(sys, "stdout", stdout)
+        stdout.write("held")
+
+        _errors._discard_stdout()
+
+        stdout.flush()
 
 
 @pytest.mark.parametrize("error", [odouche.LoginError("No session captured."), odouche.LoginTimeoutError("Late.")])

@@ -102,7 +102,7 @@ def logs(transport: Transport, project: str, build: Build) -> list[Log]:
     return [] if source is None else _logs(transport, source)
 
 
-def read(transport: Transport, project: str, build: Build, kind: LogKind | str, tail: int | None) -> Iterator[LogLine]:
+def read(transport: Transport, project: str, build: Build, kind: LogKind | str, tail: int | None) -> Generator[LogLine]:
     """Yield the lines of a log, or the last `tail` of them that its last mebibyte holds."""
     if tail is not None and builds.number("tail", tail) < 1:
         raise ValueError("A tail is at least 1")
@@ -163,7 +163,7 @@ def _locate(transport: Transport, project: str, build: Build, kind: LogKind | st
     return _File(transport, source, source.path(name))
 
 
-def _read(file: _File, tail: int | None) -> Iterator[LogLine]:
+def _read(file: _File, tail: int | None) -> Generator[LogLine]:
     if tail is None:
         lines = _Lines()
         yield from _fetch(file, lines)
