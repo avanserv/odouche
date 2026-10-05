@@ -22,36 +22,55 @@ _monotonic: Callable[[], float] = time.monotonic
 _sleep: Callable[[float], None] = time.sleep
 
 
-def watch(transport: Transport, project: Project | str, build: Build, *, timeout: float) -> Generator[Build]:
-    """Yield a build as it is now, then at each change, and end after yielding it finished."""
+def watch(
+    transport: Transport, project: Project | str, build: Build, *, timeout: float, pulse: float | None = None
+) -> Generator[Build]:
+    """Yield a build as it is now, then at each change, and end after yielding it finished.
+
+    With `pulse`, it is also yielded unchanged when a wait of that long at most brought no change.
+    """
     if timeout <= 0:
         raise ValueError("A timeout is more than 0")
-    return _Watch(transport, build, _monotonic() + timeout).run(project)
+    if pulse is not None and pulse <= 0:
+        raise ValueError("A pulse is more than 0")
+    return _Watch(transport, build, _monotonic() + timeout, pulse).run(project)
 
 
 class _Watch:
     """One watch of one build: what was last yielded of it, and what was last heard of it."""
 
-    def __init__(self, transport: Transport, build: Build, deadline: float) -> None:
+    def __init__(self, transport: Transport, build: Build, deadline: float, pulse: float | None) -> None:
         self._transport = transport
         self._build = build
         self._deadline = deadline
+        self._pulse = pulse
         self._heard_at = 0.0
         # The last notification held, which a subscription names.
         self._last = 0
         self._failures = 0
 
     def run(self, project: Project | str) -> Generator[Build]:
+        failed = None
+        try:
+            yield from self._run(project)
+        except UpstreamUnavailableError as error:
+            failed = error
+        if failed is not None:
+            # A request the timeout cut short is the timeout, which `_remaining` raises.
+            self._remaining()
+            raise failed
+
+    def _run(self, project: Project | str) -> Generator[Build]:
         self._heard_at = _monotonic()
-        self._build = builds.build(self._transport, self._build.branch_id, self._build.id)
+        self._build = self._asked()
         yield self._build
         if self._build.finished:
             return
-        channel = f"paas_repository:{_project_id(self._transport, project)}"
+        channel = f"paas_repository:{_project_id(self._transport, project, self._remaining())}"
         while not self._build.finished:
             self._remaining()
             try:
-                with self._transport.bus(_OPERATION) as socket:
+                with self._transport.bus(_OPERATION, self._remaining()) as socket:
                     yield from self._listen(socket, channel)
                 continue
             except UpstreamUnavailableError as error:
@@ -72,10 +91,16 @@ class _Watch:
                 yield from self._ask()
                 self._failures = 0
                 continue
-            frame = socket.receive(min(quiet, self._remaining()))
+            frame = socket.receive(min(quiet, self._remaining(), self._pulse or quiet))
+            changed = False
             if frame is not None:
                 self._failures = 0
-                yield from self._events(frame)
+                for change in self._events(frame):
+                    changed = True
+                    yield change
+            # A frame can hold no change: it is of another build, or says what is known.
+            if self._pulse and not changed:
+                yield self._build
 
     def _remaining(self) -> float:
         remaining = self._deadline - _monotonic()
@@ -84,8 +109,10 @@ class _Watch:
         return remaining
 
     def _ask(self) -> Iterator[Build]:
-        self._remaining()
-        yield from self._take(builds.build(self._transport, self._build.branch_id, self._build.id))
+        yield from self._take(self._asked())
+
+    def _asked(self) -> Build:
+        return builds.build(self._transport, self._build.branch_id, self._build.id, within=self._remaining())
 
     def _events(self, frame: str) -> Iterator[Build]:
         for notification in _notifications(frame):
@@ -122,10 +149,10 @@ def _notifications(frame: str) -> list[Reader]:
     return Reader(_OPERATION, {"frame": notifications}).items("frame")
 
 
-def _project_id(transport: Transport, project: Project | str) -> int:
+def _project_id(transport: Transport, project: Project | str, within: float) -> int:
     if isinstance(project, Project):
         return project.id
-    found = projects.project_id(transport, project)
+    found = projects.project_id(transport, project, within=within)
     if found is None:
         raise NotFoundError(f"The session's user can reach no project named {project!r}.", operation=_OPERATION)
     return found

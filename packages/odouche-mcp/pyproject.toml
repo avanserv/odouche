@@ -21,6 +21,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
+    "anyio>=4.9",
     "mcp>=2.2.0",
     # Exact, because the three packages are released together and tested only together.
     "odouche==0.3.0", # x-release-please-version

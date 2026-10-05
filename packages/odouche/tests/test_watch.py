@@ -416,6 +416,40 @@ def test_a_build_still_watched_at_the_timeout_raises_the_timeout_error(client, b
     assert bus.streams[0].closed.is_set()
 
 
+def test_each_request_of_a_watch_has_what_is_left_of_the_timeout(client, upstream, build, bus, time):
+    upstream.requests.clear()
+    watching = client.watch_build(PROJECT, build, timeout=20)
+    next(watching)
+    time.now += 15
+    bus.push(event(1, status="progress", result=False, status_info="Testing: invoicing"))
+    next(watching)
+
+    assert [request.url.path for request in upstream.requests] == [BUILDS, PROJECTS, SOCKET, BUILDS]
+    assert [request.extensions["timeout"]["read"] for request in upstream.requests] == [20, 5, 5, 5]
+    watching.close()
+
+
+def test_a_request_the_timeout_cut_short_raises_the_timeout_error(client, upstream, build, bus, time):
+    watching = client.watch_build(PROJECT, build, timeout=90)
+    next(watching)
+    bus.push(event(1, status="progress", result=False, status_info="Testing: invoicing"))
+    next(watching)
+
+    def late(request):
+        time.now += request.extensions["timeout"]["read"]
+        raise httpx2.ReadTimeout("late", request=request)
+
+    upstream.bodies[BUILDS] = late
+    time.now += 60
+
+    with pytest.raises(StreamTimeoutError) as raised:
+        next(watching)
+
+    assert raised.value.operation == "watch"
+    assert raised.value.__context__ is None
+    assert bus.streams[0].closed.is_set()
+
+
 def test_the_timeout_ends_the_wait_before_the_socket_is_opened_again(client, build, bus, time):
     bus.failures = [httpx2.ConnectError] * 3
     watching = client.watch_build(PROJECT, build, timeout=2.5)
@@ -426,6 +460,68 @@ def test_the_timeout_ends_the_wait_before_the_socket_is_opened_again(client, bui
 
     assert time.sleeps == [1.0, 1.5]
     assert raised.value.__context__ is None
+
+
+def test_a_pulse_yields_the_build_unchanged_while_odoo_sh_says_nothing(client, build, bus, time, asked):
+    watching = client.watch_build(PROJECT, build, timeout=600, pulse=0.01)
+    first = next(watching)
+
+    assert [next(watching), next(watching)] == [first, first]
+    bus.push(event(1, status="progress", result=False, status_info="Testing: invoicing"))
+    assert next(change for change in watching if change != first).status_info == "Testing: invoicing"
+    assert asked() == [BUILDS, PROJECTS, SOCKET, BUILDS]
+    watching.close()
+    assert bus.streams[0].closed.is_set()
+
+
+def test_a_pulse_is_not_put_off_by_what_happens_to_another_build(client, build, bus, time):
+    watching = client.watch_build(PROJECT, build, timeout=600, pulse=4)
+    first = next(watching)
+    bus.push(event(1, build_id=BUILD + 1, status="progress", result=False, status_info="Testing: stock"))
+
+    assert next(watching) == first
+    watching.close()
+
+
+def test_a_pulse_longer_than_what_is_left_does_not_put_off_the_timeout(client, build, bus, time, monkeypatch):
+    waits = []
+    receive = Socket.receive
+    monkeypatch.setattr(Socket, "receive", lambda socket, timeout: waits.append(timeout) or receive(socket, 0.01))
+    watching = client.watch_build(PROJECT, build, timeout=3, pulse=600)
+    first = next(watching)
+
+    assert next(watching) == first
+    assert waits == [3]
+    watching.close()
+
+
+def test_a_pulse_does_not_put_off_the_request_of_a_quiet_spell(client, upstream, build, bus, time, asked):
+    watching = client.watch_build(PROJECT, build, timeout=600, pulse=0.01)
+    first = next(watching)
+    assert next(watching) == first
+    answer(upstream, status="done", result="success", status_info="done")
+    time.now += 60
+
+    assert next(watching).result is BuildResult.SUCCESS
+    assert asked() == [BUILDS, PROJECTS, SOCKET, BUILDS, BUILDS]
+
+
+def test_a_pulse_does_not_put_off_the_timeout(client, build, bus, time):
+    watching = client.watch_build(PROJECT, build, timeout=90, pulse=0.01)
+    next(watching)
+    next(watching)
+    time.now += 90
+
+    with pytest.raises(StreamTimeoutError):
+        next(watching)
+
+
+@pytest.mark.parametrize("pulse", [0, -1])
+def test_a_pulse_that_is_not_one_is_refused_before_any_request(client, build, bus, asked, pulse):
+    with pytest.raises(ValueError, match="pulse"):
+        client.watch_build(PROJECT, build, timeout=600, pulse=pulse)
+
+    assert asked() == []
 
 
 @pytest.mark.parametrize("timeout", [0, -1])

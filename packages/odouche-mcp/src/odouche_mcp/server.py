@@ -19,6 +19,7 @@ from odouche_mcp._read import (
     list_projects,
 )
 from odouche_mcp._session import get_session
+from odouche_mcp._wait import DEFAULT_WAIT, MAX_WAIT, wait_for_build
 from odouche_mcp._write import CHANGING, changing_tool
 
 
@@ -61,6 +62,19 @@ def create_server(*, allow_changes: bool = False) -> MCPServer:
         get_build,
         returns="the build, with its commit and the address of its database.",
         bounds="three requests to Odoo.sh; a build older than the branch's latest ones is not found.",
+    )
+    add_tool(
+        server,
+        wait_for_build,
+        returns=(
+            "the build as last seen, or none while the branch has no build of `commit`, `finished`, the `timeout` "
+            "applied, `timeout_capped`, true when it was lowered, and `next_step`, set while the build has not finished."
+        ),
+        bounds=(
+            f"`timeout` seconds, {DEFAULT_WAIT} by default and {MAX_WAIT} at most, longer when Odoo.sh is slow to "
+            "answer for the branch or for a commit's build; six requests to Odoo.sh and one socket, more when the "
+            "socket drops, and one request every 3 seconds while a commit has no build."
+        ),
     )
     add_tool(
         server,

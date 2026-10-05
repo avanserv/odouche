@@ -502,6 +502,39 @@ def test_keeps_no_cookie_from_an_answer(connect):
     assert upstream.requests[1].headers.get_list("Cookie") == [f"session_id={SESSION}"]
 
 
+def test_a_call_with_seconds_left_cuts_every_phase_to_them(connect):
+    transport, upstream = connect(fixture("projects.json"), fixture("projects.json"), fixture("projects.json"))
+
+    transport.call(OPERATION, PATH)
+    transport.call(OPERATION, PATH, within=4)
+    transport.call(OPERATION, PATH, within=20)
+
+    assert [request.extensions["timeout"] for request in upstream.requests] == [
+        {"connect": 10, "read": 30, "write": 10, "pool": 10},
+        {"connect": 4, "read": 4, "write": 4, "pool": 4},
+        {"connect": 10, "read": 20, "write": 10, "pool": 10},
+    ]
+
+
+def test_a_call_is_not_sent_again_past_the_seconds_left(connect):
+    transport, upstream = connect(httpx2.Response(503), fixture("projects.json"))
+
+    with pytest.raises(UpstreamUnavailableError):
+        transport.call(OPERATION, PATH, retry=True, within=0.5)
+
+    assert len(upstream.requests) == 1
+    assert upstream.sleeps == []
+
+
+def test_a_call_sent_again_has_what_the_wait_left(connect):
+    transport, upstream = connect(httpx2.Response(503), fixture("projects.json"))
+
+    transport.call(OPERATION, PATH, retry=True, within=5)
+
+    assert upstream.sleeps == [1.0]
+    assert 3.5 < upstream.requests[1].extensions["timeout"]["read"] <= 4
+
+
 def test_bounds_every_phase_of_a_request_and_takes_no_option_to_change_it(connect):
     transport, _ = connect(fixture("projects.json"))
 

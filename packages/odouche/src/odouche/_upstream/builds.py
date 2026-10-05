@@ -24,16 +24,18 @@ _COMMIT_HASH = re.compile(r"/([0-9a-f]{40}|[0-9a-f]{64})$")
 _logger = logging.getLogger("odouche")
 
 
-def builds(transport: Transport, branch_id: int, limit: int = DEFAULT_LIMIT) -> list[Build]:
+def builds(
+    transport: Transport, branch_id: int, limit: int = DEFAULT_LIMIT, *, within: float | None = None
+) -> list[Build]:
     """List the latest builds of a branch, newest first and at most `limit` of them."""
-    listed = [whole(build) for build in _listed(transport, branch_id, limit)]
+    listed = [whole(build) for build in _listed(transport, branch_id, limit, within)]
     return sorted(listed, key=lambda build: build.id, reverse=True)[:limit]
 
 
-def build(transport: Transport, branch_id: int, build_id: int) -> Build:
+def build(transport: Transport, branch_id: int, build_id: int, *, within: float | None = None) -> Build:
     """Return one of the latest builds of a branch. Odoo.sh has no request for a build by its number."""
     number("build", build_id)
-    for listed in builds(transport, branch_id):
+    for listed in builds(transport, branch_id, within=within):
         if listed.id == build_id:
             return listed
     raise _not_listed(branch_id, build_id)
@@ -54,11 +56,11 @@ def _not_listed(branch_id: int, build_id: int) -> NotFoundError:
     )
 
 
-def _listed(transport: Transport, branch_id: int, limit: int) -> list[Reader]:
-    return entry(transport, branch_id, limit).items("builds")
+def _listed(transport: Transport, branch_id: int, limit: int, within: float | None = None) -> list[Reader]:
+    return entry(transport, branch_id, limit, within).items("builds")
 
 
-def entry(transport: Transport, branch_id: int, limit: int) -> Reader:
+def entry(transport: Transport, branch_id: int, limit: int, within: float | None = None) -> Reader:
     """Return what Odoo.sh answers for a branch: its `branch_info` and its latest `builds`."""
     number("branch", branch_id)
     if number("limit", limit) < 1:
@@ -71,6 +73,7 @@ def entry(transport: Transport, branch_id: int, limit: int) -> Reader:
             {"build_limit": limit},
             retry=True,
             not_found=f"The session's user can reach no branch numbered {branch_id}. Odoo.sh gives no reason.",
+            within=within,
         ),
     )
     branches = answer.items("result")
