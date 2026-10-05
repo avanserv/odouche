@@ -8,6 +8,7 @@ import pytest
 
 from odouche_mcp._logs import DEFAULT_LINES, MAX_BYTES, MAX_LINES
 from odouche_mcp._read import DEFAULT_BUILDS, DEFAULT_LISTED, MAX_BUILDS, MAX_LISTED
+from odouche_mcp._wait import DEFAULT_WAIT, MAX_WAIT
 from odouche_mcp.server import create_server
 
 
@@ -44,3 +45,9 @@ def test_the_guide_gives_the_caps_of_a_log():
 
     assert f"`lines`, {DEFAULT_LINES} by default and {MAX_LINES} at most" in section
     assert f"{MAX_BYTES} bytes" in section
+
+
+def test_the_guide_gives_the_most_a_wait_lasts():
+    section = " ".join(sections()["wait_for_build"].split())
+
+    assert f"`timeout` in seconds, {DEFAULT_WAIT} by default and {MAX_WAIT} at most" in section

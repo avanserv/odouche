@@ -117,7 +117,9 @@ class Client:
         """
         rebuild.allow(branch.stage)
 
-    def watch_build(self, project: Project | str, build: Build, *, timeout: float) -> Generator[Build]:
+    def watch_build(
+        self, project: Project | str, build: Build, *, timeout: float, pulse: float | None = None
+    ) -> Generator[Build]:
         """Yield a build of a project as it is now, then at each change, and end once it has finished.
 
         A change is one of `status`, `result` or `status_info`. The last build yielded is the
@@ -125,12 +127,16 @@ class Client:
         this build: a newer one on the branch ends it as `DROPPED`. Closing the iterator closes the
         connection.
 
+        With `pulse`, the build is also yielded unchanged, every `pulse` seconds at least while
+        nothing changes. An iterator is closed only between two builds, so a caller that may have
+        to stop the watch asks for one.
+
         Raises `StreamTimeoutError` after `timeout` seconds, `UpstreamUnavailableError` when the
         connection fails three times in a row or Odoo.sh cannot be asked for the build, and
         `NotFoundError` when the build is not among its
         branch's latest, or the project is not one the session's user can reach.
         """
-        return watch.watch(self._transport, project, build, timeout=timeout)
+        return watch.watch(self._transport, project, build, timeout=timeout, pulse=pulse)
 
     def logs(self, project: Project | str, build: Build) -> list[Log]:
         """List the logs a build of a project has, which is none while it waits for a worker.

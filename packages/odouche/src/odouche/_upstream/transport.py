@@ -52,7 +52,9 @@ _UNEXPLAINED = "builtins.Exception"
 _SESSION_ALPHABET = re.compile(r"[A-Za-z0-9_-]+")
 _WORKER = re.compile(r"https://[a-z0-9-]+\.odoo\.com")
 _CONTENT_RANGE = re.compile(r"bytes (\d+)-\d+/\d+")
-_TIMEOUT = httpx2.Timeout(connect=10, read=30, write=10, pool=10)
+_PHASE = 10.0
+_READ = 30.0
+_TIMEOUT = httpx2.Timeout(connect=_PHASE, read=_READ, write=_PHASE, pool=_PHASE)
 _BACKOFF = (1.0, 2.0)
 _TRANSIENT = frozenset({502, 503, 504})
 # The failures of a connection that was never opened: the request did not leave.
@@ -194,6 +196,16 @@ def _worker_url(operation: str, worker: str, path: str) -> httpx2.URL:
     return url
 
 
+def _bounded(within: float | None) -> httpx2.Timeout:
+    """Return the timeout of a request that has `within` seconds left: each phase is cut to them."""
+    if within is None:
+        return _TIMEOUT
+    left = max(within, 0.001)
+    return httpx2.Timeout(
+        connect=min(_PHASE, left), read=min(_READ, left), write=min(_PHASE, left), pool=min(_PHASE, left)
+    )
+
+
 def _unavailable(operation: str, failure: str) -> UpstreamUnavailableError:
     return UpstreamUnavailableError(f"Odoo.sh could not be reached ({failure}).", operation=operation)
 
@@ -279,17 +291,19 @@ class Transport:
         *,
         retry: bool = False,
         not_found: str | None = None,
+        within: float | None = None,
     ) -> dict[str, object]:
         """Send one JSON-RPC request and return the answer, which holds no `error`.
 
         `retry` repeats a request that failed in transit or on a gateway error. A state-changing
-        request goes through `change`.
+        request goes through `change`. `within` is the seconds a caller has left: no phase of the
+        request waits longer, and it is not sent again past them.
 
         `not_found` is the message of the `NotFoundError` raised for the error Odoo.sh gives no
         reason for, which is its answer to a branch that does not exist. Without it that answer
         is an `UpstreamChangedError`.
         """
-        answer = self._attempt(operation, "POST", _url(path), params, retry=retry)
+        answer = self._attempt(operation, "POST", _url(path), params, retry=retry, within=within)
         error = _error(operation, answer, not_found)
         if error is not None:
             raise error
@@ -376,8 +390,11 @@ class Transport:
             response.close()
 
     @contextmanager
-    def bus(self, operation: str) -> Generator[Socket]:
-        """Open the bus socket with the session. It is not repeated, and holds no other request back."""
+    def bus(self, operation: str, within: float | None = None) -> Generator[Socket]:
+        """Open the bus socket with the session. It is not repeated, and holds no other request back.
+
+        `within` bounds the opening as it bounds a `call`.
+        """
         url = _url(_BUS_PATH)
         session = status = failure = None
         with ExitStack() as stack:
@@ -392,6 +409,7 @@ class Transport:
                         queue_size=0,
                         # The page keeps the socket open with a frame of its own: see `Socket.idle`.
                         keepalive_ping_interval_seconds=None,
+                        timeout=_bounded(within),
                     )
                 )
             except WebSocketUpgradeError as error:
@@ -405,16 +423,25 @@ class Transport:
             yield Socket(operation, session)
 
     def _attempt(
-        self, operation: str, method: str, url: httpx2.URL, params: Mapping[str, object] | None, *, retry: bool
+        self,
+        operation: str,
+        method: str,
+        url: httpx2.URL,
+        params: Mapping[str, object] | None,
+        *,
+        retry: bool,
+        within: float | None = None,
     ) -> _Answer:
         """Send a request, again if it may be, and raise if Odoo.sh rejects the session."""
+        end = None if within is None else time.monotonic() + within
         with self._lock:
-            answer = self._send(method, url, params)
+            answer = self._send(method, url, params, within)
             for delay in _BACKOFF if retry else ():
-                if not answer.transient:
+                left = None if end is None else end - time.monotonic() - delay
+                if not answer.transient or (left is not None and left <= 0):
                     break
                 self._sleep(delay)
-                answer = self._send(method, url, params)
+                answer = self._send(method, url, params, left)
         rejected = answer.status is not None and is_unauthenticated(answer.status, answer.location, answer.body)
         # A worker knows nothing of the session.
         if rejected and url.host == HOST:
@@ -424,7 +451,9 @@ class Transport:
             )
         return answer
 
-    def _send(self, method: str, url: httpx2.URL, params: Mapping[str, object] | None) -> _Answer:
+    def _send(
+        self, method: str, url: httpx2.URL, params: Mapping[str, object] | None, within: float | None = None
+    ) -> _Answer:
         """Make one attempt: a `POST` with `params` as a JSON-RPC body, or a `GET` with them as the query.
 
         A failure is returned, not raised: the client's exception holds the request, and an error
@@ -435,12 +464,13 @@ class Transport:
         try:
             if method == "GET":
                 query = {key: str(value) for key, value in (params or {}).items()}
-                response = self._client.get(url, params=query or None, headers=headers)
+                response = self._client.get(url, params=query or None, headers=headers, timeout=_bounded(within))
             else:
                 response = self._client.post(
                     url,
                     json={"jsonrpc": "2.0", "method": "call", "params": dict(params or {}), "id": 1},
                     headers=headers,
+                    timeout=_bounded(within),
                 )
         except httpx2.RequestError as error:
             answer = _Answer(failure=type(error).__name__)

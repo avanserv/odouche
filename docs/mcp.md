@@ -76,6 +76,34 @@ Reads one build of a branch, with its commit and the address of its database: th
 - **Touches**: reads only.
 - **Bounds**: three requests to Odoo.sh. A build older than the branch's latest ones is not found.
 
+### `wait_for_build`
+
+Waits for a build of a branch to finish, for `timeout` seconds at most: the build of `build_id`,
+or the branch's latest one. It returns the build as last seen and `finished`, as soon as the build
+ends.
+
+A build that outlasts the wait is not an error. `finished` is false and `next_step` tells the
+agent to call the tool again, which continues the wait. The wait is short because a client gives
+up on a call that lasts: a `timeout` over the most is lowered to it, `timeout` in the result is
+the one applied, and `timeout_capped` says it was lowered.
+
+With `commit`, the tool waits for the branch to have a build of that commit, then for that build.
+Right after a push the latest build is still the previous one, so an agent that pushed gives the
+commit. While the branch has no such build, `build` is null and `next_step` says to call again.
+
+- **Arguments**: `project`, `branch` as the git branch's name, and optionally `build_id` or
+  `commit`, the first 7 to 64 digits of its hash, but not both, and `timeout` in seconds,
+  30 by default and 50 at most.
+- **Progress**: a notification at each change of the build, to a client that asked for them. It
+  holds the build's number, status and result, and nothing Odoo.sh or a commit's author wrote.
+- **Cancellation**: a call the client cancels closes its connection to Odoo.sh, within a few
+  seconds unless a request is being answered.
+- **Touches**: reads only.
+- **Bounds**: six requests to Odoo.sh and one socket, on which Odoo.sh says what changes. More
+  when the socket drops, and one request every 3 seconds while a commit has no build. The
+  requests that find the build, or await one of a commit, are not cut at the `timeout`: a slow
+  Odoo.sh can make a call last longer.
+
 ### `read_log`
 
 Reads the last lines of one log of a build: of the build of `build_id`, or of the branch's latest
@@ -142,7 +170,7 @@ project. A call without one is rejected.
 
 A list holds at most `limit` items, and `truncated` is true when there were more. A `limit` over
 the most a tool returns is lowered to it, and one below 1 is an error. The `lines` of `read_log`
-follow the same rule.
+and the `timeout` of `wait_for_build` follow the same rule.
 
 ### Untrusted text
 

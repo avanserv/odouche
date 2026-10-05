@@ -9,9 +9,9 @@ official public API; this project is an **unofficial** client for what the Odoo.
 
 Status: the workspace, tooling and CI exist. The CLI has the commands of its first milestone:
 `osh auth`, `osh projects list`, `osh branches list`, `osh builds list`, `show`, `watch` and
-`rebuild`, and `osh logs`, with a reference page generated from them. The MCP server has six read-only
-tools: `get_session`, `list_projects`, `list_branches`, `list_builds`, `get_build` and `read_log`.
-A seventh, `rebuild_branch`, changes state and is registered only with `--allow-changes`. The library has its transport, session
+`rebuild`, and `osh logs`, with a reference page generated from them. The MCP server has seven read-only
+tools: `get_session`, `list_projects`, `list_branches`, `list_builds`, `get_build`, `wait_for_build`
+and `read_log`. An eighth, `rebuild_branch`, changes state and is registered only with `--allow-changes`. The library has its transport, session
 store, login, logout and a client that
 reports the session's user, lists projects, branches and builds, watches a build, reads and
 follows a build's logs, and triggers a rebuild. The architecture and security sections below are
@@ -46,13 +46,17 @@ Rules that hold across packages:
 ### Library shape
 
 - The public API is synchronous and written once; there is no async surface. A CLI command calls
-  it directly. An MCP handler calls it through `asyncio.to_thread`, so the event loop never blocks.
+  it directly. The MCP server runs each tool in an anyio worker thread, so the event loop never
+  blocks.
 - A call running in a thread cannot be interrupted, so every call is bounded: each request has a
   timeout and each stream takes a deadline.
 - Watching a build and following a log return a generator of typed events: the build's changed
   state, or a line of log text with its offset. A watch ends on a terminal state. Closing the
   generator closes the connection. A passed deadline raises a typed timeout error, never a silent
   end.
+- A generator is closed only between two events. A watch takes a pulse, at which it yields the
+  build unchanged, so a caller in a thread can stop it: the MCP wait checks for a cancelled call
+  there.
 - Build status comes from upstream's bus websocket, opened by the transport so the host pin covers
   it. The socket gives no sign of a missing or expired session, so a watch also asks `builds`: at
   the start, after a reconnect and after a quiet spell. That request is what detects an

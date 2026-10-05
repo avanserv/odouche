@@ -35,9 +35,9 @@ def technical_name(transport: Transport, name: str) -> str | None:
     return None
 
 
-def project_id(transport: Transport, name: str) -> int | None:
+def project_id(transport: Transport, name: str, *, within: float | None = None) -> int | None:
     """Return the number of the project named `name`, or `None` when it is not listed."""
-    for repo in _repos(transport):
+    for repo in _repos(transport, within):
         if repo.text("project_name") == name:
             return repo.integer("id")
     return None
@@ -66,6 +66,6 @@ def access_token(transport: Transport, name: str) -> Secret:
     return Secret(token)
 
 
-def _repos(transport: Transport) -> list[Reader]:
-    answer = Reader(_OPERATION, transport.call(_OPERATION, PATH, retry=True))
+def _repos(transport: Transport, within: float | None = None) -> list[Reader]:
+    answer = Reader(_OPERATION, transport.call(_OPERATION, PATH, retry=True, within=within))
     return answer.child("result").items("repos")

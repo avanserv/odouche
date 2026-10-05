@@ -238,8 +238,10 @@ with odouche.Client() as client:
 - A change is one of `status`, `result` or `status_info`. The last build yielded is the finished
   one, and a build that has already finished is yielded once, with no wait.
 - The watch stays on its build. A newer build on the branch ends it as `DROPPED`.
+- With `pulse=2`, the build is also yielded unchanged, every 2 seconds at least while nothing
+  changes, so a caller that watches in a thread can close the iterator.
 - After `timeout` seconds it raises `StreamTimeoutError`: the build is still running, which is not
-  Odoo.sh being unavailable.
+  Odoo.sh being unavailable. A request of the watch waits no longer than what is left of them.
 - Changes come over a websocket to `www.odoo.sh`. Odoo.sh is also asked for the build at the
   start, when the connection is opened again and after a minute with no news of the build, which
   is what detects a rejected session.
