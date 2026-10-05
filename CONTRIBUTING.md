@@ -107,6 +107,9 @@ One thing to know before merging one: wait for the
 to pass on it. Release Please does not know about `uv.lock`; the Release workflow adds that
 commit. Run `make live-check` as well, since CI cannot.
 
+After the merge, the three publish jobs wait for a maintainer to approve their deployment in the
+Release workflow run.
+
 ## Security
 
 See [SECURITY.md](SECURITY.md) for how to report a vulnerability, and
