@@ -10,9 +10,10 @@ from odouche_cli._context import BRANCH_ENV, PROJECT_ENV
 
 @pytest.fixture(autouse=True)
 def isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Run in an empty directory, with neither variable set and no git configuration of the user's."""
+    """Run in an empty directory, with none of `osh`'s variables set and no git configuration of the user's."""
     monkeypatch.delenv(PROJECT_ENV, raising=False)
     monkeypatch.delenv(BRANCH_ENV, raising=False)
+    monkeypatch.delenv("OSH_DEBUG", raising=False)
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", "/dev/null")
     monkeypatch.setenv("GIT_CONFIG_SYSTEM", "/dev/null")
     # A stray repository above `tmp_path` is not this test's checkout.

@@ -99,6 +99,29 @@ def find_branch(client: odouche.Client, project: str, name: str) -> odouche.Bran
     raise odouche.NotFoundError(msg)
 
 
+def project_branch(
+    ctx: typer.Context, client: odouche.Client, project: str | None, name: str
+) -> tuple[str, odouche.Branch]:
+    """Return the project's name and its branch of that name."""
+    project_name = resolve_project(ctx, project, client.projects)
+    return project_name, find_branch(client, project_name, name)
+
+
+def find_build(client: odouche.Client, project: str, branch: odouche.Branch, build_id: int | None) -> odouche.Build:
+    """Return the branch's build of that number, or its latest."""
+    if build_id is not None:
+        for build in client.builds(branch):
+            if build.id == build_id:
+                return build
+        msg = f"Build {build_id} is not among the latest builds of branch {branch.name} of {project}."
+        raise odouche.NotFoundError(msg)
+    latest = client.latest_build(branch)
+    if latest is None:
+        msg = f"Branch {branch.name} of {project} has no build."
+        raise odouche.NotFoundError(msg)
+    return latest
+
+
 def _refuse_empty(ctx: typer.Context, value: str, flag: str) -> None:
     """Fail on an empty flag, which a script's unset variable gives, and never fall back from it."""
     if not value:

@@ -12,7 +12,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, fields, is_dataclass
 from datetime import datetime
 from enum import Enum, StrEnum
-from typing import Annotated
+from typing import Annotated, TextIO
 
 import typer
 from rich import box
@@ -26,6 +26,19 @@ _PLAIN_WIDTH = 100_000
 
 _CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 _CONTROL_SPACE = re.compile(r"[\t\n\v\f\r\u2028\u2029]+")
+_LINE_CONTROL = re.compile(r"[\x00-\x08\x0a-\x1f\x7f-\x9f]")
+_CSI = r"(?:\x1b\[|\x9b)[0-?]*[ -/]*[@-~]"
+_STRING = r"[^\x07\x1b\x9c]*"
+_END = r"(?:\x07|\x1b\\|\x9c)"
+# A 7-bit string that was cut goes to the end of the line. An 8-bit introducer that nothing ends
+# is a character of text decoded twice: only it goes, and `bare` is the text after it.
+_SEQUENCE = re.compile(
+    rf"{_CSI}"
+    rf"|\x1b[\]PX^_]{_STRING}{_END}?"  # OSC, DCS, SOS, PM, APC
+    rf"|[\x90\x98\x9d\x9e\x9f](?:{_STRING}{_END}|(?P<bare>{_STRING}))"  # the same, in 8 bits
+    r"|\x1b[ -/]*[0-~]"  # any other escape
+)
+_BARE_SEQUENCE = re.compile(_CSI)
 _JSON_UNESCAPED = re.compile(r"[\x7f-\x9f]")
 
 
@@ -58,6 +71,18 @@ def strip_control(text: str) -> str:
     A run of those that are whitespace, and of the Unicode line and paragraph separators, becomes one space.
     """
     return _CONTROL.sub("", _CONTROL_SPACE.sub(" ", text))
+
+
+def strip_line_control(text: str) -> str:
+    """Remove the escape sequences from a line of text that is not ours, then the control characters but the tab."""
+    return _LINE_CONTROL.sub("", _SEQUENCE.sub(_unsequenced, text))
+
+
+def _unsequenced(found: re.Match[str]) -> str:
+    """Return what a sequence leaves: nothing, or the text after a bare 8-bit introducer."""
+    bare = found["bare"]
+    # No string starts in it: each would end where this one does not.
+    return _BARE_SEQUENCE.sub("", bare) if bare else ""
 
 
 def to_json(value: object) -> object:
@@ -125,11 +150,37 @@ class Output:
             else:
                 typer.echo(strip_control(line(item)))
 
+    def lines[T](self, items: Iterable[T], text: Callable[[T], str], *, strip: bool | None = None) -> None:
+        """Print lines of text that is not ours as they arrive: as a stream of JSON, or `text` of each.
+
+        A terminal gets them without their escape sequences and control characters, tabs kept, and
+        anything else gets them as they are. `strip` forces one or the other. Each line is flushed.
+        """
+        if self.format is Format.JSON:
+            self.stream(items, text)
+            return
+        if strip is None:
+            strip = _is_terminal()
+        for item in items:
+            _echo_line(strip_line_control(text(item)) if strip else text(item))
+
 
 def _echo_json(value: object, *, indent: int | None) -> None:
     dumped = json.dumps(to_json(value), indent=indent, ensure_ascii=False)
+    try:
+        dumped.encode(sys.stdout.encoding or "utf-8")
+    except (UnicodeEncodeError, LookupError):
+        dumped = json.dumps(to_json(value), indent=indent)
     # `json` escapes C0 and leaves DEL and C1 as they are.
     typer.echo(_JSON_UNESCAPED.sub(lambda found: f"\\u{ord(found[0]):04x}", dumped))
+
+
+def _echo_line(text: str) -> None:
+    stream = _stdout()
+    # A character the stream cannot encode is escaped: the error would quote it.
+    encoding = stream.encoding or "utf-8"
+    # `color` keeps click from removing the escape sequences when stdout is not a terminal.
+    typer.echo(text.encode(encoding, "backslashreplace").decode(encoding), file=stream, color=True)
 
 
 def _cell[T](column: Column[T], item: T) -> Text:
@@ -137,6 +188,11 @@ def _cell[T](column: Column[T], item: T) -> Text:
     value = column.value(item)
     style = column.style(item) if column.style else None
     return Text("" if value is None else strip_control(str(value)), style=style or "")
+
+
+# What the tests replace: where the lines go.
+def _stdout() -> TextIO:
+    return sys.stdout
 
 
 def _is_terminal() -> bool:

@@ -1,6 +1,6 @@
 """The client: the one object a caller asks Odoo.sh through."""
 
-from collections.abc import Callable, Generator, Iterator
+from collections.abc import Callable, Generator
 from typing import Self
 
 from odouche._session import SessionStore
@@ -135,14 +135,15 @@ class Client:
 
     def read_log(
         self, project: Project | str, build: Build, kind: LogKind | str, *, tail: int | None = None
-    ) -> Iterator[LogLine]:
+    ) -> Generator[LogLine]:
         """Yield the lines of one log of a build, given as a `LogKind` or by its name.
 
         Log content is untrusted: it is whatever a process printed, terminal escape sequences and
         secrets of the instance included, and it is returned unchanged.
 
         With `tail`, only the last lines are yielded, out of the log's last mebibyte. A line
-        longer than 64 KiB is cut. Raises `NotFoundError` when the build has no such log.
+        longer than 64 KiB is cut. Closing the iterator closes the connection. Raises
+        `NotFoundError` when the build has no such log.
         """
         return logs.read(self._transport, _project_name(project), build, kind, tail)
 
@@ -162,8 +163,9 @@ class Client:
 
         It starts after the log's last `tail` lines, or at `offset`, which is the `offset` of a
         line read before. Odoo.sh is asked every second. Raises `StreamTimeoutError` after
-        `timeout` seconds, `UpstreamUnavailableError` when a failed request is not answered after
-        two more tries, and `NotFoundError` when the build has no such log.
+        `timeout` seconds, which `math.inf` makes no limit, `UpstreamUnavailableError` when a
+        failed request is not answered after two more tries, and `NotFoundError` when the build
+        has no such log.
         """
         return logs.follow(
             self._transport, _project_name(project), build, kind, timeout=timeout, tail=tail, offset=offset

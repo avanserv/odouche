@@ -111,6 +111,47 @@ of 20 to 23 of the [exit codes](#exit-codes) otherwise.
   been replaced by a newer build. A dropped build has no address.
 - Ctrl+C exits 130 and leaves the build running: watching changes nothing on Odoo.sh.
 
+## Logs
+
+```bash
+osh logs
+osh logs --follow
+osh logs --build 1234 --kind pip --tail 20
+osh logs --kinds
+osh logs --all | grep ERROR
+```
+
+- `logs` prints the end of one log of a build of a branch of the
+  [project](#project-and-branch): the branch's latest build, or the one `--build` numbers. A
+  number that is not among the branch's latest builds exits 4, and so does a branch with no build.
+- `--kind` names the log. The default is `install` when the build has it, where a development
+  build installs the modules and runs their tests, and `odoo` otherwise, as on a staging build.
+  A log the build does not have exits 4, and the message names the ones it has.
+- `--kinds` lists the logs the build has instead: the kind, what Odoo.sh calls the log, its size
+  and how long ago it was last written to. A kind `osh` does not know is `unknown`, and `--kind`
+  takes its name. As JSON it is the whole [`Log`](reference.md) model. A build that waits for a
+  worker has no log yet.
+- `--tail` is how many of the last lines are printed, 100 by default and at least 1. They are
+  taken from the log's last mebibyte, so a large tail can print fewer. `--all` prints the whole
+  log.
+- `--follow`, or `-f`, prints the tail and then each new line as it is written, asking Odoo.sh
+  every second, until Ctrl+C, which exits 130. With `--all` it starts at the first line.
+- `--timeout` is the longest a follow lasts, in seconds and at least 1. Then the command exits 8.
+  Without it a follow has no limit.
+- A log is untrusted text. On a terminal the escape sequences and control characters are removed
+  from each line, tabs kept, so a line cannot clear the screen or set the window's title. When
+  stdout is a pipe or a file the lines are written as they are. `--strip` and `--no-strip` force
+  one or the other.
+- A line longer than 64 KiB is cut, and bytes that are not UTF-8 are replaced. A character
+  stdout cannot encode is written as its escape, such as `\u2192`.
+- As JSON each line is one [`LogLine`](reference.md), with the control characters escaped, so
+  `--strip` has no effect.
+- Each line is flushed as it is printed. When the pipe it is written to closes, as under
+  `osh logs | head`, the command ends with nothing on stderr and exits 141.
+- `--kinds` goes with none of the options that print a log, `--all` not with `--tail`, and
+  `--timeout` only with `--follow`: the command exits 2.
+- Nothing of a log is written to stderr, with `--debug` or without.
+
 ## Project and branch
 
 A command that works on a project or a branch takes them from the first of these that gives a
@@ -139,14 +180,17 @@ written to stdout, so `osh --format json ... | jq` receives nothing else.
   Datetimes are ISO 8601 with an offset. A stream is one object per line.
 - A table has no colour and no box drawing when stdout is not a terminal or `NO_COLOR` is set.
 - A table has the control characters removed from every cell, and a tab or a line break made a
-  space, so a commit message cannot drive the terminal. JSON has them escaped.
+  space, so a commit message cannot drive the terminal. JSON has them escaped. The lines of
+  [`osh logs`](#logs) keep them when stdout is not a terminal.
 - An empty result is `[]` as JSON, and one line on stderr as a table. Both exit 0.
 
 ## Exit codes
 
 A command that fails prints one or two lines on stderr, what happened and what to do, and nothing
 on stdout. `osh builds watch` also exits non-zero for a build that did not succeed, with the
-result line on stdout, or on stderr as JSON. Scripts can branch on the exit code:
+result line on stdout, or on stderr as JSON. `osh logs` can fail after lines went to stdout, at a
+follow's timeout (8) or when a request fails (7), and a closed pipe (141) writes nothing to
+stderr. Scripts can branch on the exit code:
 
 | Code | Meaning |
 | --- | --- |
@@ -170,6 +214,7 @@ result line on stdout, or on stderr as JSON. Scripts can branch on the exit code
 | 23 | `osh builds watch`: the build had not finished, or had not appeared, at the timeout. |
 | 24 to 29 | Reserved for the result of a build. |
 | 130 | Interrupted with Ctrl+C. |
+| 141 | Stdout is a pipe and its reader, such as `head`, closed it. Nothing is written to stderr. |
 
 `--debug`, or `OSH_DEBUG=1`, adds the traceback on stderr. It shows no local variables, and a
 session supplied through `ODOUCHE_SESSION` is masked in it.
