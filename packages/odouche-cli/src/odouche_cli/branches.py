@@ -6,7 +6,7 @@ import typer
 
 import odouche
 from odouche_cli._client import open_client
-from odouche_cli._context import ProjectOption, checkout_branch, resolve_project
+from odouche_cli._context import ProjectOption, checkout_branch, resolve_project, stage_of
 from odouche_cli._output import Column, Format, Output
 
 
@@ -39,11 +39,6 @@ def list_(ctx: typer.Context, project: ProjectOption = None, stage: StageOption 
     columns = [
         Column[odouche.Branch]("", lambda branch: "*" if branch.name == current else ""),
         Column[odouche.Branch]("Name", lambda branch: branch.name),
-        Column[odouche.Branch]("Stage", _stage),
+        Column[odouche.Branch]("Stage", stage_of),
     ]
     output.rows(found, columns, empty="No branches.")
-
-
-def _stage(branch: odouche.Branch) -> str:
-    """Return the stage's name, and what Odoo.sh calls it when the library does not know it."""
-    return branch.stage_name if branch.stage is odouche.Stage.UNKNOWN else branch.stage.value

@@ -36,7 +36,7 @@ BranchOption = Annotated[
 
 
 class ContextError(typer.BadParameter):
-    """A usage error: no source names the project or the branch, or the checkout names several."""
+    """A usage error that is no option's value, such as no source naming the project or the branch."""
 
     @override
     def format_message(self) -> str:
@@ -51,7 +51,7 @@ def resolve_project(ctx: typer.Context, value: str | None, projects: Callable[[]
     """
     if value is not None:
         _refuse_empty(ctx, value, "--project")
-        _debug(ctx, f"Project {value}, from {_given(ctx, 'project', '--project', PROJECT_ENV)}.")
+        _debug(ctx, f"Project {value}, from {_source(ctx, 'project', '--project', PROJECT_ENV)}.")
         return value
     repository = _checkout_repository()
     if repository is None:
@@ -80,7 +80,7 @@ def resolve_branch(ctx: typer.Context, value: str | None) -> str:
     """
     if value is not None:
         _refuse_empty(ctx, value, "--branch")
-        _debug(ctx, f"Branch {value}, from {_given(ctx, 'branch', '--branch', BRANCH_ENV)}.")
+        _debug(ctx, f"Branch {value}, from {_source(ctx, 'branch', '--branch', BRANCH_ENV)}.")
         return value
     branch = checkout_branch()
     if branch is None:
@@ -122,6 +122,17 @@ def find_build(client: odouche.Client, project: str, branch: odouche.Branch, bui
     return latest
 
 
+def stage_of(branch: odouche.Branch) -> str:
+    """Return the stage's name, and what Odoo.sh calls it when the library does not know it."""
+    return branch.stage_name if branch.stage is odouche.Stage.UNKNOWN else branch.stage.value
+
+
+def is_given(ctx: typer.Context, parameter: str) -> bool:
+    """Tell whether the user gave that parameter, by a flag or a variable."""
+    source = ctx.get_parameter_source(parameter)
+    return source is not None and source.name != "DEFAULT"
+
+
 def _refuse_empty(ctx: typer.Context, value: str, flag: str) -> None:
     """Fail on an empty flag, which a script's unset variable gives, and never fall back from it."""
     if not value:
@@ -129,7 +140,7 @@ def _refuse_empty(ctx: typer.Context, value: str, flag: str) -> None:
         raise ContextError(msg, ctx=ctx)
 
 
-def _given(ctx: typer.Context, parameter: str, flag: str, variable: str) -> str:
+def _source(ctx: typer.Context, parameter: str, flag: str, variable: str) -> str:
     """Name the source of a value the user gave: the flag or the variable."""
     source = ctx.get_parameter_source(parameter)
     return variable if source is not None and source.name == "ENVIRONMENT" else flag

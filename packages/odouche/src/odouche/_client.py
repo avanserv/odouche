@@ -110,6 +110,13 @@ class Client:
         stage = branch.stage if isinstance(branch, Branch) else None
         return rebuild.rebuild(self._transport, _branch_id(branch), stage)
 
+    def check_rebuild(self, branch: Branch) -> None:
+        """Raise `StageRefusedError` when `rebuild` would refuse the branch for its stage.
+
+        Odoo.sh is not asked and nothing changes, on a read-only client too.
+        """
+        rebuild.allow(branch.stage)
+
     def watch_build(self, project: Project | str, build: Build, *, timeout: float) -> Generator[Build]:
         """Yield a build of a project as it is now, then at each change, and end once it has finished.
 

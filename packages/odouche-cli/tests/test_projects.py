@@ -20,8 +20,11 @@ class StubClient:
 
     found: tuple[odouche.Project, ...] = (ACME, GLOBEX)
     error: odouche.OdoucheError | None = None
+    modes: list[bool]
+    """The `read_only` each client was built with."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, read_only: bool = False) -> None:
+        self.modes.append(read_only)
         if self.error is not None:
             raise self.error
 
@@ -38,7 +41,7 @@ class StubClient:
 @pytest.fixture(autouse=True)
 def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     class Client(StubClient):
-        pass
+        modes: list[bool] = []
 
     monkeypatch.setattr(odouche, "Client", Client)
     return Client

@@ -88,12 +88,15 @@ class StubClient:
     changes: tuple[Build, ...] = (RUNNING, TESTING, done(RUNNING))
     ending: BaseException | None = None
     error: odouche.OdoucheError | None = None
+    modes: list[bool]
+    """The `read_only` each client was built with."""
     calls: list[str]
     watches: list[Iterator[Build]]
     """Every watch, kept so that only closing one ends it early."""
     closed: list[int]
 
-    def __init__(self) -> None:
+    def __init__(self, *, read_only: bool = False) -> None:
+        self.modes.append(read_only)
         if self.error is not None:
             raise self.error
 
@@ -141,6 +144,7 @@ class StubClient:
 @pytest.fixture(autouse=True)
 def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     class Client(StubClient):
+        modes: list[bool] = []
         calls: list[str] = []
         watches: list[Iterator[Build]] = []
         closed: list[int] = []

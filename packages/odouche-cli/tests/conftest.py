@@ -1,9 +1,10 @@
 import subprocess
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from pathlib import Path
 
 import pytest
 
+import odouche
 from odouche_cli import _output
 from odouche_cli._context import BRANCH_ENV, PROJECT_ENV
 
@@ -19,6 +20,42 @@ def isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # A stray repository above `tmp_path` is not this test's checkout.
     monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
     monkeypatch.chdir(tmp_path)
+
+
+@pytest.fixture(autouse=True)
+def unreached(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[..., object]]:
+    """Fail a test that reaches the library's client, login or logout, and return what stands for the client.
+
+    A file's own stand-ins replace these.
+    """
+    reached: list[str] = []
+
+    def refuse(name: str) -> Callable[..., object]:
+        def refused(*_: object, **__: object) -> object:
+            reached.append(name)
+            msg = f"odouche.{name} has no stand-in."
+            raise AssertionError(msg)
+
+        return refused
+
+    refusals = {name: refuse(name) for name in ("Client", "login", "logout")}
+    for name, refused in refusals.items():
+        monkeypatch.setattr(odouche, name, refused)
+    yield refusals["Client"]
+    # The command reports the error as its own, with an exit code a test may expect.
+    assert reached == [], "A command reached the library with no stand-in."
+
+
+@pytest.fixture(autouse=True)
+def read_only_clients(unreached: Callable[..., object]) -> Iterator[None]:
+    """Fail a test whose command built a client that writes: `osh builds rebuild` is the only one that may."""
+    yield
+    if odouche.Client is unreached:
+        return
+    # `unreached` is asked for so that the test's stand-in is still in place here.
+    modes: list[bool] | None = getattr(odouche.Client, "modes", None)
+    assert modes is not None, "The stand-in for `odouche.Client` has to record each `read_only` in `modes`."
+    assert all(modes), "A command built a client that is not read-only."
 
 
 @pytest.fixture

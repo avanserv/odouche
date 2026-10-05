@@ -69,12 +69,14 @@ osh builds show
 osh builds show 1234
 git push && osh builds watch
 osh builds watch 1234 --timeout 600
+osh builds rebuild
+osh builds rebuild --yes --watch
 ```
 
 - All work on a branch of the [project](#project-and-branch). A branch the project does not have
   exits 4.
-- As JSON all give the whole [`Build`](reference.md) model: `show` one object, `list` an array,
-  `watch` one object per line.
+- As JSON all give the whole [`Build`](reference.md) model: `show` and `rebuild` one object,
+  `list` an array, `watch` and `rebuild --watch` one object per line.
 - `list` shows the branch's latest builds, newest first: the number, the status, the result, the
   short commit hash, the first line of the commit message and how long ago the build started.
 - `--limit` is the most builds to list, 4 by default and at least 1. Odoo.sh has only been seen
@@ -110,6 +112,28 @@ of 20 to 23 of the [exit codes](#exit-codes) otherwise.
 - A build that was dropped after it finished exits with the result it had, and is said to have
   been replaced by a newer build. A dropped build has no address.
 - Ctrl+C exits 130 and leaves the build running: watching changes nothing on Odoo.sh.
+
+`rebuild` is the one command that changes a project: it starts a new build of the branch, which
+replaces its latest one. Every other command that opens a client opens it read-only, and it
+sends no change.
+
+- Only a development or a staging branch is rebuilt. Any other stage exits 9 before anything is
+  asked or sent.
+- It first says on stderr what it works on: the project, the branch with its stage, and the
+  branch's latest build with its commit. Then it asks on stderr, and anything but `y` or `yes`
+  sends nothing and exits 1.
+- `--yes`, or `-y`, rebuilds without asking. When stdin or stderr is not a terminal it is
+  required: without it the command exits 2 and sends nothing.
+- Once the rebuild is sent, stderr names the new build. It is then shown as `show` shows one, or
+  as one `Build` as JSON.
+- `--watch` watches the new build as `watch` does, with that command's output and exit codes:
+  the result line on stdout, or one `Build` per change as JSON, the first being the new build.
+  `--timeout` is the longest it waits, 1800 seconds by default, and goes with `--watch` only.
+- A watch that fails leaves the build as it is: stderr names it, for `osh builds watch` to follow.
+  Another `rebuild` would start a second build.
+- The rebuild is sent once. When Odoo.sh does not confirm it, or the new build is not found, the
+  command exits 10: look at `osh builds list` before running it again, since a second rebuild
+  can start a second build.
 
 ## Logs
 
@@ -187,15 +211,15 @@ written to stdout, so `osh --format json ... | jq` receives nothing else.
 ## Exit codes
 
 A command that fails prints one or two lines on stderr, what happened and what to do, and nothing
-on stdout. `osh builds watch` also exits non-zero for a build that did not succeed, with the
-result line on stdout, or on stderr as JSON. `osh logs` can fail after lines went to stdout, at a
-follow's timeout (8) or when a request fails (7), and a closed pipe (141) writes nothing to
-stderr. Scripts can branch on the exit code:
+on stdout. `osh builds watch`, and `osh builds rebuild --watch` like it, also exits non-zero for a
+build that did not succeed, with the result line on stdout, or on stderr as JSON. `osh logs` can
+fail after lines went to stdout, at a follow's timeout (8) or when a request fails (7), and a
+closed pipe (141) writes nothing to stderr. Scripts can branch on the exit code:
 
 | Code | Meaning |
 | --- | --- |
 | 0 | Success. |
-| 1 | Unexpected error, which is a bug to report, or a prompt that was declined. |
+| 1 | Unexpected error, which is a bug to report, or a prompt or a question that was declined. |
 | 2 | Usage error: an unknown option, a missing argument. |
 | 3 | No session, or an expired one. Run `osh auth login`. |
 | 4 | The project, branch, build or log is not one the logged-in user can reach. |
@@ -204,7 +228,7 @@ stderr. Scripts can branch on the exit code:
 | 7 | Odoo.sh could not be reached, or answered with a server error. |
 | 8 | A followed log or a login reached its timeout. |
 | 9 | Refused, and nothing was changed: a read-only run, or a branch in a stage `osh` does not change. |
-| 10 | A change was sent and Odoo.sh did not confirm it. Look at Odoo.sh before trying again. |
+| 10 | A change was sent and Odoo.sh did not confirm it. `osh builds list` shows whether the build was started. |
 | 11 | No usable keyring to store the session in. |
 | 12 | The login ended without a session. |
 | 13 | Any other error from the library. |

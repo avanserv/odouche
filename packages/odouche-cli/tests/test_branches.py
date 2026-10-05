@@ -33,9 +33,12 @@ class StubClient:
 
     found: tuple[Branch, ...] = BRANCHES
     error: odouche.OdoucheError | None = None
+    modes: list[bool]
+    """The `read_only` each client was built with."""
     calls: list[str]
 
-    def __init__(self) -> None:
+    def __init__(self, *, read_only: bool = False) -> None:
+        self.modes.append(read_only)
         if self.error is not None:
             raise self.error
 
@@ -57,6 +60,7 @@ class StubClient:
 @pytest.fixture(autouse=True)
 def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     class Client(StubClient):
+        modes: list[bool] = []
         calls: list[str] = []
 
     monkeypatch.setattr(odouche, "Client", Client)
