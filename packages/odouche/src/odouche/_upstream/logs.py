@@ -6,7 +6,7 @@ Nothing of a log goes to the library's logger.
 import re
 import time
 from collections import deque
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterator
 from contextlib import AbstractContextManager
 from dataclasses import dataclass
 
@@ -118,7 +118,7 @@ def follow(
     timeout: float,
     tail: int,
     offset: int | None,
-) -> Iterator[LogLine]:
+) -> Generator[LogLine]:
     """Yield the lines of a log as they are written, from `offset` or after the last `tail` lines."""
     if timeout <= 0:
         raise ValueError("A timeout is more than 0")
@@ -174,7 +174,7 @@ def _read(file: _File, tail: int | None) -> Iterator[LogLine]:
         yield from kept
 
 
-def _follow(file: _File, deadline: float, tail: int, offset: int | None) -> Iterator[LogLine]:
+def _follow(file: _File, deadline: float, tail: int, offset: int | None) -> Generator[LogLine]:
     if offset is None:
         kept, lines = _tail(file, tail)
         yield from kept

@@ -8,7 +8,7 @@
 > with your own Odoo.sh access and nothing more, and staying within your agreement with Odoo is
 > your responsibility. See [Unofficial status](https://avanserv.github.io/odouche/unofficial/).
 
-**Status: pre-alpha.** `osh auth` logs in to Odoo.sh, logs out and shows the session in use, `osh projects list` and `osh branches list` list your projects and their branches, and `osh builds list` and `osh builds show` list and show a branch's builds; no other command exists yet.
+**Status: pre-alpha.** `osh auth` logs in to Odoo.sh, logs out and shows the session in use, `osh projects list` and `osh branches list` list your projects and their branches, and `osh builds list`, `osh builds show` and `osh builds watch` list, show and watch a branch's builds; no other command exists yet.
 
 ```bash
 uv tool install odouche-cli

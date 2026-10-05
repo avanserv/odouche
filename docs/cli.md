@@ -67,11 +67,14 @@ osh builds list
 osh builds list --branch staging --limit 2
 osh builds show
 osh builds show 1234
+git push && osh builds watch
+osh builds watch 1234 --timeout 600
 ```
 
-- Both work on a branch of the [project](#project-and-branch). A branch the project does not have
+- All work on a branch of the [project](#project-and-branch). A branch the project does not have
   exits 4.
-- As JSON both give the whole [`Build`](reference.md) model: `show` one object, `list` an array.
+- As JSON all give the whole [`Build`](reference.md) model: `show` one object, `list` an array,
+  `watch` one object per line.
 - `list` shows the branch's latest builds, newest first: the number, the status, the result, the
   short commit hash, the first line of the commit message and how long ago the build started.
 - `--limit` is the most builds to list, 4 by default and at least 1. Odoo.sh has only been seen
@@ -79,10 +82,34 @@ osh builds show 1234
 - `show` shows one build with its commit, its author and the address of its database: the
   branch's latest, or the one whose number is given. A number that is not among the branch's
   latest builds exits 4, and so does a branch that has no build.
-- Both exit 0 whatever the build's result: a failed build is shown, not reported as a failure.
+- `list` and `show` exit 0 whatever the build's result: a failed build is shown, not reported as
+  a failure.
 - A status or a result `osh` does not know is shown as Odoo.sh names it.
 - On a terminal the result is coloured, and it is always written out.
 - A table shows times as how long ago they were.
+
+`watch` follows one build until it finishes and exits with its result: 0 for a success, and one
+of 20 to 23 of the [exit codes](#exit-codes) otherwise.
+
+- It watches the build whose number is given, or the build of the commit you just pushed. When
+  the checkout is of the project's repository and on the branch, however the two were named, it
+  waits for a build of the checkout's HEAD to be listed, asking every 3 seconds, and watches that
+  one.
+- `--commit` waits for another commit of the branch, given as the first 7 to 64 digits of its
+  hash, also when the branch is not the one checked out.
+- `--no-wait` watches the branch's latest build, whatever its commit, and so does a run with
+  no `--commit` on another project or branch than the checkout's, or one where HEAD cannot be
+  read.
+- The wait for a commit's build lasts two minutes at most, then exits 23: push the commit, or use
+  `--no-wait`.
+- `--timeout` is the longest the whole command waits, in seconds: 1800 by default and at least 1.
+- The changes go to stderr: one line kept up to date when stderr is a terminal, with how long the
+  build has run, and one line per change otherwise. The last line, on stdout, is the result and
+  the address of the build's database.
+- As JSON, stdout is one `Build` per change and nothing else, and the result line goes to stderr.
+- A build that was dropped after it finished exits with the result it had, and is said to have
+  been replaced by a newer build. A dropped build has no address.
+- Ctrl+C exits 130 and leaves the build running: watching changes nothing on Odoo.sh.
 
 ## Project and branch
 
@@ -118,7 +145,8 @@ written to stdout, so `osh --format json ... | jq` receives nothing else.
 ## Exit codes
 
 A command that fails prints one or two lines on stderr, what happened and what to do, and nothing
-on stdout. Scripts can branch on the exit code:
+on stdout. `osh builds watch` also exits non-zero for a build that did not succeed, with the
+result line on stdout, or on stderr as JSON. Scripts can branch on the exit code:
 
 | Code | Meaning |
 | --- | --- |
@@ -130,13 +158,17 @@ on stdout. Scripts can branch on the exit code:
 | 5 | The session is not allowed to do this. |
 | 6 | Odoo.sh answered in a shape `osh` does not read. Please report it. |
 | 7 | Odoo.sh could not be reached, or answered with a server error. |
-| 8 | A watch, a followed log or a login reached its timeout. |
+| 8 | A followed log or a login reached its timeout. |
 | 9 | Refused, and nothing was changed: a read-only run, or a branch in a stage `osh` does not change. |
 | 10 | A change was sent and Odoo.sh did not confirm it. Look at Odoo.sh before trying again. |
 | 11 | No usable keyring to store the session in. |
 | 12 | The login ended without a session. |
 | 13 | Any other error from the library. |
-| 20 to 29 | Reserved for the result of a build. |
+| 20 | `osh builds watch`: the build failed. `osh logs` is the next step. |
+| 21 | `osh builds watch`: the build finished with warnings. |
+| 22 | `osh builds watch`: the build ended without a result. It was dropped for a newer build, killed or skipped, or its result is one `osh` does not know. |
+| 23 | `osh builds watch`: the build had not finished, or had not appeared, at the timeout. |
+| 24 to 29 | Reserved for the result of a build. |
 | 130 | Interrupted with Ctrl+C. |
 
 `--debug`, or `OSH_DEBUG=1`, adds the traceback on stderr. It shows no local variables, and a

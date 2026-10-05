@@ -2,7 +2,7 @@
 
 import json
 import time
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterator
 
 from odouche._upstream import builds, projects
 from odouche._upstream.reader import Reader
@@ -22,7 +22,7 @@ _monotonic: Callable[[], float] = time.monotonic
 _sleep: Callable[[float], None] = time.sleep
 
 
-def watch(transport: Transport, project: Project | str, build: Build, *, timeout: float) -> Iterator[Build]:
+def watch(transport: Transport, project: Project | str, build: Build, *, timeout: float) -> Generator[Build]:
     """Yield a build as it is now, then at each change, and end after yielding it finished."""
     if timeout <= 0:
         raise ValueError("A timeout is more than 0")
@@ -41,7 +41,7 @@ class _Watch:
         self._last = 0
         self._failures = 0
 
-    def run(self, project: Project | str) -> Iterator[Build]:
+    def run(self, project: Project | str) -> Generator[Build]:
         self._heard_at = _monotonic()
         self._build = builds.build(self._transport, self._build.branch_id, self._build.id)
         yield self._build

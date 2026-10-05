@@ -9,7 +9,15 @@ from typer.testing import CliRunner, Result
 
 import odouche
 from odouche_cli import _context  # pyright: ignore[reportPrivateUsage]
-from odouche_cli._context import BRANCH_ENV, PROJECT_ENV, BranchOption, ProjectOption, resolve_branch, resolve_project
+from odouche_cli._context import (
+    BRANCH_ENV,
+    PROJECT_ENV,
+    BranchOption,
+    ProjectOption,
+    checkout_is_of,
+    resolve_branch,
+    resolve_project,
+)
 from odouche_cli._errors import DebugOption, OshGroup
 
 
@@ -109,6 +117,23 @@ def test_a_branch_tracking_a_local_one_falls_back_to_origin(checkout: Callable[.
     result, _ = run("project")
 
     assert result.stdout == "acme\n"
+
+
+def test_the_checkout_is_of_the_project_of_its_repository_and_no_other(checkout: Callable[..., None]):
+    checkout("main", origin=SSH)
+
+    assert checkout_is_of("acme", lambda: [ACME, ACME_TEST, GLOBEX])
+    assert checkout_is_of("acme-test", lambda: [ACME, ACME_TEST, GLOBEX])
+    assert not checkout_is_of("globex", lambda: [ACME, GLOBEX])
+    assert not checkout_is_of("unknown", lambda: [ACME, GLOBEX])
+
+
+def test_a_checkout_with_no_github_remote_builds_no_project_and_lists_none(checkout: Callable[..., None]):
+    checkout("main", origin="git@gitlab.com:acme/odoo.git")
+    lookups: list[str] = []
+
+    assert not checkout_is_of("acme", lambda: lookups.append("projects") or [ACME])
+    assert lookups == []
 
 
 def test_the_flag_wins_over_the_variable_and_the_checkout(

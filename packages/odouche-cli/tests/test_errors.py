@@ -4,7 +4,16 @@ import typer
 from typer.testing import CliRunner, Result
 
 import odouche
-from odouche_cli._errors import EXIT_CODES, ISSUES_URL, DebugOption, OshGroup
+from odouche_cli._errors import (
+    EXIT_BUILD_FAILED,
+    EXIT_BUILD_NO_RESULT,
+    EXIT_BUILD_TIMEOUT,
+    EXIT_BUILD_WARNING,
+    EXIT_CODES,
+    ISSUES_URL,
+    DebugOption,
+    OshGroup,
+)
 from odouche_cli.app import app
 
 
@@ -198,6 +207,13 @@ def test_every_library_error_has_its_own_row():
 
 def test_no_code_collides_with_the_reserved_ones():
     assert all(2 < code < 20 for _, code, _ in EXIT_CODES)
+
+
+def test_the_codes_of_a_watched_build_are_distinct_and_in_their_range():
+    codes = [EXIT_BUILD_FAILED, EXIT_BUILD_WARNING, EXIT_BUILD_NO_RESULT, EXIT_BUILD_TIMEOUT]
+
+    assert len(set(codes)) == len(codes)
+    assert all(20 <= code < 30 for code in codes)
 
 
 def test_the_application_never_shows_locals():
