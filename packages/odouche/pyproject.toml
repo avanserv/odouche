@@ -1,6 +1,6 @@
 [project]
 name = "odouche"
-version = "0.2.0" # x-release-please-version
+version = "0.3.0" # x-release-please-version
 description = "Unofficial Python client for Odoo.sh: projects, branches, builds and logs"
 readme = "README.md"
 license = "MIT"
