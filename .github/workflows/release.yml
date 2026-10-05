@@ -30,7 +30,7 @@ jobs:
       # request that token opens until someone approves them, so the release pull request would
       # never get its CI unattended.
       - name: Generate the release App token
-        uses: actions/create-github-app-token@v3.2.0
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
         with:
           client-id: ${{ secrets.RELEASE_BOT_APP_ID }}
@@ -50,7 +50,7 @@ jobs:
       # so the lockfile is brought back in step on the branch before anyone merges it.
       - name: Checkout the release branch
         if: ${{ steps.release.outputs.pr }}
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           token: ${{ steps.app-token.outputs.token }}
           ref: ${{ steps.release.outputs.pr && fromJSON(steps.release.outputs.pr).headBranchName || '' }}
@@ -109,7 +109,7 @@ jobs:
       id-token: write # PyPI trusted publishing: the upload is authorised by this job's identity
     steps:
       - name: Checkout the release tag
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.release-please.outputs.tag_name }}
           persist-credentials: false

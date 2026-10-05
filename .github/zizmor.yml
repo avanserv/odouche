@@ -3,13 +3,9 @@
 # beside it, so it cannot outlive the code it excuses.
 
 rules:
-  # GitHub's own actions may be referenced by tag; everyone else must be pinned to a commit. The
-  # asymmetry is the point: a tag is a mutable pointer, and for `actions/*` and `github/*` the
-  # owner is GitHub, which already runs the job. .github/dependabot.yml keeps the third-party pins
-  # current.
+  # Every action is pinned to a commit, GitHub's own included: the repository's Actions settings
+  # refuse anything else. .github/dependabot.yml keeps the pins current.
   unpinned-uses:
     config:
       policies:
-        actions/*: ref-pin
-        github/*: ref-pin
         "*": hash-pin
