@@ -183,6 +183,33 @@ def test_a_production_branch_is_refused_before_any_request(client, upstream):
     assert upstream.requests == []
 
 
+def test_a_check_refuses_the_stage_a_rebuild_refuses_and_asks_nothing(client, upstream):
+    production, development = client.branches("acme-shop")[:2]
+    upstream.requests.clear()
+
+    client.check_rebuild(development)
+    with pytest.raises(StageRefusedError) as checked:
+        client.check_rebuild(production)
+    with pytest.raises(StageRefusedError) as rebuilt:
+        client.rebuild(production)
+
+    assert str(checked.value) == str(rebuilt.value)
+    assert checked.value.operation == "rebuild"
+    assert upstream.requests == []
+
+
+def test_a_read_only_client_checks_too(upstream, session):
+    client = Client(Secret(session), read_only=True)
+    production, development = client.branches("acme-shop")[:2]
+    upstream.requests.clear()
+
+    client.check_rebuild(development)
+    with pytest.raises(StageRefusedError):
+        client.check_rebuild(production)
+
+    assert upstream.requests == []
+
+
 @pytest.mark.parametrize("stage", ["production", "archived"])
 def test_a_branch_given_by_number_is_refused_before_the_rebuild(client, upstream, stage):
     in_stage(upstream, stage)

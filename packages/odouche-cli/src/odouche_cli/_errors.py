@@ -19,6 +19,8 @@ from odouche_cli._output import strip_control
 ISSUES_URL = "https://github.com/avanserv/odouche/issues"
 
 EXIT_UNEXPECTED = 1
+# What click exits with when a prompt is aborted.
+EXIT_DECLINED = 1
 
 _LOGIN = "Run `osh auth login`."
 _LOGIN_AGAIN = "Run `osh auth login` again."
@@ -45,7 +47,7 @@ EXIT_CODES: tuple[tuple[type[odouche.OdoucheError], int, str | None], ...] = (
     (odouche.LoginTimeoutError, 8, _LOGIN_AGAIN),
     (odouche.ReadOnlyError, 9, None),
     (odouche.StageRefusedError, 9, None),
-    (odouche.OutcomeUnknownError, 10, "Look at Odoo.sh before trying again."),
+    (odouche.OutcomeUnknownError, 10, "`osh builds list` shows whether the build was started."),
     (odouche.KeyringUnavailableError, 11, None),
     (odouche.LoginError, 12, _LOGIN_AGAIN),
     (odouche.OdoucheError, 13, None),

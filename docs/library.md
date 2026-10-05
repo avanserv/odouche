@@ -342,6 +342,8 @@ with odouche.Client() as client:
 - Only a development or a staging branch is rebuilt. Any other stage raises `StageRefusedError`
   before the rebuild is sent, and before any request when a `Branch` in that stage is passed.
   A rebuild has only been observed on a development branch.
+- `client.check_rebuild(branch)` raises the same `StageRefusedError` for a `Branch` and asks
+  nothing, on a read-only client too: call it before asking the user.
 - The library asks for no confirmation. That is the caller's to do.
 
 ## Errors

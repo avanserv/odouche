@@ -6,7 +6,7 @@ import time
 from collections.abc import Callable, Iterator
 from contextlib import closing
 from datetime import datetime
-from typing import Annotated
+from typing import Annotated, TextIO
 
 import typer
 from rich.console import Console
@@ -17,22 +17,31 @@ import odouche
 from odouche_cli._client import open_client
 from odouche_cli._context import (
     BranchOption,
+    ContextError,
     ProjectOption,
     checkout_branch,
     checkout_head,
     checkout_is_of,
     find_build,
+    is_given,
     project_branch,
     resolve_branch,
+    stage_of,
 )
-from odouche_cli._errors import EXIT_BUILD_FAILED, EXIT_BUILD_NO_RESULT, EXIT_BUILD_TIMEOUT, EXIT_BUILD_WARNING
+from odouche_cli._errors import (
+    EXIT_BUILD_FAILED,
+    EXIT_BUILD_NO_RESULT,
+    EXIT_BUILD_TIMEOUT,
+    EXIT_BUILD_WARNING,
+    EXIT_DECLINED,
+)
 from odouche_cli._output import Column, Format, Output, strip_control
 from odouche_cli._time import ago, elapsed
 
 
 app = typer.Typer(
     name="builds",
-    help="List, show and watch the builds of a branch.",
+    help="List, show and watch the builds of a branch, and start a new one.",
     epilog="Example: osh builds show",
     no_args_is_help=True,
 )
@@ -107,6 +116,20 @@ NoWaitOption = Annotated[
     bool,
     typer.Option("--no-wait", help="Watch the branch's latest build, whatever its commit."),
 ]
+YesOption = Annotated[
+    bool,
+    typer.Option("--yes", "-y", help="Rebuild without asking. Needed when stdin or stderr is not a terminal."),
+]
+WatchOption = Annotated[
+    bool,
+    typer.Option("--watch", help="Watch the new build until it finishes, and exit with its result."),
+]
+WatchTimeoutOption = Annotated[
+    int,
+    typer.Option(
+        "--timeout", min=1, metavar="SECONDS", help="The longest to wait for the new build to finish, with `--watch`."
+    ),
+]
 
 
 @app.command("list", epilog="Example: osh builds list --branch staging")
@@ -146,21 +169,7 @@ def show(
     with open_client() as client:
         project_name, found = project_branch(ctx, client, project, name)
         build = find_build(client, project_name, found, build_id)
-    columns = [
-        Column[odouche.Build]("ID", lambda build: build.id),
-        Column[odouche.Build]("Name", lambda build: build.name),
-        Column[odouche.Build]("Branch", lambda build: build.branch_name),
-        Column[odouche.Build]("Status", _status),
-        Column[odouche.Build]("Result", _result, _result_style),
-        Column[odouche.Build]("Info", lambda build: build.status_info),
-        Column[odouche.Build]("Started", lambda build: _ago(build.started_at)),
-        Column[odouche.Build]("Commit", lambda build: build.commit.hash),
-        Column[odouche.Build]("Subject", _subject),
-        Column[odouche.Build]("Author", lambda build: build.commit.author),
-        Column[odouche.Build]("Committed", lambda build: _ago(build.commit.timestamp)),
-        Column[odouche.Build]("URL", lambda build: build.url),
-    ]
-    output.one(build, columns)
+    output.one(build, _build_columns())
 
 
 @app.command(epilog="Example: git push && osh builds watch")
@@ -209,6 +218,88 @@ def watch(
         # A build listed by the last request allowed is still watched.
         code = watch_build(client, output, project_name, build, timeout=max(deadline - _monotonic(), _POLL))
     raise typer.Exit(code)
+
+
+@app.command(epilog="Example: osh builds rebuild --watch")
+def rebuild(
+    ctx: typer.Context,
+    project: ProjectOption = None,
+    branch: BranchOption = None,
+    *,
+    yes: YesOption = False,
+    then_watch: WatchOption = False,
+    timeout: WatchTimeoutOption = _DEFAULT_TIMEOUT,
+) -> None:
+    """Change state on Odoo.sh: start a new build of a branch, which replaces its latest one.
+
+    Only a development or a staging branch is rebuilt. It asks first, unless `--yes` is given.
+    """
+    output: Output = ctx.obj
+    if is_given(ctx, "timeout") and not then_watch:
+        msg = "--timeout goes with --watch only."
+        raise typer.BadParameter(msg, ctx=ctx)
+    name = resolve_branch(ctx, branch)
+    if not yes and not (_stdin_is_terminal() and _stderr_is_terminal()):
+        msg = (
+            "Stdin or stderr is not a terminal, so the rebuild cannot be confirmed. "
+            "Give --yes to rebuild without being asked."
+        )
+        raise ContextError(msg, ctx=ctx)
+    with open_client(writes=True) as client:
+        project_name, found = project_branch(ctx, client, project, name)
+        client.check_rebuild(found)
+        latest = client.latest_build(found)
+        for line in _rebuilt(project_name, found, latest):
+            typer.echo(strip_control(line), err=True)
+        if not yes and not _confirmed("Start a new build of this branch?"):
+            typer.echo("Nothing was sent.", err=True)
+            raise typer.Exit(EXIT_DECLINED)
+        # Sent once: an error is reported, never retried.
+        started = client.rebuild(found)
+        typer.echo(f"Build {started.id} was started.", err=True)
+        if not then_watch:
+            output.one(started, _build_columns())
+            return
+        try:
+            code = watch_build(client, output, project_name, started, timeout=timeout)
+        except odouche.OdoucheError:
+            typer.echo(
+                f"Build {started.id} may still be running. Follow it with `osh builds watch {started.id}`.", err=True
+            )
+            raise
+    raise typer.Exit(code)
+
+
+def _confirmed(question: str) -> bool:
+    """Ask on stderr and read the answer from stdin: only `y` or `yes` is a yes. Nothing goes to stdout."""
+    typer.echo(f"{question} [y/N]: ", nl=False, err=True)
+    return sys.stdin.readline().strip().lower() in {"y", "yes"}
+
+
+def _rebuilt(project: str, branch: odouche.Branch, latest: odouche.Build | None) -> list[str]:
+    """Say what a rebuild is about to work on: the project, the branch and its latest build."""
+    build = "none"
+    if latest is not None:
+        build = f"{latest.id}, of commit {latest.commit.hash[:_HASH_LENGTH]} {_subject(latest)}".rstrip()
+    return [f"Project: {project}", f"Branch: {branch.name} ({stage_of(branch)})", f"Latest build: {build}"]
+
+
+def _build_columns() -> list[Column[odouche.Build]]:
+    """Return the columns that show one build."""
+    return [
+        Column[odouche.Build]("ID", lambda build: build.id),
+        Column[odouche.Build]("Name", lambda build: build.name),
+        Column[odouche.Build]("Branch", lambda build: build.branch_name),
+        Column[odouche.Build]("Status", _status),
+        Column[odouche.Build]("Result", _result, _result_style),
+        Column[odouche.Build]("Info", lambda build: build.status_info),
+        Column[odouche.Build]("Started", lambda build: _ago(build.started_at)),
+        Column[odouche.Build]("Commit", lambda build: build.commit.hash),
+        Column[odouche.Build]("Subject", _subject),
+        Column[odouche.Build]("Author", lambda build: build.commit.author),
+        Column[odouche.Build]("Committed", lambda build: _ago(build.commit.timestamp)),
+        Column[odouche.Build]("URL", lambda build: build.url),
+    ]
 
 
 def watch_build(client: odouche.Client, output: Output, project: str, build: odouche.Build, *, timeout: float) -> int:
@@ -288,8 +379,17 @@ def _conclude(build: odouche.Build, *, as_json: bool) -> int:
     return code
 
 
+def _stdin_is_terminal() -> bool:
+    return _is_terminal(sys.stdin)
+
+
 def _stderr_is_terminal() -> bool:
-    return sys.stderr.isatty()
+    return _is_terminal(sys.stderr)
+
+
+def _is_terminal(stream: TextIO | None) -> bool:
+    """Tell whether a standard stream is a terminal, which a closed one is not."""
+    return stream is not None and stream.isatty()
 
 
 def _redraws(console: Console) -> bool:

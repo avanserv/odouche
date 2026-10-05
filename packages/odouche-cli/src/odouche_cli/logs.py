@@ -12,7 +12,7 @@ import typer
 
 import odouche
 from odouche_cli._client import open_client
-from odouche_cli._context import BranchOption, ProjectOption, find_build, project_branch, resolve_branch
+from odouche_cli._context import BranchOption, ProjectOption, find_build, is_given, project_branch, resolve_branch
 from odouche_cli._output import Column, Output
 from odouche_cli._time import ago
 
@@ -144,7 +144,7 @@ def _absent(build: odouche.Build, kinds: tuple[str, ...], names: list[str]) -> o
 
 def _refuse_conflicts(ctx: typer.Context) -> None:
     """Fail on options that do not go together, as a usage error."""
-    given = {parameter for parameter in _PRINTING if _given(ctx, parameter)}
+    given = {parameter for parameter in _PRINTING if is_given(ctx, parameter)}
     msg = None
     if ctx.params["kinds"] and given:
         msg = f"--kinds does not go with {', '.join(flag for parameter, flag in _PRINTING.items() if parameter in given)}."
@@ -154,8 +154,3 @@ def _refuse_conflicts(ctx: typer.Context) -> None:
         msg = "--timeout goes with --follow only."
     if msg is not None:
         raise typer.BadParameter(msg, ctx=ctx)
-
-
-def _given(ctx: typer.Context, parameter: str) -> bool:
-    source = ctx.get_parameter_source(parameter)
-    return source is not None and source.name != "DEFAULT"

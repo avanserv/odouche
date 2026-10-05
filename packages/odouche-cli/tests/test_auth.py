@@ -26,10 +26,13 @@ class StubClient:
 
     info: odouche.SessionInfo = STORED
     error: odouche.OdoucheError | None = None
+    modes: list[bool]
+    """The `read_only` each client was built with."""
     rejected: odouche.OdoucheError | None = None
     asked: int = 0
 
-    def __init__(self) -> None:
+    def __init__(self, *, read_only: bool = False) -> None:
+        self.modes.append(read_only)
         self._held = odouche.Secret(SENTINEL)
         if self.error is not None:
             raise self.error
@@ -56,7 +59,7 @@ class StubClient:
 @pytest.fixture(autouse=True)
 def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     class Client(StubClient):
-        pass
+        modes: list[bool] = []
 
     monkeypatch.delenv(odouche.SESSION_ENV, raising=False)
     monkeypatch.setattr(odouche, "Client", Client)

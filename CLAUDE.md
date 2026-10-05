@@ -8,11 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 official public API; this project is an **unofficial** client for what the Odoo.sh web UI uses.
 
 Status: the workspace, tooling and CI exist; the CLI has `osh auth`, `osh projects list`,
-`osh branches list`, `osh builds list`, `osh builds show`, `osh builds watch` and `osh logs` and
-nothing else yet, and the MCP server has no tools. The library has its transport, session store,
-login, logout and a client that reports the session's user, lists projects, branches and builds,
-watches a build, reads and follows a build's logs, and triggers a rebuild.
-The architecture and security sections below are the design the implementation is held to.
+`osh branches list`, `osh builds list`, `osh builds show`, `osh builds watch`,
+`osh builds rebuild` and `osh logs` and nothing else yet, and the MCP server has no tools. The
+library has its transport, session store, login, logout and a client that reports the session's
+user, lists projects, branches and builds, watches a build, reads and follows a build's logs, and
+triggers a rebuild. The architecture and security sections below are the design the
+implementation is held to.
 
 ## Architecture
 
@@ -94,6 +95,8 @@ These are design constraints, not guidelines:
   on top of upstream expiry.
 - Headless use takes the session from the environment and keeps it in memory only.
 - Session values must not appear in logs, exceptions, `repr()`s, CLI output, or MCP tool results.
+- Every `osh` command opens its client read-only, except `osh builds rebuild`, which asks before
+  it sends unless `--yes` is given.
 - The MCP server is read-only by default; tools that change state on Odoo.sh are opt-in and
   documented as such. Every tool documents what it does and what it can touch.
 

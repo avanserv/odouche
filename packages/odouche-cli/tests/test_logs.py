@@ -97,6 +97,8 @@ class StubClient:
     ending: BaseException | None = None
     """What ends a follow that nothing closed, in place of its timeout, or of an interrupt when it has none."""
     error: odouche.OdoucheError | None = None
+    modes: list[bool]
+    """The `read_only` each client was built with."""
     pause: Callable[[], object] = staticmethod(lambda: None)
     """Called once the first line of a log has been taken."""
     calls: list[str]
@@ -104,7 +106,8 @@ class StubClient:
     """Every read and follow, kept so that only closing one ends it early."""
     closed: list[str]
 
-    def __init__(self) -> None:
+    def __init__(self, *, read_only: bool = False) -> None:
+        self.modes.append(read_only)
         if self.error is not None:
             raise self.error
 
@@ -195,6 +198,7 @@ class StubClient:
 
 def fresh() -> type[StubClient]:
     class Client(StubClient):
+        modes: list[bool] = []
         calls: list[str] = []
         streams: list[Iterator[LogLine]] = []
         closed: list[str] = []
