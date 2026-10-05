@@ -7,10 +7,8 @@ development agents work with your Odoo.sh projects.
 uvx odouche-mcp
 ```
 
-!!! note "One tool so far"
-
-    The server starts over stdio and has one tool, `get_session`. This page documents each tool,
-    what it does and what it can touch, as the tools land.
+The server starts over stdio. Its tools read: none changes anything on Odoo.sh. This page
+documents each one, what it does and what it can touch.
 
 ## Session
 
@@ -40,6 +38,61 @@ rejects is an error, as from any other tool.
 
 - **Touches**: reads only.
 - **Bounds**: one request to Odoo.sh, none when there is no session.
+
+### `list_projects`
+
+Lists the projects you can reach, each with its name, repository and address. Every other tool
+takes a project by its name, so an agent calls this one first.
+
+- **Arguments**: `limit`, 50 by default and 200 at most.
+- **Touches**: reads only.
+- **Bounds**: one request to Odoo.sh.
+
+### `list_branches`
+
+Lists the branches of a project, each with its name and stage, in the order Odoo.sh answers them.
+
+- **Arguments**: `project`, and `limit`, 50 by default and 200 at most.
+- **Touches**: reads only.
+- **Bounds**: two requests to Odoo.sh.
+
+### `list_builds`
+
+Lists the latest builds of a branch, newest first, with their status, result and commit.
+
+- **Arguments**: `project`, `branch` as the git branch's name, and `limit`, 4 by default and 20
+  at most.
+- **Touches**: reads only.
+- **Bounds**: three requests to Odoo.sh. Odoo.sh has only been seen to answer 4 builds: older
+  ones are out of reach, whatever `truncated` says.
+
+### `get_build`
+
+Reads one build of a branch, with its commit and the address of its database: the build of
+`build_id`, or the branch's latest one.
+
+- **Arguments**: `project`, `branch` as the git branch's name, and optionally `build_id`.
+- **Touches**: reads only.
+- **Bounds**: three requests to Odoo.sh. A build older than the branch's latest ones is not found.
+
+## Arguments and results
+
+### The project
+
+The project is always an argument. The server does not read it from a git checkout: its working
+directory is wherever the client started it, and a guess could point an agent at the wrong
+project. A call without one is rejected.
+
+### Limits
+
+A list holds at most `limit` items, and `truncated` is true when there were more. A `limit` over
+the most a tool returns is lowered to it, and one below 1 is an error.
+
+### Untrusted text
+
+Branch names, commit messages and author names are written by other people. The server returns
+them in the fields of a result only, never in a sentence of its own, and a client should treat
+them as data, not as instructions.
 
 ## Design constraints
 
