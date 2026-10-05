@@ -23,7 +23,7 @@ The server cannot log in. Give it a session first, one of two ways:
 
 <!-- x-release-please-start-version -->
 ```bash
-claude mcp add odouche -- uvx odouche-mcp==0.3.0
+claude mcp add odouche -- uvx odouche-mcp==0.4.0
 ```
 <!-- x-release-please-end -->
 
@@ -33,7 +33,7 @@ Or, for everyone who works on a project, in its `.mcp.json`:
 ```json
 {
   "mcpServers": {
-    "odouche": { "command": "uvx", "args": ["odouche-mcp==0.3.0"] }
+    "odouche": { "command": "uvx", "args": ["odouche-mcp==0.4.0"] }
   }
 }
 ```
@@ -48,7 +48,7 @@ command:
 
 <!-- x-release-please-start-version -->
 ```bash
-uvx odouche-mcp==0.3.0
+uvx odouche-mcp==0.4.0
 ```
 <!-- x-release-please-end -->
 
@@ -164,7 +164,7 @@ The tools that change state on Odoo.sh are off until you start the server with `
 ```json
 {
   "mcpServers": {
-    "odouche": { "command": "uvx", "args": ["odouche-mcp==0.3.0", "--allow-changes"] }
+    "odouche": { "command": "uvx", "args": ["odouche-mcp==0.4.0", "--allow-changes"] }
   }
 }
 ```
