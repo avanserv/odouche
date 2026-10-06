@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 import odouche
-from odouche_cli import __version__, auth, branches, builds, logs, projects
+from odouche_cli import __version__, auth, branches, builds, logs, projects, ssh
 from odouche_cli._errors import DebugOption, OshGroup
 from odouche_cli._output import Format, FormatOption, Output
 
@@ -24,6 +24,8 @@ app.add_typer(branches.app)
 app.add_typer(builds.app)
 app.command(epilog=logs.EPILOG)(logs.logs)
 app.add_typer(projects.app)
+# The options of `osh ssh` come first: what follows its first argument is `ssh`'s.
+app.command(epilog=ssh.EPILOG, context_settings={"allow_interspersed_args": False})(ssh.ssh)
 
 
 @dataclass(frozen=True, slots=True)

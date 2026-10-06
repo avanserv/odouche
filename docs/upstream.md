@@ -141,6 +141,10 @@ authentication of its own, the build host answers 302 to
 `www.odoo.sh/paas/build/<build id>/token?redirect=...&otp=0`, so access is handed over from the
 `www.odoo.sh` session. The hops after that were not captured.
 
+A build is reached over SSH as `<build id>@<host of the build's url>`, which is what the page
+shows for a development, a staging and the production build (seen in the page on 2026-10-06, not
+captured: no payload has it). The keys are those registered on the user's account. The session has no part in it.
+
 Named in the project payloads but not contacted:
 
 | Host | Role |

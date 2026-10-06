@@ -91,6 +91,18 @@ session.
   sequences and your instance's own secrets. The library returns it unchanged and never writes it
   to its own log.
 
+## A shell on a build
+
+`osh ssh` hands over to your own `ssh`: the `osh` process becomes it.
+
+- odouche reads, generates and uploads no SSH key. `ssh` authenticates with your configuration and
+  your agent, against the keys registered on your Odoo.sh account.
+- The user and the host come from Odoo.sh, so each is checked before it is an argument of `ssh`:
+  the user is a number and the host is under `odoo.com`, with no label starting with a dash.
+- `ODOUCHE_SESSION` is removed from the environment `ssh` gets.
+- What you give after the options of `osh ssh` is given to `ssh` as it is.
+- The MCP server has no such tool, with or without `--allow-changes`.
+
 ## What odouche can change
 
 One call changes something on Odoo.sh: a rebuild, which starts a new build of a development or a

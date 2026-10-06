@@ -147,6 +147,19 @@ stderr, with `--debug` or without.
   its name. A build that waits for a worker has no log yet.
 - A log the build does not have exits 4, and the message names the ones it has.
 
+## A shell on a build
+
+`osh ssh` opens a shell on the latest build of the [branch](#project-and-branch), with your own
+`ssh`: its configuration, its agent and the keys registered on your Odoo.sh account. `osh` reads
+no key, and its process becomes `ssh`, so the exit code is then `ssh`'s.
+
+- The options of `osh` come first. Everything from the first argument on is given to `ssh` after
+  the host: a command to run on the build, or options of `ssh`. Put `--` before it when it starts
+  with a dash: `osh ssh -- -L 8069:localhost:8069`.
+- A build with no address exits 4.
+- Where there is no `ssh` to become, as on native Windows, the command to run by hand is shown
+  and `osh` exits 14.
+
 ## Scripts
 
 ### Output
@@ -194,13 +207,15 @@ osh --format json builds show --project acme --branch feature-x | jq -r .result
 ### Exit codes
 
 A command that fails prints one or two lines on stderr, what happened and what to do, and nothing
-on stdout. Two commands do otherwise:
+on stdout. Three commands do otherwise:
 
 - `osh builds watch`, and `osh builds rebuild --watch` like it, exits non-zero for a build that
   did not succeed, with the result line on stdout, or on stderr as JSON. `osh builds list` and
   `osh builds show` exit 0 whatever the build's result.
 - `osh logs` can fail after lines went to stdout, at a follow's timeout (8) or when a request
   fails (7).
+- `osh ssh`, once it has become `ssh`, exits with what `ssh` exits with: the code of the remote
+  command, or 255 for an error of `ssh` itself. The table below is not how to read it.
 
 | Code | Meaning | Returned by |
 | --- | --- | --- |
@@ -218,6 +233,7 @@ on stdout. Two commands do otherwise:
 | 11 | No usable keyring: none to store the session in, or one that stayed locked. | `osh auth login`, `osh auth logout`, every command that reads the stored session |
 | 12 | The login ended without a session. | `osh auth login` |
 | 13 | Any other error from the library. | Every command |
+| 14 | No `ssh` to hand over to, or native Windows. The command to run is shown. | `osh ssh` |
 | 20 | The build failed. `osh logs` is the next step. | `osh builds watch`, `osh builds rebuild --watch` |
 | 21 | The build finished with warnings. | `osh builds watch`, `osh builds rebuild --watch` |
 | 22 | The build ended without a result. It was dropped for a newer build, killed or skipped, or its result is one `osh` does not know. | `osh builds watch`, `osh builds rebuild --watch` |

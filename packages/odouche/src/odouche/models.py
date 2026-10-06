@@ -148,6 +148,17 @@ class Build:
         return self.status in _FINISHED
 
 
+@dataclass(frozen=True, slots=True)
+class SshTarget:
+    """Where `ssh` reaches a build: the user to log in as and the host."""
+
+    user: str
+    """The user on the build's host, which is the build's number."""
+
+    host: str
+    """The build's own host."""
+
+
 class LogKind(StrEnum):
     """The logs Odoo.sh keeps of a build. A build has only some of them."""
 

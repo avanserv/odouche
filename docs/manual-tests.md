@@ -21,7 +21,7 @@ is what PyPI serves.
 | --- | --- | --- | --- | --- |
 | I1 | | `uv tool install odouche-cli`, then `osh --version` | `osh X (odouche X)`, both the released version | 0 |
 | I2 | | `osh --format json --version` | One line of JSON with `osh` and `odouche` | 0 |
-| I3 | | `uvx --from odouche-cli osh --help` | The help, with the `auth`, `branches`, `builds`, `logs` and `projects` commands | 0 |
+| I3 | | `uvx --from odouche-cli osh --help` | The help, with the `auth`, `branches`, `builds`, `logs`, `projects` and `ssh` commands | 0 |
 | I4 | | `osh`, then `osh auth`, with no argument | The help | 2 |
 | I5 | | `osh --bogus` | `No such option: --bogus` on stderr | 2 |
 | I6 | A new project from `uv init` | `uv add odouche`, then the first example of [Library](library.md) | It runs as written | 0 |
@@ -156,6 +156,11 @@ check that names production is the refusal.
 | S38 | | `osh builds rebuild`, then Ctrl+C at the question | `osh builds list` is unchanged | 130 |
 | S39 | | `osh builds rebuild --branch <production branch>` | That a branch in the production stage is not rebuilt. No summary and no question. The branch has no new build | 9 |
 | S40 | A build of `<dev-branch>` in progress | `osh builds rebuild --yes` | Not known: [Upstream reference](upstream.md) has it as an open question. Write down what Odoo.sh answers | - |
+| S41 | A public key registered on the account, a running build | `osh ssh`, then `exit 3` in the shell | A shell on the latest build of `<dev-branch>`, as `ssh <build id>@<host>` from the page gives. `ssh`'s exit code is `osh`'s | 3 |
+| S42 | The same | `osh ssh --branch` with a staging branch, then with the production branch, each with `-- true` | The command runs on that build | 0 |
+| S43 | The same | `osh ssh -- -v true`, then `osh ssh -- -L 8069:localhost:8069` | `ssh`'s debug lines, with no identity file named by `osh`. Then the port is forwarded | 0 |
+| S44 | `ODOUCHE_SESSION` set | `osh ssh -- -o PermitLocalCommand=yes -o LocalCommand=env true` | The environment of `ssh`, with no `ODOUCHE_SESSION` in it | 0 |
+| S45 | `PATH` without `ssh` | `osh ssh` | That there is no `ssh`, with the command to run | 14 |
 
 ## MCP server
 

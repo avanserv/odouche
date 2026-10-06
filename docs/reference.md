@@ -47,6 +47,8 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.BuildResult
 
+::: odouche.SshTarget
+
 ::: odouche.Commit
 
 ## Logs

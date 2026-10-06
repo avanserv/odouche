@@ -314,6 +314,25 @@ Each line is a `LogLine`:
 - Each call asks Odoo.sh for the build's worker and the project's access token before the log.
   [Security](security.md#build-logs) says what happens to the token.
 
+### A shell on a build
+
+`client.ssh_target(build)` returns the `SshTarget` of a build: the `user` and the `host` that
+`ssh` reaches it with. Odoo.sh is not asked, and the library opens no connection and reads no key.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    build = client.build(51044, 88212)
+    target = client.ssh_target(build)
+print("ssh", "-l", target.user, target.host)
+```
+
+- Both values are checked to be safe as arguments of `ssh`: one that is not raises
+  `UpstreamChangedError`.
+- A build with no address raises `NotFoundError`.
+
 ## State-changing operations
 
 Every other call of the client only reads. These are the calls that change something on Odoo.sh:
