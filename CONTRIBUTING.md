@@ -77,6 +77,9 @@ pasted into an issue. Run it:
 - before merging a release pull request;
 - when someone reports an "Unexpected answer from Odoo.sh" error.
 
+The other thing to run before a release is the [manual tests](docs/manual-tests.md): what the
+live check does not reach, from the install to the MCP server.
+
 ## Commits and pull requests
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org):
@@ -105,7 +108,8 @@ Merging the release pull request tags the release and publishes the three packag
 One thing to know before merging one: wait for the
 `chore: sync uv.lock with the release version` commit to land on the release branch, and for CI
 to pass on it. Release Please does not know about `uv.lock`; the Release workflow adds that
-commit. Run `make live-check` as well, since CI cannot.
+commit. Run `make live-check` and the [manual tests](docs/manual-tests.md) as well, since CI
+cannot.
 
 After the merge, the three publish jobs wait for a maintainer to approve their deployment in the
 Release workflow run.

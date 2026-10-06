@@ -16,6 +16,7 @@ nav = [
     { "Unofficial status" = "unofficial.md" },
     { "Upstream reference" = "upstream.md" },
     { "API reference" = "reference.md" },
+    { "Manual tests" = "manual-tests.md" },
     { "Contributing" = "contributing.md" },
 ]
 
