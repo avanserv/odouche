@@ -8,7 +8,7 @@ from odouche_cli.app import app
 
 runner = CliRunner()
 
-COMMANDS = ["auth", "branches", "builds", "logs", "projects"]
+COMMANDS = ["auth", "branches", "builds", "logs", "projects", "ssh"]
 
 
 # What each shell's completion script sets to ask `osh` for the words that complete a line.

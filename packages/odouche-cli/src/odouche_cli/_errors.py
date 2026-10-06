@@ -31,6 +31,9 @@ EXIT_BUILD_WARNING = 21
 EXIT_BUILD_NO_RESULT = 22
 EXIT_BUILD_TIMEOUT = 23
 
+# What `osh ssh` exits with when there is no `ssh` to become.
+EXIT_NO_SSH = 14
+
 # What a shell reports for a command that SIGPIPE ended.
 EXIT_CLOSED_PIPE = 141
 

@@ -9,7 +9,7 @@
 > your responsibility. See [Unofficial status](https://avanserv.github.io/odouche/unofficial/).
 
 **Status: pre-alpha.** `osh` logs in, lists projects, branches and builds, watches a build, prints
-and follows its logs and starts a rebuild.
+and follows its logs, starts a rebuild and opens a shell on a build with your own `ssh`.
 
 ```bash
 uv tool install odouche-cli
@@ -23,6 +23,7 @@ osh branches list     # the project's branches, with their stage
 git push
 osh builds watch      # follow the build of the pushed commit, and exit with its result
 osh logs              # the end of that build's log
+osh ssh               # a shell on that build, with your own ssh and keys
 ```
 
 Anywhere else, name the project and the branch:

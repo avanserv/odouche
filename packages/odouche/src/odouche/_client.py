@@ -4,9 +4,9 @@ from collections.abc import Callable, Generator
 from typing import Self
 
 from odouche._session import SessionStore
-from odouche._upstream import branches, builds, logs, projects, rebuild, user, watch
+from odouche._upstream import branches, builds, logs, projects, rebuild, ssh, user, watch
 from odouche._upstream.transport import Transport
-from odouche.models import Branch, Build, Identity, Log, LogKind, LogLine, Project, SessionInfo
+from odouche.models import Branch, Build, Identity, Log, LogKind, LogLine, Project, SessionInfo, SshTarget
 from odouche.secret import Secret
 
 
@@ -94,6 +94,15 @@ class Client:
         """Return the newest build of a branch, or `None` when it has none."""
         latest = builds.builds(self._transport, _branch_id(branch), 1)
         return latest[0] if latest else None
+
+    def ssh_target(self, build: Build) -> SshTarget:
+        """Return the user and the host `ssh` reaches a build with. Odoo.sh is not asked.
+
+        Odoo.sh accepts there the keys registered on the user's account, not the session. Raises
+        `NotFoundError` when the build has no host, and `UpstreamChangedError` when its number or
+        its address is not one that can be handed to `ssh` as it is.
+        """
+        return ssh.target(build)
 
     def rebuild(self, branch: Branch | int) -> Build:
         """Change state on Odoo.sh: start a new build of a branch, given as a `Branch` or by its number.

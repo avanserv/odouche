@@ -36,6 +36,7 @@ from odouche.models import (
     Project,
     SessionInfo,
     SessionSource,
+    SshTarget,
     Stage,
 )
 from odouche.secret import Secret
@@ -71,6 +72,7 @@ __all__ = [
     "SessionExpiredError",
     "SessionInfo",
     "SessionSource",
+    "SshTarget",
     "Stage",
     "StageRefusedError",
     "StreamTimeoutError",

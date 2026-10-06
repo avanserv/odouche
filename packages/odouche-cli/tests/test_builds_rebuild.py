@@ -1,5 +1,6 @@
 import json
 import re
+import shutil
 import sys
 from collections.abc import Iterator
 from dataclasses import replace
@@ -13,7 +14,7 @@ from typer.testing import CliRunner, Result
 
 import odouche
 from odouche import Branch, Build, BuildResult, BuildStatus, Commit, Log, LogKind, LogLine, Stage
-from odouche_cli import _time, builds
+from odouche_cli import _time, builds, ssh
 from odouche_cli._context import BRANCH_ENV, PROJECT_ENV
 from odouche_cli.app import app
 
@@ -123,6 +124,7 @@ class StubClient:
 
     # The library's own, which asks nothing.
     check_rebuild = odouche.Client.check_rebuild
+    ssh_target = odouche.Client.ssh_target
 
     def rebuild(self, branch: Branch | int) -> Build:
         self.calls.append(f"rebuild {branch.name if isinstance(branch, Branch) else branch}")
@@ -520,6 +522,8 @@ def test_only_rebuild_builds_a_client_that_writes(
     monkeypatch.setenv(BRANCH_ENV, "feature-x")
     monkeypatch.delenv(odouche.SESSION_ENV, raising=False)
     monkeypatch.setattr(odouche, "login", lambda **_: None)
+    monkeypatch.setattr(ssh, "_exec", lambda *_: None)
+    monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/ssh")
     monkeypatch.setattr(odouche, "logout", lambda: odouche.LogoutResult(None, False, False, None))  # noqa: FBT003
 
     result = run(*path, *ARGUMENTS.get(path, ()))

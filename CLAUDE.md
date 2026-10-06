@@ -9,12 +9,14 @@ official public API; this project is an **unofficial** client for what the Odoo.
 
 Status: the workspace, tooling and CI exist. The CLI has the commands of its first milestone:
 `osh auth`, `osh projects list`, `osh branches list`, `osh builds list`, `show`, `watch` and
-`rebuild`, and `osh logs`, with a reference page generated from them. The MCP server has seven read-only
+`rebuild`, `osh logs` and `osh ssh`, with a reference page generated from them.
+The MCP server has seven read-only
 tools: `get_session`, `list_projects`, `list_branches`, `list_builds`, `get_build`, `wait_for_build`
 and `read_log`. An eighth, `rebuild_branch`, changes state and is registered only with `--allow-changes`. A reference page is generated from the tools. The library has its transport, session
 store, login, logout and a client that
 reports the session's user, lists projects, branches and builds, watches a build, reads and
-follows a build's logs, and triggers a rebuild. The architecture and security sections below are
+follows a build's logs, triggers a rebuild, and gives the SSH target of a build. The architecture
+and security sections below are
 the design the implementation is held to.
 
 ## Architecture
@@ -103,6 +105,9 @@ These are design constraints, not guidelines:
 - Session values must not appear in logs, exceptions, `repr()`s, CLI output, or MCP tool results.
 - Every `osh` command opens its client read-only, except `osh builds rebuild`, which asks before
   it sends unless `--yes` is given.
+- `osh ssh` replaces its process with the user's own `ssh`. odouche never reads, generates or
+  uploads an SSH key, and the target from upstream is checked as a user and a host before it is
+  an argument. There is no MCP tool for it, opt-in or not.
 - The MCP server is read-only by default; tools that change state on Odoo.sh are opt-in and
   documented as such. Every tool documents what it does and what it can touch.
 

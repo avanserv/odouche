@@ -31,6 +31,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, and start a new one. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
 | [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach. |
+| [`osh ssh`](#osh-ssh) | Open a shell on the branch's latest build, with your own `ssh`, its configuration and its keys. |
 
 ## `osh auth`
 
@@ -286,4 +287,27 @@ Example:
 
 ```bash
 osh projects list
+```
+
+## `osh ssh`
+
+Open a shell on the branch's latest build, with your own `ssh`, its configuration and its keys.
+
+```text
+osh ssh [OPTIONS] [SSH_ARGS]...
+```
+
+| Argument | Description |
+| --- | --- |
+| `[SSH_ARGS]...` | What to give `ssh` after the host: its own options, or a command to run on the build. Everything from the first one on is `ssh`'s. Put `--` before it when it starts with a dash. |
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--branch BRANCH` | The branch's name. Default: the git checkout's. | `OSH_BRANCH` |
+
+Example:
+
+```bash
+osh ssh --branch staging -- ls
 ```

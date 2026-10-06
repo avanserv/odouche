@@ -24,7 +24,7 @@ with odouche.Client() as client:
 ```
 
 It logs in through a browser, lists projects, branches and builds, watches a build, reads and
-follows build logs and triggers a rebuild. The session is kept in the OS keyring, or taken from
+follows build logs, triggers a rebuild and gives the SSH target of a build. The session is kept in the OS keyring, or taken from
 `ODOUCHE_SESSION` in headless use.
 
 - [Guide](https://avanserv.github.io/odouche/library/)
