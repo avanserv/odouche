@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.5.0](https://github.com/avanserv/odouche/compare/v0.4.0...v0.5.0) (2026-10-06)
+
+
+### Features
+
+* **cli:** Add osh ssh, which opens a shell on a build with the user's own ssh ([#59](https://github.com/avanserv/odouche/issues/59)) ([654a3ba](https://github.com/avanserv/odouche/commit/654a3ba64b185c14a603b07e1aa668d425f5b20c))
+
+
+### Documentation
+
+* Add the manual test checklist a maintainer runs before a release ([#57](https://github.com/avanserv/odouche/issues/57)) ([60cdc9e](https://github.com/avanserv/odouche/commit/60cdc9ee5e4eef57ed17c56ed47650087f68615b))
+
 ## [0.4.0](https://github.com/avanserv/odouche/compare/v0.3.0...v0.4.0) (2026-10-05)
 
 
