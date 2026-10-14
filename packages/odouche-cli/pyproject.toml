@@ -1,6 +1,6 @@
 [project]
 name = "odouche-cli"
-version = "0.4.0" # x-release-please-version
+version = "0.5.0" # x-release-please-version
 description = "osh: an unofficial command-line interface for Odoo.sh"
 readme = "README.md"
 license = "MIT"
@@ -23,7 +23,7 @@ classifiers = [
 ]
 dependencies = [
     # Exact, because the three packages are released together and tested only together.
-    "odouche==0.4.0", # x-release-please-version
+    "odouche==0.5.0", # x-release-please-version
     "rich>=15.0.0",
     "typer>=0.27.2",
 ]
