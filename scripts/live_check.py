@@ -11,6 +11,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from odouche import (
+    Backup,
+    BackupKind,
     Branch,
     Build,
     BuildResult,
@@ -51,6 +53,7 @@ def run(client: Client, project: str) -> list[Step]:
     _attempt(steps, "projects", client.projects, lambda found: _count(len(found), "project"))
 
     branches = _attempt(steps, "branches", lambda: client.branches(project), _branches)
+    _attempt(steps, "backups", lambda: client.backups(project), _backups)
     branch = _pick(branches) if branches else None
     builds = (
         _attempt(steps, "builds", lambda: client.builds(branch), _builds)
@@ -147,6 +150,11 @@ def _unknown(number: int, noun: str) -> str:
 def _branches(branches: Sequence[Branch]) -> str:
     unknown = sum(branch.stage is Stage.UNKNOWN for branch in branches)
     return _count(len(branches), "branch", "branches") + _unknown(unknown, "stage")
+
+
+def _backups(backups: Sequence[Backup]) -> str:
+    unknown = sum(backup.kind is BackupKind.UNKNOWN for backup in backups)
+    return _count(len(backups), "backup") + _unknown(unknown, "kind")
 
 
 def _builds(builds: Sequence[Build]) -> str:

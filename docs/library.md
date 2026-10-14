@@ -166,6 +166,36 @@ holds the session itself.
   exists. One that Odoo.sh lists but refuses the branches of raises `PermissionDeniedError`.
 - Each call asks Odoo.sh twice: for the projects, then for the branches.
 
+### Backups
+
+`client.backups(project)` returns the backups of a project, every branch's, newest first, as a list
+of `Backup`. `project` is a `Project` or a project's name.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    for backup in client.backups("acme-shop"):
+        print(backup.taken_at, backup.kind, backup.branch_name, backup.downloadable)
+```
+
+| Field | Meaning |
+| --- | --- |
+| `kind` | A `BackupKind`: `MANUAL`, `DAILY`, `REMOTE` or `UNKNOWN`. |
+| `kind_name` | What Odoo.sh calls that kind. |
+| `taken_at` | When it was taken, in UTC, to the second. It is what names the backup. |
+| `build_name` | The name of the build it was taken from. |
+| `branch_name`, `commit_hash` | The git branch and the full commit of that build. |
+| `downloadable` | Whether Odoo.sh lets it be downloaded. |
+| `size` | The bytes of its compressed SQL, or `None`: only a `REMOTE` backup has one. |
+
+- A `REMOTE` backup is a daily one kept off-site, under the same `taken_at` as the `DAILY` one
+  while that is kept. Odoo.sh does not let it be downloaded as it is.
+- A backup has no number: the one Odoo.sh gives a `REMOTE` backup changes between two answers.
+- A project that is not among those the user can reach raises `NotFoundError`, whether or not it
+  exists. Each call asks Odoo.sh twice: for the projects, then for the backups.
+
 ### Builds
 
 `client.builds(branch)` returns the latest builds of a branch, newest first, as a list of `Build`.

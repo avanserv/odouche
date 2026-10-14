@@ -8,7 +8,7 @@
 > with your own Odoo.sh access and nothing more, and staying within your agreement with Odoo is
 > your responsibility. See [Unofficial status](https://avanserv.github.io/odouche/unofficial/).
 
-**Status: pre-alpha.** `osh` logs in, lists projects, branches and builds, watches a build, prints
+**Status: pre-alpha.** `osh` logs in, lists projects, branches, builds and backups, watches a build, prints
 and follows its logs, starts a rebuild and opens a shell on a build with your own `ssh`.
 
 ```bash

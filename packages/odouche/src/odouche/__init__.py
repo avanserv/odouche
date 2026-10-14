@@ -23,6 +23,8 @@ from odouche.errors import (
     UpstreamUnavailableError,
 )
 from odouche.models import (
+    Backup,
+    BackupKind,
     Branch,
     Build,
     BuildResult,
@@ -46,6 +48,8 @@ __all__ = [
     "KEYRING_ENTRY",
     "KEYRING_SERVICE",
     "SESSION_ENV",
+    "Backup",
+    "BackupKind",
     "Branch",
     "Build",
     "BuildResult",

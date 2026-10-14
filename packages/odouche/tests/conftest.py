@@ -120,6 +120,7 @@ class Upstream:
         self.bodies = {
             "/app/projects": self.load("projects.json"),
             "/app/project/acme-corp-odoo-addons-4217/branches": self.load("branches.json"),
+            "/app/project/acme-corp-odoo-addons-4217/backups": self.load("backups.json"),
             "/app/branch/51044/builds": self.load("builds.json"),
             "/app/user/profile": self.load("user_profile.json"),
             "/app/project/acme-shop/get_info": self.load("project_info.json"),

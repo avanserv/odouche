@@ -203,6 +203,47 @@ class LogLine:
     """Whether the line was longer than the library reads, and was cut."""
 
 
+class BackupKind(StrEnum):
+    """How a backup was made, and where it is kept."""
+
+    MANUAL = "manual"
+    """Asked for on a branch, and kept for three days."""
+    DAILY = "daily"
+    REMOTE = "remote"
+    """A daily backup kept off-site. Odoo.sh does not let it be downloaded as it is."""
+    UNKNOWN = "unknown"
+    """A kind the library does not know. The backup's `kind_name` holds what Odoo.sh calls it."""
+
+
+@dataclass(frozen=True, slots=True)
+class Backup:
+    """A backup of a project's database, on any of its branches."""
+
+    kind: BackupKind
+    """How it was made."""
+
+    kind_name: str
+    """What Odoo.sh calls that kind, such as `daily`."""
+
+    taken_at: datetime
+    """When it was taken, in UTC, to the second. It is what names the backup to Odoo.sh."""
+
+    build_name: str
+    """The name of the build it was taken from."""
+
+    branch_name: str
+    """The git branch of that build."""
+
+    commit_hash: str
+    """The full hash of that build's commit."""
+
+    downloadable: bool
+    """Whether Odoo.sh lets it be downloaded."""
+
+    size: int | None
+    """The bytes of its compressed SQL, or `None` when Odoo.sh gives none, as for all but `REMOTE`."""
+
+
 class SessionSource(StrEnum):
     """Where a session came from."""
 

@@ -117,6 +117,9 @@ class StubClient:
         self.calls.append(f"branches {project}")
         return [self.branch]
 
+    def backups(self, project: str) -> list[odouche.Backup]:
+        return []
+
     def builds(self, branch: Branch, *, limit: int = 4) -> list[Build]:
         return [] if self.latest is None else [self.latest][:limit]
 

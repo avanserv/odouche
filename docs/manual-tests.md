@@ -108,6 +108,8 @@ Search the output of every check below for the session value: it appears in none
 | R27 | The same | The same with `NO_PROXY=www.odoo.sh` | The proxy sees no request | 0 |
 | R28 | A proxy that intercepts TLS with its own authority | `HTTPS_PROXY=<proxy> osh projects list`, then with `SSL_CERT_FILE` set to that authority | Refused as unreachable, then the projects | 7, then 0 |
 | R29 | The same proxy | `HTTP_PROXY=<proxy> osh projects list` | The proxy sees no request | 0 |
+| R30 | | `osh backups list`, then with `--branch` naming the production branch, then with `--format json` | Every branch's backups, newest first, as the Backups tab lists them. Columns `Taken (UTC)`, `Kind`, `Branch`, `Build`, `Commit`, `Size`, `Downloadable`. Only `remote` has a size and is `no`. Then that branch's alone. Then an array of `Backup` | 0 |
+| R31 | | `osh backups list --branch nope` | `No backups.` on stderr | 0 |
 
 ## Streams and rebuild
 
