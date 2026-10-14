@@ -1,10 +1,11 @@
 """The client: the one object a caller asks Odoo.sh through."""
 
+import ipaddress
 from collections.abc import Callable, Generator
 from typing import Self
 
 from odouche._session import SessionStore
-from odouche._upstream import branches, builds, logs, projects, rebuild, ssh, user, watch
+from odouche._upstream import allow_ip, branches, builds, logs, projects, rebuild, ssh, user, watch
 from odouche._upstream.transport import Transport
 from odouche.models import Branch, Build, Identity, Log, LogKind, LogLine, Project, SessionInfo, SshTarget
 from odouche.secret import Secret
@@ -103,6 +104,19 @@ class Client:
         its address is not one that can be handed to `ssh` as it is.
         """
         return ssh.target(build)
+
+    def allow_ip(self, branch: Branch | int) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
+        """Change state on Odoo.sh: let the address this machine reaches it from connect with `ssh`.
+
+        Returns the address, which Odoo.sh takes from the connection: behind a proxy it is the
+        proxy's. Odoo.sh says the rule lasts one hour and takes up to five minutes to apply. The
+        branch is given as a `Branch` or by its number.
+
+        The request is sent once. Raises `OutcomeUnknownError` when it left and Odoo.sh did not
+        confirm it, `ReadOnlyError` on a read-only client, and `PermissionDeniedError` when Odoo.sh
+        refuses it to the session's user, as the page expects for a stage above their access.
+        """
+        return allow_ip.allow_ip(self._transport, _branch_id(branch))
 
     def rebuild(self, branch: Branch | int) -> Build:
         """Change state on Odoo.sh: start a new build of a branch, given as a `Branch` or by its number.

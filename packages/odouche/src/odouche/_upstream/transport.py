@@ -309,8 +309,8 @@ class Transport:
             raise error
         return cast("dict[str, object]", answer.body)
 
-    def change(self, operation: str, path: str) -> None:
-        """Send one state-changing JSON-RPC request, once: sent twice, it is done twice.
+    def change(self, operation: str, path: str) -> dict[str, object]:
+        """Send one state-changing JSON-RPC request, once, and return its answer: sent twice, it is done twice.
 
         Raises `ReadOnlyError` before sending when the transport is read-only, and
         `OutcomeUnknownError` when the request left and nothing says what Odoo.sh did with it:
@@ -332,6 +332,7 @@ class Transport:
         error = _error(operation, answer, None)
         if error is not None:
             raise error
+        return cast("dict[str, object]", answer.body)
 
     def leave(
         self, operation: str, path: str, params: Mapping[str, str] | None = None, *, to: str, retry: bool = False

@@ -1,3 +1,4 @@
+import ipaddress
 import re
 from pathlib import Path
 
@@ -6,6 +7,9 @@ PACKAGES = Path(__file__).parents[2]
 
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)")
 SCRUBBED_DOMAIN = "example.com"
+IPV4 = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
+# RFC 5737: the three IPv4 ranges kept for documentation.
+DOCUMENTATION = tuple(ipaddress.ip_network(net) for net in ("192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24"))
 
 
 def unscrubbed_addresses(directory: Path) -> list[str]:
@@ -19,7 +23,20 @@ def unscrubbed_addresses(directory: Path) -> list[str]:
                 domain = match.group(1).lower()
                 if domain != SCRUBBED_DOMAIN and not domain.endswith(f".{SCRUBBED_DOMAIN}"):
                     findings.append(f"{path}:{number}: {match.group(0)}")
+            findings.extend(
+                f"{path}:{number}: {match.group(0)}"
+                for match in IPV4.finditer(line)
+                if not _documentation(match.group(0))
+            )
     return findings
+
+
+def _documentation(text: str) -> bool:
+    try:
+        address = ipaddress.IPv4Address(text)
+    except ValueError:
+        return False
+    return any(address in network for network in DOCUMENTATION)
 
 
 def test_clean_fixture_passes(tmp_path):
@@ -42,6 +59,14 @@ def test_dirty_fixture_is_reported(tmp_path):
     ]
 
 
+def test_an_ip_address_outside_the_documentation_ranges_is_reported(tmp_path):
+    (tmp_path / "allow_ip.json").write_text(
+        '{"result": "203.0.113.7", "real": "81.2.69.160", "version": "18.0.1.3.0"}\n'
+    )
+
+    assert unscrubbed_addresses(tmp_path) == [f"{tmp_path / 'allow_ip.json'}:1: 81.2.69.160"]
+
+
 def test_committed_fixtures_are_scrubbed():
     findings = [
         finding
@@ -49,4 +74,6 @@ def test_committed_fixtures_are_scrubbed():
         for finding in unscrubbed_addresses(directory)
     ]
 
-    assert not findings, "fixtures hold addresses outside example.com:\n" + "\n".join(findings)
+    assert not findings, "fixtures hold addresses outside example.com or the IPv4 documentation ranges:\n" + "\n".join(
+        findings
+    )

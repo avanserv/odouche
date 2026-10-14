@@ -108,9 +108,9 @@ build of the commit you just pushed.
 
 ## Rebuilding a branch
 
-`osh builds rebuild` is the one command that changes a project: it starts a new build of the
-branch, which replaces its latest one. Every other command that opens a client opens it
-read-only, and it sends no change.
+`osh builds rebuild` starts a new build of the branch, which replaces its latest one. It is one
+of the two commands that change a project, with [`osh ssh`](#a-shell-on-a-build) when it allows
+your address. Every other command that opens a client opens it read-only, and it sends no change.
 
 - Only a development or a staging branch is rebuilt. Any other stage exits 9 before anything is
   asked or sent.
@@ -157,6 +157,16 @@ no key, and its process becomes `ssh`, so the exit code is then `ssh`'s.
   the host: a command to run on the build, or options of `ssh`. Put `--` before it when it starts
   with a dash: `osh ssh -- -L 8069:localhost:8069`.
 - A build with no address exits 4.
+- Odoo.sh lets a build be reached only from an allowed address. `osh` first runs `true` on the
+  build with your `ssh` in batch mode, which asks for nothing. When that does not get in, `osh`
+  offers to allow the address Odoo.sh sees from your machine for one hour: the "Allow my IP" of
+  the branch's page, which was seen to open other branches of the project too. Declining exits 1. `--yes` allows without asking, and is
+  needed when stdin or stderr is not a terminal: without it, `osh` exits 2.
+- Once allowed, `osh` tries again every ten seconds for up to ten minutes, then becomes `ssh`.
+  Past that it exits 8, with the last line `ssh` printed.
+- The try checks no host key, since every build is a new name for the gateway's key: the `ssh`
+  `osh` becomes asks you about it. When the build refuses your keys (`Permission denied`), the
+  address got through: `osh` sends nothing and becomes `ssh`.
 - Where there is no `ssh` to become, as on native Windows, the command to run by hand is shown
   and `osh` exits 14.
 
@@ -221,15 +231,15 @@ on stdout. Three commands do otherwise:
 | --- | --- | --- |
 | 0 | Success. `osh auth logout` with nothing to log out of is one. | Every command |
 | 1 | Unexpected error, which is a bug to report, or a prompt or a question that was declined. | Every command |
-| 2 | Usage error: an unknown option, a value an option does not take, options that do not go together, no [project or branch](#project-and-branch), or a rebuild that cannot ask. | Every command |
+| 2 | Usage error: an unknown option, a value an option does not take, options that do not go together, no [project or branch](#project-and-branch), or a rebuild or an IP allow that cannot be confirmed. | Every command |
 | 3 | No session, or an expired one. Run `osh auth login`. | Every command that needs the session |
 | 4 | The project, branch, build or log is not one the logged-in user can reach. A build that is not among the branch's latest ones is not, and neither is the build of a branch that has none. | Every command that takes a project |
 | 5 | The session is not allowed to do this. | Every command that asks Odoo.sh |
 | 6 | Odoo.sh answered in a shape `osh` does not read. Please report it. | Every command that asks Odoo.sh |
 | 7 | Odoo.sh could not be reached, or answered with a server error. | Every command that asks Odoo.sh |
-| 8 | A followed log or a login reached its timeout. | `osh logs --follow --timeout`, `osh auth login` |
+| 8 | A followed log or a login reached its timeout, or `ssh` did not get in once the IP was allowed. | `osh logs --follow --timeout`, `osh auth login`, `osh ssh` |
 | 9 | Refused, and nothing was changed: a read-only run, or a branch in a stage `osh` does not change. | `osh builds rebuild` |
-| 10 | A change was sent and Odoo.sh did not confirm it. `osh builds list` shows whether the build was started. | `osh builds rebuild` |
+| 10 | A change was sent and Odoo.sh did not confirm it. `osh builds list` shows whether a build was started; `osh ssh` can be run again. | `osh builds rebuild`, `osh ssh` |
 | 11 | No usable keyring: none to store the session in, or one that stayed locked. | `osh auth login`, `osh auth logout`, every command that reads the stored session |
 | 12 | The login ended without a session. | `osh auth login` |
 | 13 | Any other error from the library. | Every command |
@@ -260,6 +270,8 @@ session supplied through `ODOUCHE_SESSION` is masked in it.
 
 - With `ODOUCHE_SESSION` set, `osh auth login` still stores the session it gets in the keyring,
   and `osh auth logout` leaves the variable for you to unset.
+- Behind a proxy, the address `osh ssh` allows is the proxy's, which Odoo.sh sees. `ssh` does not
+  go through the proxy.
 - Git, which reads the checkout, and Rich, which draws the tables and the help, read variables of
   their own, such as `GIT_DIR` and `TERM`.
 

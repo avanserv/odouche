@@ -101,15 +101,28 @@ session.
   the user is a number and the host is under `odoo.com`, with no label starting with a dash.
 - `ODOUCHE_SESSION` is removed from the environment `ssh` gets.
 - What you give after the options of `osh ssh` is given to `ssh` as it is.
+- Before that, `osh` runs `true` on the build with the same `ssh`, in batch mode and with no
+  input, to learn whether it gets in. That try checks no host key and records none, runs no
+  command of your configuration and forwards no agent, port or display: it proves only that the
+  address gets through. The `ssh` that follows checks the host key as usual.
+- `osh` reads only the try's stderr: to tell a refusal of your keys, which is not the address,
+  and to quote its last line.
+- When it does not get in, `osh ssh` asks before allowing your address, unless `--yes` is given.
+  Odoo.sh takes the address from the request, so odouche asks no other service for it. Behind a
+  proxy set in the environment, the proxy's address is the one allowed.
 - The MCP server has no such tool, with or without `--allow-changes`.
 
 ## What odouche can change
 
-One call changes something on Odoo.sh: a rebuild, which starts a new build of a development or a
-staging branch. Every other call only reads.
+Two calls change something on Odoo.sh: a rebuild, which starts a new build of a development or a
+staging branch, and allowing an IP, which lets the address of the machine that sends it connect
+to the builds with `ssh` for one hour. The request names a branch, and the rule was seen to open
+other branches of the project too ([Upstream reference](upstream.md#allow-an-ip)). Every other call only reads.
 
-- The request is sent once and never repeated.
-- A client opened read-only refuses it before anything is sent.
+- Each request is sent once and never repeated.
+- A client opened read-only refuses them before anything is sent.
+- Allowing an IP allows only the address the request comes from: odouche sends no address, so it
+  cannot open a build to anyone else. The rule expires by itself, and odouche never removes one.
 - The library asks for no confirmation: the tool that calls it does.
 
 [State-changing operations](library.md#state-changing-operations) has the details.

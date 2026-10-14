@@ -144,6 +144,12 @@ authentication of its own, the build host answers 302 to
 A build is reached over SSH as `<build id>@<host of the build's url>`, which is what the page
 shows for a development, a staging and the production build (seen in the page on 2026-10-06, not
 captured: no payload has it). The keys are those registered on the user's account. The session has no part in it.
+A build host also accepts SSH only from an allowed address: see [Allow an IP](#allow-an-ip).
+Port 22 is Odoo.sh's own gateway (`SSH-2.0-Odoo.sh`). It waits about six seconds for the client's
+version line before sending its own, and it greets an address that is not allowed, then closes
+the connection after the key exchange, or refuses the connection. Only a login tells that the
+address is let in. The production and a staging build of one project were behind the same
+gateway address, with the same host key (seen on 2026-10-14).
 
 Named in the project payloads but not contacted:
 
@@ -446,6 +452,30 @@ build of one project, on two workers.
 
 Seen once, on a development branch. What it does on a branch whose `push_behavior` is `update`,
 on a staging or production branch, or while a build is in progress, is unknown.
+
+### Allow an IP
+
+`POST /app/branch/<id>/allow_ip`, no params. Fixture: `allow_ip.json`, with a documentation address.
+
+Read from the page's script on 2026-10-14 (`paas_master.paas_app_assets`), not captured: the
+"Allow my IP" action of a branch's SSH tab.
+
+- The `result` is the address as a string, which the page shows: "Your IP address (`<result>`)
+  has been authorized for 1 hour. Adding or removing IP addresses can take up to 5 minutes to
+  take effect." The page sends no address: Odoo.sh takes it from the connection.
+- The page offers the action only when the user's access level reaches the one the branch's
+  stage needs (`access_level_map` and `access_by_stage` of the page's config).
+- No request lists these rules or says one applies. The project setting `ip_whitelist` (IPv4s,
+  one per line, at most 10, in `get_settings`) is a permanent rule for production and staging,
+  which the library does not read.
+
+Seen on 2026-10-14, on a production and a staging branch: the `result` is the IPv4 address the
+page shows. On the staging branch the rule took over five and a half minutes to apply. Within the
+hour after it, a build of another branch of the project let the address in with no rule of its
+own, so a rule seems to cover the project, or the address, rather than the branch.
+
+Not seen: the refusal for a stage above the user's access, a rule on one project tried from
+another, and an IPv6 address.
 
 ### Enumerations
 

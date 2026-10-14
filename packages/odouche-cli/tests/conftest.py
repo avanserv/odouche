@@ -48,7 +48,7 @@ def unreached(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[..., object]
 
 @pytest.fixture(autouse=True)
 def read_only_clients(unreached: Callable[..., object]) -> Iterator[None]:
-    """Fail a test whose command built a client that writes: `osh builds rebuild` is the only one that may."""
+    """Fail a test whose command built a client that writes. Test files of the commands that may write replace it."""
     yield
     if odouche.Client is unreached:
         return

@@ -156,11 +156,15 @@ check that names production is the refusal.
 | S38 | | `osh builds rebuild`, then Ctrl+C at the question | `osh builds list` is unchanged | 130 |
 | S39 | | `osh builds rebuild --branch <production branch>` | That a branch in the production stage is not rebuilt. No summary and no question. The branch has no new build | 9 |
 | S40 | A build of `<dev-branch>` in progress | `osh builds rebuild --yes` | Not known: [Upstream reference](upstream.md) has it as an open question. Write down what Odoo.sh answers | - |
-| S41 | A public key registered on the account, a running build | `osh ssh`, then `exit 3` in the shell | A shell on the latest build of `<dev-branch>`, as `ssh <build id>@<host>` from the page gives. `ssh`'s exit code is `osh`'s | 3 |
+| S41 | A public key registered on the account, a running build, an allowed address | `osh ssh`, then `exit 3` in the shell | A shell on the latest build of `<dev-branch>`, as `ssh <build id>@<host>` from the page gives. `ssh`'s exit code is `osh`'s | 3 |
 | S42 | The same | `osh ssh --branch` with a staging branch, then with the production branch, each with `-- true` | The command runs on that build | 0 |
 | S43 | The same | `osh ssh -- -v true`, then `osh ssh -- -L 8069:localhost:8069` | `ssh`'s debug lines, with no identity file named by `osh`. Then the port is forwarded | 0 |
 | S44 | `ODOUCHE_SESSION` set | `osh ssh -- -o PermitLocalCommand=yes -o LocalCommand=env true` | The environment of `ssh`, with no `ODOUCHE_SESSION` in it | 0 |
 | S45 | `PATH` without `ssh` | `osh ssh` | That there is no `ssh`, with the command to run | 14 |
+| S46 | An address not allowed, as from a new network: no permanent rule, and no allow on any branch of the project within the hour | `osh ssh -- true`, and answer `n` | That `ssh` does not get into build `<id>` without a prompt, the question, then `Nothing was sent.` No change in the page | 1 |
+| S47 | The same | `osh ssh -- true`, and answer `y` | `Odoo.sh allowed <address> for one hour`, the address the page's Allow my IP shows. A waiting line until `ssh` gets in, within ten minutes, then the command runs with no `Connection closed`. Write down what the request answered and whether another branch of the project is reachable too, in [Upstream reference](upstream.md#allow-an-ip) | 0 |
+| S48 | Within the hour after S47, then over an hour after it | `osh ssh -- true`, then `osh ssh --yes -- true` | First no question and no waiting line. Then the address is allowed again with no question. The command runs each time | 0 |
+| S49 | An address not allowed | `osh ssh -- true < /dev/null` | That allowing cannot be confirmed, with `--yes` and Allow my IP as the ways. Nothing is sent | 2 |
 
 ## MCP server
 
