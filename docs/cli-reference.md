@@ -293,6 +293,10 @@ osh projects list
 
 Open a shell on the branch's latest build, with your own `ssh`, its configuration and its keys.
 
+It first tries `ssh` with no prompt. When that does not get in, it changes state on Odoo.sh: it
+asks Odoo.sh to allow this machine's address for one hour, unless declined, and tries again
+for up to ten minutes.
+
 ```text
 osh ssh [OPTIONS] [SSH_ARGS]...
 ```
@@ -305,6 +309,7 @@ osh ssh [OPTIONS] [SSH_ARGS]...
 | --- | --- | --- |
 | `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
 | `--branch BRANCH` | The branch's name. Default: the git checkout's. | `OSH_BRANCH` |
+| `--yes`, `-y` | Allow this machine's address without asking, when `ssh` does not get in. Needed then when stdin or stderr is not a terminal. | |
 
 Example:
 

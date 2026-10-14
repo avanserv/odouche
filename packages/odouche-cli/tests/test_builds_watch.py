@@ -12,7 +12,7 @@ from typer.testing import CliRunner, Result
 
 import odouche
 from odouche import Branch, Build, BuildResult, BuildStatus, Commit, Stage
-from odouche_cli import _time, builds
+from odouche_cli import _terminal, _time, builds
 from odouche_cli._context import BRANCH_ENV, PROJECT_ENV
 from odouche_cli.app import app
 
@@ -536,7 +536,7 @@ def test_off_a_terminal_each_change_is_a_line_on_stderr_with_the_time_the_build_
 
 @pytest.mark.usefixtures("terminal")
 def test_on_a_terminal_the_changes_are_one_line_that_is_redrawn(monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setattr(builds, "_stderr_is_terminal", lambda: True)
+    monkeypatch.setattr(_terminal, "stderr_is_terminal", lambda: True)
 
     result = run("builds", "watch", *ON_FEATURE)
 
@@ -559,7 +559,7 @@ def test_on_a_terminal_the_changes_are_one_line_that_is_redrawn(monkeypatch: pyt
 @pytest.mark.usefixtures("terminal")
 def test_on_a_dumb_terminal_each_change_is_a_line(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("TERM", "dumb")
-    monkeypatch.setattr(builds, "_stderr_is_terminal", lambda: True)
+    monkeypatch.setattr(_terminal, "stderr_is_terminal", lambda: True)
 
     result = run("builds", "watch", *ON_FEATURE)
 
@@ -574,7 +574,7 @@ def test_on_a_dumb_terminal_each_change_is_a_line(monkeypatch: pytest.MonkeyPatc
 @pytest.mark.parametrize("variable", ["TTY_COMPATIBLE", "TTY_INTERACTIVE"])
 def test_on_a_terminal_said_not_to_redraw_each_change_is_a_line(monkeypatch: pytest.MonkeyPatch, variable: str):
     monkeypatch.setenv(variable, "0")
-    monkeypatch.setattr(builds, "_stderr_is_terminal", lambda: True)
+    monkeypatch.setattr(_terminal, "stderr_is_terminal", lambda: True)
 
     result = run("builds", "watch", *ON_FEATURE)
 

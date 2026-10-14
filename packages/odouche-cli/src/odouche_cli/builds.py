@@ -6,7 +6,7 @@ import time
 from collections.abc import Callable, Iterator
 from contextlib import closing
 from datetime import datetime
-from typing import Annotated, TextIO
+from typing import Annotated
 
 import typer
 from rich.console import Console
@@ -14,6 +14,7 @@ from rich.live import Live
 from rich.text import Text
 
 import odouche
+from odouche_cli import _terminal
 from odouche_cli._client import open_client
 from odouche_cli._context import (
     BranchOption,
@@ -253,7 +254,7 @@ def rebuild(
         msg = "--timeout goes with --watch only."
         raise typer.BadParameter(msg, ctx=ctx)
     name = resolve_branch(ctx, branch)
-    if not yes and not (_stdin_is_terminal() and _stderr_is_terminal()):
+    if not yes and not _terminal.can_ask():
         msg = (
             "Stdin or stderr is not a terminal, so the rebuild cannot be confirmed. "
             "Give --yes to rebuild without being asked."
@@ -265,7 +266,7 @@ def rebuild(
         latest = client.latest_build(found)
         for line in _rebuilt(project_name, found, latest):
             typer.echo(strip_control(line), err=True)
-        if not yes and not _confirmed("Start a new build of this branch?"):
+        if not yes and not _terminal.confirmed("Start a new build of this branch?"):
             typer.echo("Nothing was sent.", err=True)
             raise typer.Exit(EXIT_DECLINED)
         # Sent once: an error is reported, never retried.
@@ -282,12 +283,6 @@ def rebuild(
             )
             raise
     raise typer.Exit(code)
-
-
-def _confirmed(question: str) -> bool:
-    """Ask on stderr and read the answer from stdin: only `y` or `yes` is a yes. Nothing goes to stdout."""
-    typer.echo(f"{question} [y/N]: ", nl=False, err=True)
-    return sys.stdin.readline().strip().lower() in {"y", "yes"}
 
 
 def _rebuilt(project: str, branch: odouche.Branch, latest: odouche.Build | None) -> list[str]:
@@ -335,7 +330,7 @@ def watch_build(client: odouche.Client, output: Output, project: str, build: odo
         with closing(client.watch_build(project, build, timeout=timeout)) as watched:
             if output.format is Format.JSON:
                 output.stream(changes(watched), _progress)
-            elif _redraws(console):
+            elif _terminal.redraws(console):
                 with Live(get_renderable=lambda: Text(_progress(last)), console=console, transient=True) as live:
                     for _ in changes(watched):
                         live.refresh()
@@ -391,24 +386,6 @@ def _conclude(build: odouche.Build, *, as_json: bool) -> int:
     if code == EXIT_BUILD_FAILED:
         typer.echo("Run `osh logs` to see why.", err=True)
     return code
-
-
-def _stdin_is_terminal() -> bool:
-    return _is_terminal(sys.stdin)
-
-
-def _stderr_is_terminal() -> bool:
-    return _is_terminal(sys.stderr)
-
-
-def _is_terminal(stream: TextIO | None) -> bool:
-    """Tell whether a standard stream is a terminal, which a closed one is not."""
-    return stream is not None and stream.isatty()
-
-
-def _redraws(console: Console) -> bool:
-    """Tell whether a `Live` on that console draws: Rich needs the three, and the environment sets each."""
-    return _stderr_is_terminal() and console.is_terminal and not console.is_dumb_terminal and console.is_interactive
 
 
 def _status(build: odouche.Build) -> str:

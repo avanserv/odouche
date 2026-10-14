@@ -34,6 +34,12 @@ EXIT_BUILD_TIMEOUT = 23
 # What `osh ssh` exits with when there is no `ssh` to become.
 EXIT_NO_SSH = 14
 
+# What a command exits with when a change it sent was not confirmed.
+EXIT_OUTCOME_UNKNOWN = 10
+
+# What a command exits with when what it waited for did not come in time.
+EXIT_TIMEOUT = 8
+
 # What a shell reports for a command that SIGPIPE ended.
 EXIT_CLOSED_PIPE = 141
 
@@ -46,11 +52,11 @@ EXIT_CODES: tuple[tuple[type[odouche.OdoucheError], int, str | None], ...] = (
     (odouche.PermissionDeniedError, 5, None),
     (odouche.UpstreamChangedError, 6, None),
     (odouche.UpstreamUnavailableError, 7, "Try again later."),
-    (odouche.StreamTimeoutError, 8, None),
-    (odouche.LoginTimeoutError, 8, _LOGIN_AGAIN),
+    (odouche.StreamTimeoutError, EXIT_TIMEOUT, None),
+    (odouche.LoginTimeoutError, EXIT_TIMEOUT, _LOGIN_AGAIN),
     (odouche.ReadOnlyError, 9, None),
     (odouche.StageRefusedError, 9, None),
-    (odouche.OutcomeUnknownError, 10, "`osh builds list` shows whether the build was started."),
+    (odouche.OutcomeUnknownError, EXIT_OUTCOME_UNKNOWN, "`osh builds list` shows whether the build was started."),
     (odouche.KeyringUnavailableError, 11, None),
     (odouche.LoginError, 12, _LOGIN_AGAIN),
     (odouche.OdoucheError, 13, None),

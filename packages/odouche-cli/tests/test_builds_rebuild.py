@@ -1,6 +1,8 @@
+import ipaddress
 import json
 import re
 import shutil
+import subprocess
 import sys
 from collections.abc import Iterator
 from dataclasses import replace
@@ -14,7 +16,7 @@ from typer.testing import CliRunner, Result
 
 import odouche
 from odouche import Branch, Build, BuildResult, BuildStatus, Commit, Log, LogKind, LogLine, Stage
-from odouche_cli import _time, builds, ssh
+from odouche_cli import _terminal, _time, builds, ssh
 from odouche_cli._context import BRANCH_ENV, PROJECT_ENV
 from odouche_cli.app import app
 
@@ -69,7 +71,7 @@ LOST = odouche.OutcomeUnknownError(
 )
 
 # The checks themselves, which a fixture replaces.
-IS_TERMINAL = {"stdin": builds._stdin_is_terminal, "stderr": builds._stderr_is_terminal}
+IS_TERMINAL = {"stdin": _terminal.stdin_is_terminal, "stderr": _terminal.stderr_is_terminal}
 
 runner = CliRunner()
 
@@ -126,6 +128,10 @@ class StubClient:
     check_rebuild = odouche.Client.check_rebuild
     ssh_target = odouche.Client.ssh_target
 
+    def allow_ip(self, branch: Branch) -> ipaddress.IPv4Address:
+        self.calls.append(f"allow_ip {branch.name}")
+        return ipaddress.IPv4Address("203.0.113.7")
+
     def rebuild(self, branch: Branch | int) -> Build:
         self.calls.append(f"rebuild {branch.name if isinstance(branch, Branch) else branch}")
         if self.lost is not None:
@@ -159,15 +165,15 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     monkeypatch.setattr(odouche, "Client", Client)
     monkeypatch.setattr(_time, "_now", lambda: NOW)
     # The usual case. A test of a script's run turns one off.
-    monkeypatch.setattr(builds, "_stdin_is_terminal", lambda: True)
-    monkeypatch.setattr(builds, "_stderr_is_terminal", lambda: True)
+    monkeypatch.setattr(_terminal, "stdin_is_terminal", lambda: True)
+    monkeypatch.setattr(_terminal, "stderr_is_terminal", lambda: True)
     return Client
 
 
-@pytest.fixture(params=["_stdin_is_terminal", "_stderr_is_terminal"], ids=["stdin", "stderr"])
+@pytest.fixture(params=["stdin_is_terminal", "stderr_is_terminal"], ids=["stdin", "stderr"])
 def unattended(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> None:
     """Make stdin, then stderr, something else than a terminal."""
-    monkeypatch.setattr(builds, request.param, lambda: False)
+    monkeypatch.setattr(_terminal, request.param, lambda: False)
 
 
 def run(*args: str, stdin: str | None = None) -> Result:
@@ -216,7 +222,7 @@ def test_an_interrupt_at_the_question_exits_130_and_sends_nothing(
     def interrupted(_: str) -> bool:
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(builds, "_confirmed", interrupted)
+    monkeypatch.setattr(_terminal, "confirmed", interrupted)
 
     result = run(*REBUILD, *ON_FEATURE)
 
@@ -523,6 +529,7 @@ def test_only_rebuild_builds_a_client_that_writes(
     monkeypatch.delenv(odouche.SESSION_ENV, raising=False)
     monkeypatch.setattr(odouche, "login", lambda **_: None)
     monkeypatch.setattr(ssh, "_exec", lambda *_: None)
+    monkeypatch.setattr(ssh, "_run", lambda command, **_: subprocess.CompletedProcess(command, 0))
     monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/ssh")
     monkeypatch.setattr(odouche, "logout", lambda: odouche.LogoutResult(None, False, False, None))  # noqa: FBT003
 
@@ -535,3 +542,21 @@ def test_only_rebuild_builds_a_client_that_writes(
     else:
         assert client.modes
         assert set(client.modes) == {path != REBUILD}
+
+
+def test_ssh_builds_a_client_that_writes_only_to_allow_the_address(
+    client: type[StubClient], monkeypatch: pytest.MonkeyPatch
+):
+    gets_in = iter([255, 0])
+    monkeypatch.setattr(
+        ssh, "_run", lambda command, **_: subprocess.CompletedProcess(command, next(gets_in), stderr="refused")
+    )
+    monkeypatch.setattr(ssh, "_sleep", lambda _: None)
+    monkeypatch.setattr(ssh, "_exec", lambda *_: None)
+    monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/ssh")
+
+    result = run("ssh", *ON_FEATURE, "--yes")
+
+    assert result.exit_code == 0, result.output
+    assert client.modes == [True, False]
+    assert [call for call in client.calls if not call.startswith(("branches", "latest"))] == ["allow_ip feature-x"]

@@ -333,6 +333,10 @@ print("ssh", "-l", target.user, target.host)
   `UpstreamChangedError`.
 - A build with no address raises `NotFoundError`.
 
+A build host accepts SSH only from an address Odoo.sh allows, and no request of Odoo.sh tells
+whether this machine's is. `client.allow_ip(branch)` allows it: see
+[State-changing operations](#state-changing-operations).
+
 ## State-changing operations
 
 Every other call of the client only reads. These are the calls that change something on Odoo.sh:
@@ -340,6 +344,7 @@ Every other call of the client only reads. These are the calls that change somet
 | Call | What it changes |
 | --- | --- |
 | `client.rebuild(branch)` | Starts a new build of the branch, which replaces its latest one. |
+| `client.allow_ip(branch)` | Lets this machine's address connect with `ssh` for one hour, to the branch's builds and, as [seen](upstream.md#allow-an-ip), the project's others. |
 
 ```python
 import odouche
@@ -365,6 +370,11 @@ with odouche.Client() as client:
   A rebuild has only been observed on a development branch.
 - `client.check_rebuild(branch)` raises the same `StageRefusedError` for a `Branch` and asks
   nothing, on a read-only client too: call it before asking the user.
+- `allow_ip` takes a `Branch` or a branch's number and returns the address Odoo.sh allowed, an
+  `ipaddress.IPv4Address` or `IPv6Address`. It sends no address: Odoo.sh takes the one the
+  request comes from, which is a proxy's when one is in the environment. Odoo.sh says the rule
+  lasts one hour and takes up to five minutes to apply; one was seen to take longer. A user whose access does not reach the branch's stage
+  is expected to get `PermissionDeniedError`.
 - The library asks for no confirmation. That is the caller's to do.
 
 ## Errors
