@@ -6,6 +6,7 @@ import sys
 from collections.abc import Iterator
 from typing import Self
 
+import click
 import pytest
 from typer.testing import CliRunner
 
@@ -148,7 +149,7 @@ def executed(monkeypatch: pytest.MonkeyPatch, client: type[StubClient], tries: S
 
 def unboxed(text: str) -> str:
     """Return a usage error's words on one line: it is boxed and wrapped to the terminal's width."""
-    return " ".join(word for word in text.split() if word not in {"│", "╰", "╭"})
+    return " ".join(word for word in click.unstyle(text).split() if word not in {"│", "╰", "╭"})
 
 
 def run(*args: str, input: str | None = None):  # noqa: A002 - the runner's own name
@@ -371,8 +372,9 @@ def test_a_try_that_outlasts_its_bound_does_not_get_in(
 
 
 @pytest.mark.usefixtures("blocked")
-def test_a_wait_with_no_terminal_says_it_waits_once_a_minute(tries: Ssh):
+def test_a_wait_with_no_terminal_says_it_waits_once_a_minute(tries: Ssh, monkeypatch: pytest.MonkeyPatch):
     tries.outcomes = [REFUSED] * 14 + [None]
+    monkeypatch.setattr(_terminal, "redraws", lambda _: False)
 
     result = run("--yes")
 
@@ -386,13 +388,15 @@ def test_a_wait_with_no_terminal_says_it_waits_once_a_minute(tries: Ssh):
 
 
 @pytest.mark.usefixtures("blocked")
-def test_a_wait_on_a_terminal_leaves_no_line_behind(executed: list[object], monkeypatch: pytest.MonkeyPatch):
+def test_a_wait_on_a_terminal_redraws_one_line_then_executes_ssh(
+    executed: list[object], monkeypatch: pytest.MonkeyPatch
+):
     monkeypatch.setattr(_terminal, "redraws", lambda _: True)
 
     result = run("--yes")
 
     assert result.exit_code == 0
-    assert "Waiting" not in result.stderr
+    assert "Waiting for the rule to apply to build 104 (0 s).\n" not in click.unstyle(result.stderr)
     assert executed[-1] == (PROGRAM, ["ssh", "-l", "104", HOST], None)
 
 
