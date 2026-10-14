@@ -27,6 +27,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | Command | Description |
 | --- | --- |
 | [`osh auth`](#osh-auth) | Log in to Odoo.sh, log out, and show the session in use. |
+| [`osh backups`](#osh-backups) | List the backups of an Odoo.sh project. |
 | [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project. |
 | [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, and start a new one. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
@@ -93,6 +94,39 @@ Example:
 
 ```bash
 osh auth logout
+```
+
+## `osh backups`
+
+List the backups of an Odoo.sh project.
+
+```text
+osh backups [OPTIONS] COMMAND [ARGS]...
+```
+
+| Command | Description |
+| --- | --- |
+| [`osh backups list`](#osh-backups-list) | List a project's backups on every branch, newest first, with the time that names each one, in UTC. |
+
+### `osh backups list`
+
+List a project's backups on every branch, newest first, with the time that names each one, in UTC.
+
+Odoo.sh keeps a daily backup off-site as well, under the same time: that copy is `remote`, and cannot be downloaded.
+
+```text
+osh backups list [OPTIONS]
+```
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--branch BRANCH` | List only the backups taken on this branch. Default: every branch. | |
+
+Example:
+
+```bash
+osh backups list --branch staging
 ```
 
 ## `osh branches`

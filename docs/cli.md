@@ -190,6 +190,7 @@ osh --format json builds show --project acme --branch feature-x | jq -r .result
     | `osh auth status --check` | One `Identity`, with the `SessionInfo` as its `session`. |
     | `osh projects list` | An array of `Project`. |
     | `osh branches list` | An array of `Branch`, in the order of the table. |
+    | `osh backups list` | An array of `Backup`, newest first. |
     | `osh builds list` | An array of `Build`. |
     | `osh builds show`, `osh builds rebuild` | One `Build`. |
     | `osh builds watch`, `osh builds rebuild --watch` | One `Build` per line, for each change, the first being the new build after a rebuild. The result line goes to stderr. |
@@ -207,7 +208,8 @@ osh --format json builds show --project acme --branch feature-x | jq -r .result
 - An empty result is `[]` as JSON, and one line on stderr as a table. Both exit 0.
 - A table has no colour and no box drawing when stdout is not a terminal or `NO_COLOR` is set.
   The result of a build is coloured on a terminal, and always written out.
-- A table shows times as how long ago they were. JSON has the time itself.
+- A table shows times as how long ago they were, except the time that names a backup, which is
+  shown in UTC. JSON has the time itself.
 - A stage, a status or a result `osh` does not know is shown as Odoo.sh names it.
 - A table has the control characters removed from every cell, and a tab or a line break made a
   space, so a commit message cannot drive the terminal. JSON has them escaped, in a `LogLine`

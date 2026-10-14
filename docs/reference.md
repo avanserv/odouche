@@ -51,6 +51,12 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.Commit
 
+## Backups
+
+::: odouche.Backup
+
+::: odouche.BackupKind
+
 ## Logs
 
 ::: odouche.Log

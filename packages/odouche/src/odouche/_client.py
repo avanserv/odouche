@@ -5,9 +5,9 @@ from collections.abc import Callable, Generator
 from typing import Self
 
 from odouche._session import SessionStore
-from odouche._upstream import allow_ip, branches, builds, logs, projects, rebuild, ssh, user, watch
+from odouche._upstream import allow_ip, backups, branches, builds, logs, projects, rebuild, ssh, user, watch
 from odouche._upstream.transport import Transport
-from odouche.models import Branch, Build, Identity, Log, LogKind, LogLine, Project, SessionInfo, SshTarget
+from odouche.models import Backup, Branch, Build, Identity, Log, LogKind, LogLine, Project, SessionInfo, SshTarget
 from odouche.secret import Secret
 
 
@@ -73,6 +73,16 @@ class Client:
         branches. Asks Odoo.sh twice, for the projects and then for the branches.
         """
         return branches.branches(self._transport, _project_name(project))
+
+    def backups(self, project: Project | str) -> list[Backup]:
+        """List the backups of a project, given as a `Project` or by its name, newest first.
+
+        They are every branch's: Odoo.sh answers a project's backups at once. A backup is named by
+        its `taken_at`, which a `REMOTE` backup shares with the `DAILY` one it is a copy of. Raises
+        `NotFoundError` when the project is not among those the session's user can reach. Asks
+        Odoo.sh twice, for the projects and then for the backups.
+        """
+        return backups.backups(self._transport, _project_name(project))
 
     def builds(self, branch: Branch | int, *, limit: int = builds.DEFAULT_LIMIT) -> list[Build]:
         """List the latest builds of a branch, given as a `Branch` or by its number, newest first.

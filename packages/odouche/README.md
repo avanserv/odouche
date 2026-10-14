@@ -23,7 +23,7 @@ with odouche.Client() as client:
         print(project.name, project.repository, project.url)
 ```
 
-It logs in through a browser, lists projects, branches and builds, watches a build, reads and
+It logs in through a browser, lists projects, branches, builds and backups, watches a build, reads and
 follows build logs, triggers a rebuild and gives the SSH target of a build. The session is kept in the OS keyring, or taken from
 `ODOUCHE_SESSION` in headless use.
 

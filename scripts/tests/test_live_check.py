@@ -4,6 +4,8 @@ import pytest
 
 import live_check
 from odouche import (
+    Backup,
+    BackupKind,
     Branch,
     Build,
     BuildStatus,
@@ -100,6 +102,13 @@ class StandIn:
         ]
         return self._answer(("branches", project), branches)
 
+    def backups(self, project):
+        backups = [
+            Backup(BackupKind.DAILY, "daily", NOW, BUILD.name, "main", COMMIT.hash, downloadable=True, size=None),
+            Backup(BackupKind.UNKNOWN, "hourly", NOW, BUILD.name, "main", COMMIT.hash, downloadable=False, size=1024),
+        ]
+        return self._answer(("backups", project), backups)
+
     def builds(self, branch):
         return self._answer(("builds", branch.id), [BUILD])
 
@@ -152,6 +161,7 @@ def test_walks_the_read_path_of_the_production_branch_on_a_read_only_client(clie
         "identity",
         "projects",
         ("branches", PROJECT),
+        ("backups", PROJECT),
         ("builds", 51001),
         ("build", 51001, 88212),
         ("logs", PROJECT, 88212),
@@ -162,11 +172,12 @@ def test_walks_the_read_path_of_the_production_branch_on_a_read_only_client(clie
         "identity  pass",
         "projects  pass     1 project",
         "branches  pass     3 branches, 1 of an unknown stage",
+        "backups   pass     2 backups, 1 of an unknown kind",
         "builds    pass     1 build",
         "build     pass",
         "logs      pass     2 logs",
         "log tail  pass     20 lines",
-        "7 passed, 0 failed, 0 skipped",
+        "8 passed, 0 failed, 0 skipped",
     ]
 
 
@@ -180,11 +191,12 @@ def test_names_the_step_and_the_field_that_changed_and_runs_the_rest(client, cap
         "identity  pass",
         "projects  changed  projects at result[0].repos[0].id",
         "branches  pass     3 branches, 1 of an unknown stage",
+        "backups   pass     2 backups, 1 of an unknown kind",
         "builds    changed  builds at result[0].builds[0].commit",
         "build     skipped  needs a build",
         "logs      skipped  needs a build",
         "log tail  skipped  needs a log",
-        "2 passed, 2 failed, 3 skipped",
+        "3 passed, 2 failed, 3 skipped",
     ]
 
 
@@ -219,7 +231,7 @@ def test_a_step_with_nothing_to_read_is_skipped_and_is_not_a_failure(client, mon
     assert capsys.readouterr().out.splitlines()[-3:] == [
         "logs      pass     0 logs",
         "log tail  skipped  needs a log",
-        "6 passed, 0 failed, 1 skipped",
+        "7 passed, 0 failed, 1 skipped",
     ]
 
 

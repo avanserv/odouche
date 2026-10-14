@@ -26,6 +26,17 @@ class Reader:
         """Return an integer field. A boolean is not one."""
         return self._read(key, int)
 
+    def boolean(self, key: str) -> bool:
+        """Return a boolean field."""
+        return self._read(key, bool)
+
+    def number(self, key: str) -> float:
+        """Return a numeric field, given as an integer or not. A boolean is not one."""
+        value = self._fields.get(key)
+        if type(value) is int:
+            return float(value)
+        return self._read(key, float)
+
     def optional_text(self, key: str) -> str | None:
         """Return a string field, or `None` when Odoo.sh answers `false` or `null` for an absent value."""
         if key in self._fields and (self._fields[key] is False or self._fields[key] is None):

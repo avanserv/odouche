@@ -6,7 +6,7 @@ from typing import Annotated
 import typer
 
 import odouche
-from odouche_cli import __version__, auth, branches, builds, logs, projects, ssh
+from odouche_cli import __version__, auth, backups, branches, builds, logs, projects, ssh
 from odouche_cli._errors import DebugOption, OshGroup
 from odouche_cli._output import Format, FormatOption, Output
 
@@ -20,6 +20,7 @@ app = typer.Typer(
     pretty_exceptions_show_locals=False,
 )
 app.add_typer(auth.app)
+app.add_typer(backups.app)
 app.add_typer(branches.app)
 app.add_typer(builds.app)
 app.command(epilog=logs.EPILOG)(logs.logs)
