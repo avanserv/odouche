@@ -65,7 +65,8 @@ def list_(ctx: typer.Context, project: ProjectOption = None, branch: BranchFilte
 def _size(size: int) -> str:
     value = float(size)
     for unit in _UNITS[:-1]:
-        if value < _STEP:
+        # Compared as shown, so 1048575 bytes is 1.0 MiB and not 1024.0 KiB.
+        if round(value, 1) < _STEP:
             return f"{value:.0f} {unit}" if unit == "B" else f"{value:.1f} {unit}"
         value /= _STEP
     return f"{value:.1f} {_UNITS[-1]}"

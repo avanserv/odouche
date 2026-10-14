@@ -133,7 +133,8 @@ def test_an_empty_branch_is_a_usage_error(client: type[StubClient]):
 
 
 @pytest.mark.parametrize(
-    ("size", "shown"), [(0, "0 B"), (1023, "1023 B"), (1024, "1.0 KiB"), (5 * 1024**4, "5120.0 GiB")]
+    ("size", "shown"),
+    [(0, "0 B"), (1023, "1023 B"), (1024, "1.0 KiB"), (1024**2 - 1, "1.0 MiB"), (5 * 1024**4, "5120.0 GiB")],
 )
 def test_a_size_is_in_binary_units(client: type[StubClient], size: int, shown: str):
     client.found = (backup(BackupKind.REMOTE, datetime(2026, 10, 1, tzinfo=UTC), "main", size),)
