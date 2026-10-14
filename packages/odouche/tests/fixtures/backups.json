@@ -1,0 +1,64 @@
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "result": [
+    {
+      "type": "manual",
+      "path": "/home/odoo/containers/acme-corp-odoo-addons-4217/backups/2026-10-14_124849-acme-shop-staging-88124_manual",
+      "backup_datetime_utc": "2026-10-14 12:48:50",
+      "odoo_branch": "19.0",
+      "installed_modules": {"custom": "acme_shop", "standard": "base,mail,web,account,stock"},
+      "name": "acme-shop-staging-88124",
+      "branch": "staging",
+      "revision": "4f1c2a9e8b7d6c5f4e3d2c1b0a9f8e7d6c5b4a39",
+      "stage": "staging",
+      "comment": null,
+      "upgrade": null,
+      "machine": "ubuntu-24.04",
+      "downloadable": true
+    },
+    {
+      "type": "daily",
+      "path": "/home/odoo/containers/acme-corp-odoo-addons-4217/backups/acme-corp-odoo-addons-19-0-88001_daily",
+      "backup_datetime_utc": "2026-10-13 18:09:37",
+      "odoo_branch": "19.0",
+      "installed_modules": {"custom": "", "standard": "base,mail,web"},
+      "name": "acme-corp-odoo-addons-19-0-88001",
+      "branch": "19.0",
+      "revision": "9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a09",
+      "stage": "production",
+      "comment": null,
+      "upgrade": null,
+      "machine": "ubuntu-24.04",
+      "downloadable": true
+    },
+    {
+      "id": 700001,
+      "backup_datetime_utc": "2026-10-13 18:09:37",
+      "branch": "19.0",
+      "name": "acme-corp-odoo-addons-19-0-88001",
+      "odoo_branch": "19.0",
+      "project": "acme-corp-odoo-addons-4217",
+      "revision": "9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a09",
+      "size_container": 37180132.0,
+      "size_sql_gz": 1150662.0,
+      "type": "remote",
+      "downloadable": false,
+      "machine": "ubuntu-24.04"
+    },
+    {
+      "id": 700002,
+      "backup_datetime_utc": "2026-10-12 18:09:59",
+      "branch": "19.0",
+      "name": "acme-corp-odoo-addons-19-0-88001",
+      "odoo_branch": "19.0",
+      "project": "acme-corp-odoo-addons-4217",
+      "revision": "9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a09",
+      "size_container": 37165036.0,
+      "size_sql_gz": 1150574.0,
+      "type": "remote",
+      "downloadable": false,
+      "machine": "ubuntu-24.04"
+    }
+  ]
+}

@@ -15,6 +15,7 @@ nav = [
     { "Security" = "security.md" },
     { "Unofficial status" = "unofficial.md" },
     { "Upstream reference" = "upstream.md" },
+    { "Upstream backups" = "upstream-backups.md" },
     { "API reference" = "reference.md" },
     { "Manual tests" = "manual-tests.md" },
     { "Contributing" = "contributing.md" },

@@ -127,7 +127,7 @@ Contacted during login and on the project pages:
 | Host | Role | Authentication |
 | --- | --- | --- |
 | `www.odoo.sh` | Pages, every `/app/...` JSON request and the bus websocket | `session_id` |
-| `<worker>.odoo.com` | Build logs, under `/paas/...` | The project's `access_token` |
+| `<worker>.odoo.com` | Build logs and backup downloads, under `/paas/...` | The project's `access_token` for logs; for a download, a `token` handed over by `www.odoo.sh` ([Upstream backups](upstream-backups.md#download)) |
 | `github.com` | Hop 3 of the login | GitHub's own session |
 | `avatars.githubusercontent.com` | User avatars | None |
 
@@ -163,6 +163,7 @@ Named in the project payloads but not contacted:
 - How long a session lasts on the server, and whether use extends it. The cookie declares 8 days
   and is renewed by page responses.
 - What the `/paas/build/<build id>/token` handover gives the build host, and how long it lasts.
+  For a backup download it gives a worker a `token`: see [Upstream backups](upstream-backups.md#download).
 - Whether state-changing requests other than the rebuild need the `csrf_token`.
 
 ## Projects, branches, builds and logs
