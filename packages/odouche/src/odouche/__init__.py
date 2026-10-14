@@ -25,6 +25,7 @@ from odouche.errors import (
 from odouche.models import (
     Backup,
     BackupKind,
+    BackupRequest,
     Branch,
     Build,
     BuildResult,
@@ -50,6 +51,7 @@ __all__ = [
     "SESSION_ENV",
     "Backup",
     "BackupKind",
+    "BackupRequest",
     "Branch",
     "Build",
     "BuildResult",

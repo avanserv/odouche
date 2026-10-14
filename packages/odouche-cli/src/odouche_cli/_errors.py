@@ -62,6 +62,9 @@ EXIT_CODES: tuple[tuple[type[odouche.OdoucheError], int, str | None], ...] = (
     (odouche.OdoucheError, 13, None),
 )
 
+# Where to look after an unconfirmed change, by the operation the library names, when it is not a build.
+_OUTCOME_HINTS = {"backup": "`osh backups list` shows whether the backup was taken."}
+
 DebugOption = Annotated[
     bool,
     typer.Option("--debug", envvar="OSH_DEBUG", help="Show the traceback when a command fails."),
@@ -124,6 +127,8 @@ def _report(error: Exception, *, debug: bool) -> int:
             typer.echo("Run again with --debug for the traceback.", err=True)
         return EXIT_UNEXPECTED
     code, hint = next((code, hint) for kind, code, hint in EXIT_CODES if isinstance(error, kind))
+    if isinstance(error, odouche.OutcomeUnknownError):
+        hint = _OUTCOME_HINTS.get(error.operation or "", hint)
     typer.echo(strip_control(str(error)), err=True)
     if hint:
         typer.echo(hint, err=True)

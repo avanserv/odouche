@@ -32,6 +32,9 @@ ESCAPE = "\x1b[2J\x1b]0;owned\x07"
 URL = "https://acme-feature-x-105.dev.odoo.com"
 ON_FEATURE = ("--project", "acme", "--branch", "feature-x")
 REBUILD = ("builds", "rebuild")
+BACKUP = ("backups", "create")
+# The commands that open a client that writes.
+WRITERS = {REBUILD, BACKUP}
 
 
 def build(number: int, **changes: object) -> Build:
@@ -129,6 +132,7 @@ class StubClient:
 
     # The library's own, which asks nothing.
     check_rebuild = odouche.Client.check_rebuild
+    check_backup = odouche.Client.check_backup
     ssh_target = odouche.Client.ssh_target
 
     def allow_ip(self, branch: Branch) -> ipaddress.IPv4Address:
@@ -140,6 +144,10 @@ class StubClient:
         if self.lost is not None:
             raise self.lost
         return STARTED
+
+    def create_backup(self, project: str, branch: Branch, *, comment: str = "") -> odouche.BackupRequest:
+        self.calls.append(f"backup {branch.name}")
+        return odouche.BackupRequest(build=STARTED, previous=None)
 
     def watch_build(self, project: str, build: Build, *, timeout: float) -> Iterator[Build]:
         self.calls.append(f"watch {project} {build.id} {timeout:g}")
@@ -513,22 +521,24 @@ def commands(command: Any, path: tuple[str, ...] = ()) -> Iterator[tuple[str, ..
 
 COMMANDS = sorted(commands(typer.main.get_command(app)))
 # What a command needs to run to its end, when the project and the branch in the environment are not enough.
-ARGUMENTS: dict[tuple[str, ...], tuple[str, ...]] = {REBUILD: ("--yes",)}
+ARGUMENTS: dict[tuple[str, ...], tuple[str, ...]] = {REBUILD: ("--yes",), BACKUP: ("--yes",)}
 # The commands that build no client.
 CLIENTLESS = {("auth", "logout")}
 
 
-def test_the_tree_has_the_command_that_writes():
-    assert REBUILD in COMMANDS
+def test_the_tree_has_the_commands_that_write():
+    assert set(COMMANDS) > WRITERS
     assert set(COMMANDS) > CLIENTLESS
 
 
 @pytest.mark.parametrize("path", COMMANDS, ids=" ".join)
-def test_only_rebuild_builds_a_client_that_writes(
+def test_only_the_writers_build_a_client_that_writes(
     client: type[StubClient], monkeypatch: pytest.MonkeyPatch, path: tuple[str, ...]
 ):
     monkeypatch.setenv(PROJECT_ENV, "acme")
     monkeypatch.setenv(BRANCH_ENV, "feature-x")
+    # Rebuilt and backed up both.
+    client.branch = replace(FEATURE, stage=Stage.STAGING, stage_name="staging")
     monkeypatch.delenv(odouche.SESSION_ENV, raising=False)
     monkeypatch.setattr(odouche, "login", lambda **_: None)
     monkeypatch.setattr(ssh, "_exec", lambda *_: None)
@@ -544,7 +554,7 @@ def test_only_rebuild_builds_a_client_that_writes(
         assert client.modes == []
     else:
         assert client.modes
-        assert set(client.modes) == {path != REBUILD}
+        assert set(client.modes) == {path not in WRITERS}
 
 
 def test_ssh_builds_a_client_that_writes_only_to_allow_the_address(

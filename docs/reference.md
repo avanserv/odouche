@@ -57,6 +57,8 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.BackupKind
 
+::: odouche.BackupRequest
+
 ## Logs
 
 ::: odouche.Log

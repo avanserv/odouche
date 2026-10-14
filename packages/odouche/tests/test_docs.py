@@ -18,6 +18,7 @@ REFERENCE = ROOT / "docs" / "reference.md"
 BLOCK = re.compile(r"^```python\n(.*?)^```$", re.MULTILINE | re.DOTALL)
 ENTRY = re.compile(r"^::: (\S+)$", re.MULTILINE)
 BUILDS = "/app/branch/51044/builds"
+BACKUPS = "/app/project/acme-corp-odoo-addons-4217/backups"
 LOG = b"Installing modules\nModules loaded\n"
 # What the guide is to show, each by a call only its example makes.
 SHOWN = [
@@ -31,6 +32,7 @@ SHOWN = [
     ".read_log(",
     ".follow_log(",
     ".rebuild(",
+    ".create_backup(",
     "except odouche.OdoucheError",
 ]
 
@@ -71,6 +73,16 @@ def odoo_sh(upstream, backend, session, monkeypatch):
         return httpx2.Response(200, json=upstream.load("rebuild.json"))
 
     upstream.bodies["/app/branch/51044/rebuild"] = rebuild
+    # Rebuilt and backed up both.
+    upstream.bodies[BUILDS]["result"][0]["branch_info"]["stage"] = "staging"
+    backups = upstream.bodies[BACKUPS]["result"]
+
+    def dump(_):
+        new = {"name": listed[0]["name"], "backup_datetime_utc": "2026-10-14 13:05:41"}
+        backups.insert(0, copy.deepcopy(backups[0]) | new)
+        return httpx2.Response(200, json=upstream.load("dump.json"))
+
+    upstream.bodies[f"/app/build/{listed[0]['id']}/dump"] = dump
     now = [0.0]
     monkeypatch.setattr(logs, "_monotonic", lambda: now[0])
     monkeypatch.setattr(logs, "_sleep", lambda seconds: now.__setitem__(0, now[0] + seconds))

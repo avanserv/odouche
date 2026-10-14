@@ -309,7 +309,7 @@ class Transport:
             raise error
         return cast("dict[str, object]", answer.body)
 
-    def change(self, operation: str, path: str) -> dict[str, object]:
+    def change(self, operation: str, path: str, params: Mapping[str, object] | None = None) -> dict[str, object]:
         """Send one state-changing JSON-RPC request, once, and return its answer: sent twice, it is done twice.
 
         Raises `ReadOnlyError` before sending when the transport is read-only, and
@@ -318,7 +318,7 @@ class Transport:
         """
         if self._read_only:
             raise _read_only(operation)
-        answer = self._attempt(operation, "POST", _url(path), None, retry=False)
+        answer = self._attempt(operation, "POST", _url(path), params, retry=False)
         if answer.status is None:
             unknown = answer.failure not in _NOT_SENT
         else:

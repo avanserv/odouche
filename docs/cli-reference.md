@@ -27,7 +27,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | Command | Description |
 | --- | --- |
 | [`osh auth`](#osh-auth) | Log in to Odoo.sh, log out, and show the session in use. |
-| [`osh backups`](#osh-backups) | List the backups of an Odoo.sh project. |
+| [`osh backups`](#osh-backups) | List the backups of an Odoo.sh project, and take one. |
 | [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project. |
 | [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, and start a new one. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
@@ -98,7 +98,7 @@ osh auth logout
 
 ## `osh backups`
 
-List the backups of an Odoo.sh project.
+List the backups of an Odoo.sh project, and take one.
 
 ```text
 osh backups [OPTIONS] COMMAND [ARGS]...
@@ -107,6 +107,7 @@ osh backups [OPTIONS] COMMAND [ARGS]...
 | Command | Description |
 | --- | --- |
 | [`osh backups list`](#osh-backups-list) | List a project's backups on every branch, newest first, with the time that names each one, in UTC. |
+| [`osh backups create`](#osh-backups-create) | Change state on Odoo.sh: take a manual backup of a branch's latest build, which Odoo.sh keeps for 3 days. |
 
 ### `osh backups list`
 
@@ -127,6 +128,31 @@ Example:
 
 ```bash
 osh backups list --branch staging
+```
+
+### `osh backups create`
+
+Change state on Odoo.sh: take a manual backup of a branch's latest build, which Odoo.sh keeps for 3 days.
+
+Only a staging or a production branch is backed up. It asks first, unless `--yes` is given.
+
+```text
+osh backups create [OPTIONS]
+```
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--branch BRANCH` | The branch's name. Default: the git checkout's. | `OSH_BRANCH` |
+| `--comment COMMENT` | The comment Odoo.sh keeps with the backup, as the page's dialog asks. | |
+| `--yes`, `-y` | Take the backup without asking. Needed when stdin or stderr is not a terminal. | |
+| `--wait` | Wait until Odoo.sh lists the backup, which takes about a minute, and show it. | |
+| `--timeout SECONDS` | The longest to wait for the backup to be listed. Goes with `--wait` only. At least 1. Default: `600`. | |
+
+Example:
+
+```bash
+osh backups create --branch staging --wait
 ```
 
 ## `osh branches`
