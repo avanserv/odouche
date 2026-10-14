@@ -7,7 +7,19 @@ from typing import Self
 from odouche._session import SessionStore
 from odouche._upstream import allow_ip, backups, branches, builds, logs, projects, rebuild, ssh, user, watch
 from odouche._upstream.transport import Transport
-from odouche.models import Backup, Branch, Build, Identity, Log, LogKind, LogLine, Project, SessionInfo, SshTarget
+from odouche.models import (
+    Backup,
+    BackupRequest,
+    Branch,
+    Build,
+    Identity,
+    Log,
+    LogKind,
+    LogLine,
+    Project,
+    SessionInfo,
+    SshTarget,
+)
 from odouche.secret import Secret
 
 
@@ -83,6 +95,40 @@ class Client:
         Odoo.sh twice, for the projects and then for the backups.
         """
         return backups.backups(self._transport, _project_name(project))
+
+    def create_backup(self, project: Project | str, branch: Branch | int, *, comment: str = "") -> BackupRequest:
+        """Change state on Odoo.sh: ask for a manual backup of a branch's latest build.
+
+        The project is given as a `Project` or by its name, the branch as a `Branch` or by its
+        number. Odoo.sh answers nothing about the backup: it is listed by `backups` about a minute
+        later, and `wait_for_backup` waits for it. Odoo.sh keeps a manual backup for three days.
+        Only a staging or a production branch is backed up: any other raises `StageRefusedError`
+        before the request.
+
+        The request is sent once. Raises `OutcomeUnknownError` when it left and Odoo.sh did not
+        confirm it: look at the backups before calling again. Raises `ReadOnlyError` on a
+        read-only client, and `NotFoundError` when the branch has no build or is not the project's.
+        """
+        stage = branch.stage if isinstance(branch, Branch) else None
+        return backups.backup(self._transport, _project_name(project), _branch_id(branch), stage, comment)
+
+    def check_backup(self, branch: Branch) -> None:
+        """Raise `StageRefusedError` when `create_backup` would refuse the branch for its stage.
+
+        Odoo.sh is not asked and nothing changes, on a read-only client too.
+        """
+        backups.allow(branch.stage)
+
+    def wait_for_backup(
+        self, project: Project | str, request: BackupRequest, *, timeout: float
+    ) -> Generator[Backup | None]:
+        """Yield the backup `create_backup` asked for once Odoo.sh lists it, and end.
+
+        Odoo.sh is asked for the project's backups every five seconds, and `None` is yielded after
+        each answer that does not list it yet, so a caller can stop the wait between two. Raises
+        `StreamTimeoutError` after `timeout` seconds.
+        """
+        return backups.wait(self._transport, _project_name(project), request, timeout=timeout)
 
     def builds(self, branch: Branch | int, *, limit: int = builds.DEFAULT_LIMIT) -> list[Build]:
         """List the latest builds of a branch, given as a `Branch` or by its number, newest first.

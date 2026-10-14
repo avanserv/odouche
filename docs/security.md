@@ -114,10 +114,16 @@ session.
 
 ## What odouche can change
 
-Two calls change something on Odoo.sh: a rebuild, which starts a new build of a development or a
-staging branch, and allowing an IP, which lets the address of the machine that sends it connect
-to the builds with `ssh` for one hour. The request names a branch, and the rule was seen to open
-other branches of the project too ([Upstream reference](upstream.md#allow-an-ip)). Every other call only reads.
+Three calls change something on Odoo.sh. Every other call only reads.
+
+- A rebuild starts a new build of a development or a staging branch.
+- A backup is taken of a staging or a production branch's latest build, and Odoo.sh keeps it for
+  three days.
+- Allowing an IP lets the address of the machine that sends it connect to the builds with `ssh`
+  for one hour. The request names a branch, and the rule was seen to open other branches of the
+  project too ([Upstream reference](upstream.md#allow-an-ip)).
+
+For each of them:
 
 - Each request is sent once and never repeated.
 - A client opened read-only refuses them before anything is sent.

@@ -375,6 +375,7 @@ Every other call of the client only reads. These are the calls that change somet
 | --- | --- |
 | `client.rebuild(branch)` | Starts a new build of the branch, which replaces its latest one. |
 | `client.allow_ip(branch)` | Lets this machine's address connect with `ssh` for one hour, to the branch's builds and, as [seen](upstream.md#allow-an-ip), the project's others. |
+| `client.create_backup(project, branch)` | Takes a manual backup of the branch's latest build, which Odoo.sh keeps for three days. |
 
 ```python
 import odouche
@@ -406,6 +407,24 @@ with odouche.Client() as client:
   lasts one hour and takes up to five minutes to apply; one was seen to take longer. A user whose access does not reach the branch's stage
   is expected to get `PermissionDeniedError`.
 - The library asks for no confirmation. That is the caller's to do.
+- `create_backup` takes the project and the branch, each as a model or by its name or number,
+  and an optional `comment`, and returns a `BackupRequest`, which names the `build` backed up. Odoo.sh answers nothing about the backup, so `client.wait_for_backup(project,
+  request, timeout=...)` asks for the project's backups every five seconds and yields `None`
+  until the new manual backup of that build is listed, then that `Backup`. It raises
+  `StreamTimeoutError` at the timeout. A backup has been seen listed 58 seconds after the request.
+- Only a staging or a production branch is backed up, checked as for a rebuild, with
+  `client.check_backup(branch)`. A backup has only been observed on a staging branch.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    request = client.create_backup("acme-shop", 51044, comment="before the upgrade")
+    for backup in client.wait_for_backup("acme-shop", request, timeout=600):
+        if backup is not None:
+            print(backup.taken_at)
+```
 
 ## Errors
 

@@ -244,6 +244,17 @@ class Backup:
     """The bytes of its compressed SQL, or `None` when Odoo.sh gives none, as for all but `REMOTE`."""
 
 
+@dataclass(frozen=True, slots=True)
+class BackupRequest:
+    """A manual backup asked of Odoo.sh, which lists it about a minute later."""
+
+    build: Build
+    """The build it is taken from: its branch's latest when it was asked for."""
+
+    previous: datetime | None
+    """When the newest manual backup of that build listed before the request was taken, which a wait looks past."""
+
+
 class SessionSource(StrEnum):
     """Where a session came from."""
 
