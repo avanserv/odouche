@@ -20,6 +20,7 @@ READ_ONLY = frozenset(
         "get_session",
         "list_branches",
         "list_builds",
+        "list_history",
         "list_projects",
         "read_log",
         "wait_for_build",

@@ -10,12 +10,16 @@ from odouche_mcp._contract import add_tool
 from odouche_mcp._logs import DEFAULT_LINES, MAX_BYTES, MAX_LINES, read_log
 from odouche_mcp._read import (
     DEFAULT_BUILDS,
+    DEFAULT_HISTORY,
     DEFAULT_LISTED,
+    HISTORY_TIMEOUT,
     MAX_BUILDS,
+    MAX_HISTORY,
     MAX_LISTED,
     get_build,
     list_branches,
     list_builds,
+    list_history,
     list_projects,
 )
 from odouche_mcp._session import get_session
@@ -55,6 +59,18 @@ def create_server(*, allow_changes: bool = False) -> MCPServer:
         bounds=(
             f"three requests to Odoo.sh; `limit` builds, {DEFAULT_BUILDS} by default and {MAX_BUILDS} at most. "
             "Odoo.sh has only been seen to answer 4: older builds are out of reach, whatever `truncated` says."
+        ),
+    )
+    add_tool(
+        server,
+        list_history,
+        returns=(
+            "the events, each with its kind, date, pusher, commits, stages and the number, status and result of the "
+            "build it made, and `truncated`, true when there are more."
+        ),
+        bounds=(
+            "two requests to Odoo.sh, then one for each 20 of `limit` + 1 events, eight in all at most, the pages "
+            f"within {HISTORY_TIMEOUT} seconds; `limit` events, {DEFAULT_HISTORY} by default and {MAX_HISTORY} at most."
         ),
     )
     add_tool(

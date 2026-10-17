@@ -39,10 +39,14 @@ from odouche.models import (
     LogoutResult,
     PreparedDownload,
     Project,
+    PushedCommit,
     SessionInfo,
     SessionSource,
     SshTarget,
     Stage,
+    TrackedBuild,
+    Tracking,
+    TrackingKind,
 )
 from odouche.secret import Secret
 
@@ -77,6 +81,7 @@ __all__ = [
     "PermissionDeniedError",
     "PreparedDownload",
     "Project",
+    "PushedCommit",
     "ReadOnlyError",
     "Secret",
     "SessionExpiredError",
@@ -86,6 +91,9 @@ __all__ = [
     "Stage",
     "StageRefusedError",
     "StreamTimeoutError",
+    "TrackedBuild",
+    "Tracking",
+    "TrackingKind",
     "UpstreamChangedError",
     "UpstreamUnavailableError",
     "__version__",

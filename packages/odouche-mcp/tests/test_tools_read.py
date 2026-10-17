@@ -1,4 +1,5 @@
 import asyncio
+from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, datetime
 from typing import Any, ClassVar, Self
@@ -8,11 +9,11 @@ from mcp import Client
 from mcp.types import CallToolResult
 
 import odouche
-from odouche_mcp._read import DEFAULT_BUILDS, DEFAULT_LISTED, MAX_BUILDS, MAX_LISTED
+from odouche_mcp._read import DEFAULT_BUILDS, DEFAULT_HISTORY, DEFAULT_LISTED, MAX_BUILDS, MAX_HISTORY, MAX_LISTED
 from odouche_mcp.server import create_server
 
 
-READS = ["list_projects", "list_branches", "list_builds", "get_build"]
+READS = ["list_projects", "list_branches", "list_builds", "list_history", "get_build"]
 
 ACME = odouche.Project(id=1, name="acme", repository="acme/odoo", url="https://www.odoo.sh/project/acme")
 MAIN = odouche.Branch(id=3, name="main", stage=odouche.Stage.PRODUCTION, stage_name="production")
@@ -49,6 +50,25 @@ def _builds(count: int) -> list[odouche.Build]:
     return [_build(number) for number in range(count, 0, -1)]
 
 
+def _event(number: int) -> odouche.Tracking:
+    return odouche.Tracking(
+        id=number,
+        kind=odouche.TrackingKind.PUSH,
+        kind_name="push",
+        created_at=datetime(2026, 1, 1, 12, tzinfo=UTC),
+        build=odouche.TrackedBuild(number, odouche.BuildStatus.DONE, "done", odouche.BuildResult.SUCCESS, "success"),
+        commits=(odouche.PushedCommit(COMMIT.hash, COMMIT.message, COMMIT.url),),
+        pusher="ada",
+        source_stage=None,
+        target_stage=None,
+    )
+
+
+def _history(count: int) -> list[odouche.Tracking]:
+    """Return that many events, newest first."""
+    return [_event(number) for number in range(count, 0, -1)]
+
+
 class Upstream:
     """A client over one project, `acme`, with its branches and the builds of `feature-x`."""
 
@@ -56,6 +76,9 @@ class Upstream:
     listed: ClassVar[list[odouche.Project]] = [ACME]
     branched: ClassVar[list[odouche.Branch]] = [MAIN, FEATURE]
     built: ClassVar[list[odouche.Build]] = _builds(2)
+    tracked: ClassVar[list[odouche.Tracking]] = _history(2)
+    read: ClassVar[list[int]] = []
+    """How many events each history call yielded."""
 
     def __init__(self, *, read_only: bool) -> None:
         self.modes.append(read_only)
@@ -78,6 +101,13 @@ class Upstream:
     def builds(self, branch: odouche.Branch, *, limit: int = 4) -> list[odouche.Build]:
         return self.built[:limit] if branch == FEATURE else []
 
+    def history(self, branch: odouche.Branch, *, limit: int = 20, timeout: float) -> Iterator[odouche.Tracking]:
+        assert timeout > 0
+        self.read.append(0)
+        for event in (self.tracked if branch == FEATURE else [])[:limit]:
+            self.read[-1] += 1
+            yield event
+
     def build(self, branch: odouche.Branch, build_id: int) -> odouche.Build:
         for build in self.builds(branch):
             if build.id == build_id:
@@ -93,6 +123,7 @@ class Upstream:
 def upstream(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
     monkeypatch.setattr(odouche, "Client", Upstream)
     monkeypatch.setattr(Upstream, "modes", [])
+    monkeypatch.setattr(Upstream, "read", [])
     return monkeypatch
 
 
@@ -117,7 +148,7 @@ def _error(tool: str, **arguments: Any) -> str:
     return result.model_dump()["content"][0]["text"]
 
 
-def test_the_four_tools_are_listed_as_read_only():
+def test_the_tools_that_read_are_listed_as_read_only():
     async def tools() -> dict[str, bool | None]:
         async with Client(create_server()) as client:
             listed = (await client.list_tools()).tools
@@ -150,6 +181,32 @@ def test_builds_are_listed_newest_first():
 
     assert [build["id"] for build in answer["builds"]] == [2, 1]
     assert answer["truncated"] is False
+
+
+def test_the_history_is_listed_newest_first_with_each_event_whole():
+    answer = _answer("list_history", project="acme", branch="feature-x")
+
+    assert answer["truncated"] is False
+    assert [event["id"] for event in answer["events"]] == [2, 1]
+    assert answer["events"][0] == {
+        "id": 2,
+        "kind": "push",
+        "kind_name": "push",
+        "created_at": "2026-01-01T12:00:00Z",
+        "build": {"id": 2, "status": "done", "status_name": "done", "result": "success", "result_name": "success"},
+        "commits": [{"hash": "a" * 40, "message": COMMIT.message, "url": COMMIT.url}],
+        "pusher": "ada",
+        "source_stage": None,
+        "target_stage": None,
+    }
+
+
+def test_the_history_reads_one_event_past_the_limit_and_no_more(upstream: pytest.MonkeyPatch):
+    upstream.setattr(Upstream, "tracked", _history(MAX_HISTORY + 50))
+
+    _answer("list_history", project="acme", branch="feature-x", limit=MAX_HISTORY + 10)
+
+    assert Upstream.read == [MAX_HISTORY + 1]
 
 
 def test_a_build_has_the_fields_of_the_library_model():
@@ -193,12 +250,16 @@ def test_the_latest_build_is_read_when_none_is_named():
             "branches",
         ),
         ("list_builds", {"project": "acme", "branch": "feature-x"}, "built", _builds(MAX_BUILDS + 1), "builds"),
+        ("list_history", {"project": "acme", "branch": "feature-x"}, "tracked", _history(MAX_HISTORY + 1), "events"),
     ],
 )
 def test_a_list_is_cut_at_the_limit_then_at_the_cap_and_says_so(
     upstream: pytest.MonkeyPatch, tool: str, arguments: dict[str, Any], attribute: str, items: list[Any], key: str
 ):
-    default, cap = (DEFAULT_BUILDS, MAX_BUILDS) if key == "builds" else (DEFAULT_LISTED, MAX_LISTED)
+    default, cap = {
+        "builds": (DEFAULT_BUILDS, MAX_BUILDS),
+        "events": (DEFAULT_HISTORY, MAX_HISTORY),
+    }.get(key, (DEFAULT_LISTED, MAX_LISTED))
     upstream.setattr(Upstream, attribute, items)
 
     by_default = _answer(tool, **arguments)
@@ -217,6 +278,7 @@ def test_a_list_is_cut_at_the_limit_then_at_the_cap_and_says_so(
         ("list_projects", {}, 1),
         ("list_branches", {"project": "acme"}, 2),
         ("list_builds", {"project": "acme", "branch": "feature-x"}, 2),
+        ("list_history", {"project": "acme", "branch": "feature-x"}, 2),
     ],
 )
 def test_a_list_that_fits_its_limit_is_not_cut(tool: str, arguments: dict[str, Any], count: int):
@@ -231,6 +293,7 @@ def test_a_list_that_fits_its_limit_is_not_cut(tool: str, arguments: dict[str, A
         ("list_projects", {}),
         ("list_branches", {"project": "acme"}),
         ("list_builds", {"project": "acme", "branch": "feature-x"}),
+        ("list_history", {"project": "acme", "branch": "feature-x"}),
     ],
 )
 def test_a_limit_below_one_is_refused_before_odoo_sh_is_asked(tool: str, arguments: dict[str, Any]):
@@ -244,6 +307,8 @@ def test_a_limit_below_one_is_refused_before_odoo_sh_is_asked(tool: str, argumen
         ("list_branches", {}),
         ("list_builds", {"branch": "feature-x"}),
         ("list_builds", {"project": "acme"}),
+        ("list_history", {"branch": "feature-x"}),
+        ("list_history", {"project": "acme"}),
         ("get_build", {"branch": "feature-x"}),
         ("get_build", {"project": "acme"}),
     ],
@@ -260,6 +325,7 @@ def test_a_call_without_its_project_or_branch_is_rejected_and_nothing_is_guessed
         ("list_branches", {"project": "other"}, "No project other among those you can reach."),
         ("list_builds", {"project": "other", "branch": "main"}, "No project other among those you can reach."),
         ("list_builds", {"project": "acme", "branch": "gone"}, "Project acme has no branch gone."),
+        ("list_history", {"project": "acme", "branch": "gone"}, "Project acme has no branch gone."),
         ("get_build", {"project": "acme", "branch": "gone"}, "Project acme has no branch gone."),
         ("get_build", {"project": "acme", "branch": "main"}, "Branch main of acme has no build."),
         (
@@ -279,6 +345,7 @@ def test_what_is_not_found_is_an_error_with_its_message(tool: str, arguments: di
         ("list_projects", {}),
         ("list_branches", {"project": "acme"}),
         ("list_builds", {"project": "acme", "branch": "feature-x"}),
+        ("list_history", {"project": "acme", "branch": "feature-x"}),
         ("get_build", {"project": "acme", "branch": "feature-x"}),
     ],
 )

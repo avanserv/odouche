@@ -64,6 +64,19 @@ RESULTS: dict[str, object] = {
     "identity": IDENTITY,
     "branches": [BRANCH],
     "builds": [BUILD],
+    "history": [
+        odouche.Tracking(
+            id=9,
+            kind=odouche.TrackingKind.PUSH,
+            kind_name="push",
+            created_at=datetime(2026, 1, 1, tzinfo=UTC),
+            build=odouche.TrackedBuild(BUILD.id, BUILD.status, BUILD.status_name, BUILD.result, BUILD.result_name),
+            commits=(odouche.PushedCommit(BUILD.commit.hash, BUILD.commit.message, BUILD.commit.url),),
+            pusher="ada",
+            source_stage=None,
+            target_stage=None,
+        )
+    ],
     "latest_build": BUILD,
     "rebuild": BUILD,
     "logs": [odouche.Log(odouche.LogKind.INSTALL, "install", datetime(2026, 1, 1, tzinfo=UTC), "1 KB")],

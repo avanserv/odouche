@@ -6,7 +6,7 @@ from contextlib import AbstractContextManager
 from typing import Self
 
 from odouche._session import SessionStore
-from odouche._upstream import allow_ip, backups, branches, builds, logs, projects, rebuild, ssh, user, watch
+from odouche._upstream import allow_ip, backups, branches, builds, history, logs, projects, rebuild, ssh, user, watch
 from odouche._upstream.transport import Transport
 from odouche.models import (
     Backup,
@@ -22,6 +22,7 @@ from odouche.models import (
     Project,
     SessionInfo,
     SshTarget,
+    Tracking,
 )
 from odouche.secret import Secret
 
@@ -207,6 +208,18 @@ class Client:
         """Return the newest build of a branch, or `None` when it has none."""
         latest = builds.builds(self._transport, _branch_id(branch), 1)
         return latest[0] if latest else None
+
+    def history(self, branch: Branch | int, *, limit: int = history.PAGE, timeout: float) -> Generator[Tracking]:
+        """Yield the events of a branch, given as a `Branch` or by its number, newest first.
+
+        At most `limit` events are yielded. Odoo.sh answers them twenty at a time, and the next
+        twenty are asked for only when the iterator is read past the last ones. That the next page
+        is at an offset of twenty is inferred, not seen. An event read again, because a newer one
+        pushed it down, is skipped, and a page with nothing older raises `UpstreamChangedError`. Raises `StreamTimeoutError` when a page is still to be
+        asked for after `timeout` seconds, and `NotFoundError` when the branch is not one the
+        session's user can reach.
+        """
+        return history.history(self._transport, _branch_id(branch), limit=limit, timeout=timeout)
 
     def ssh_target(self, build: Build) -> SshTarget:
         """Return the user and the host `ssh` reaches a build with. Odoo.sh is not asked.

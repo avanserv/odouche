@@ -28,7 +28,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | --- | --- |
 | [`osh auth`](#osh-auth) | Log in to Odoo.sh, log out, and show the session in use. |
 | [`osh backups`](#osh-backups) | List the backups of an Odoo.sh project, take one, download one, and copy one over SSH. |
-| [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project. |
+| [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project, and a branch's history. |
 | [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, and start a new one. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
 | [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach. |
@@ -219,7 +219,7 @@ osh backups pull --output daily.sql.gz
 
 ## `osh branches`
 
-List the branches of an Odoo.sh project.
+List the branches of an Odoo.sh project, and a branch's history.
 
 ```text
 osh branches [OPTIONS] COMMAND [ARGS]...
@@ -228,6 +228,7 @@ osh branches [OPTIONS] COMMAND [ARGS]...
 | Command | Description |
 | --- | --- |
 | [`osh branches list`](#osh-branches-list) | List a project's branches with their stage: production, staging, then development, each sorted by name. |
+| [`osh branches history`](#osh-branches-history) | List a branch's history, newest first: each push with its commits, each rebuild and each move between stages. |
 
 ### `osh branches list`
 
@@ -248,6 +249,29 @@ Example:
 
 ```bash
 osh branches list --stage staging
+```
+
+### `osh branches history`
+
+List a branch's history, newest first: each push with its commits, each rebuild and each move between stages.
+
+A push lists each commit by its short hash and the first line of its message, and `--commits` prints them in full. The build is the one the event made, as it is now: `osh builds show` has the rest of it.
+
+```text
+osh branches history [OPTIONS]
+```
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--branch BRANCH` | The branch's name. Default: the git checkout's. | `OSH_BRANCH` |
+| `--limit LIMIT` | The most events to list, 200 at most. From 1 to 200. Default: `10`. | |
+| `--commits` | Print each commit in full: its whole hash, its address and its whole message. | |
+
+Example:
+
+```bash
+osh branches history --branch staging --limit 30
 ```
 
 ## `osh builds`

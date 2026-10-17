@@ -15,6 +15,7 @@ A tool that changes Odoo.sh is registered only when the server is started with
 | [`list_projects`](#list_projects) | No | reads only |
 | [`list_branches`](#list_branches) | No | reads only |
 | [`list_builds`](#list_builds) | No | reads only |
+| [`list_history`](#list_history) | No | reads only |
 | [`get_build`](#get_build) | No | reads only |
 | [`wait_for_build`](#wait_for_build) | No | reads only |
 | [`read_log`](#read_log) | No | reads only |
@@ -87,6 +88,27 @@ List the latest builds of a branch of a project, newest first, with their status
 - **Returns**: the builds, and `truncated`, true when Odoo.sh answered more than `limit`.
 - **Touches**: reads only
 - **Bounds**: three requests to Odoo.sh; `limit` builds, 4 by default and 20 at most. Odoo.sh has only been seen to answer 4: older builds are out of reach, whatever `truncated` says.
+
+| Hint | Value |
+| --- | --- |
+| `readOnlyHint` | true |
+| `destructiveHint` | false |
+| `idempotentHint` | true |
+| `openWorldHint` | true |
+
+## `list_history`
+
+List the history of a branch of a project, newest first: each push with its commits, each rebuild and each move between stages.
+
+| Argument | Type | Default |
+| --- | --- | --- |
+| `project` | string | Required. |
+| `branch` | string | Required. |
+| `limit` | integer | `10` |
+
+- **Returns**: the events, each with its kind, date, pusher, commits, stages and the number, status and result of the build it made, and `truncated`, true when there are more.
+- **Touches**: reads only
+- **Bounds**: two requests to Odoo.sh, then one for each 20 of `limit` + 1 events, eight in all at most, the pages within 60 seconds; `limit` events, 10 by default and 100 at most.
 
 | Hint | Value |
 | --- | --- |

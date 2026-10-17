@@ -18,6 +18,11 @@ PROJECT_ENV = "OSH_PROJECT"
 BRANCH_ENV = "OSH_BRANCH"
 
 _GIT_TIMEOUT = 5.0
+_RESULT_STYLES = {
+    odouche.BuildResult.SUCCESS: "green",
+    odouche.BuildResult.WARNING: "yellow",
+    odouche.BuildResult.FAILED: "red",
+}
 
 _GITHUB = re.compile(
     r"(?:git@github\.com:|ssh://git@github\.com(?::\d+)?/|https://(?:[^/@\s]+@)?github\.com/)"
@@ -125,6 +130,28 @@ def find_build(client: odouche.Client, project: str, branch: odouche.Branch, bui
 def stage_of(branch: odouche.Branch) -> str:
     """Return the stage's name, and what Odoo.sh calls it when the library does not know it."""
     return branch.stage_name if branch.stage is odouche.Stage.UNKNOWN else branch.stage.value
+
+
+def status_of(build: odouche.Build | odouche.TrackedBuild) -> str:
+    """Return the status's name, and what Odoo.sh calls it when the library does not know it."""
+    return build.status_name if build.status is odouche.BuildStatus.UNKNOWN else build.status.value
+
+
+def result_of(build: odouche.Build | odouche.TrackedBuild) -> str | None:
+    """Return the result's name, and what Odoo.sh calls it when the library does not know it."""
+    if build.result is None or build.result is odouche.BuildResult.UNKNOWN:
+        return build.result_name
+    return build.result.value
+
+
+def result_style(build: odouche.Build | odouche.TrackedBuild) -> str | None:
+    return None if build.result is None else _RESULT_STYLES.get(build.result)
+
+
+def subject(message: str) -> str:
+    """Return the first line of a commit message."""
+    lines = message.strip().splitlines()
+    return lines[0] if lines else ""
 
 
 def is_given(ctx: typer.Context, parameter: str) -> bool:

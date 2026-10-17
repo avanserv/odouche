@@ -27,7 +27,11 @@ from odouche_cli._context import (
     is_given,
     project_branch,
     resolve_branch,
+    result_of,
+    result_style,
     stage_of,
+    status_of,
+    subject,
 )
 from odouche_cli._errors import (
     EXIT_BUILD_FAILED,
@@ -62,11 +66,6 @@ _COMMIT = re.compile(r"[0-9a-f]{7,64}", re.IGNORECASE)
 _monotonic: Callable[[], float] = time.monotonic
 _sleep: Callable[[float], None] = time.sleep
 
-_RESULT_STYLES = {
-    odouche.BuildResult.SUCCESS: "green",
-    odouche.BuildResult.WARNING: "yellow",
-    odouche.BuildResult.FAILED: "red",
-}
 _RESULT_EXITS = {
     odouche.BuildResult.SUCCESS: (0, "succeeded"),
     odouche.BuildResult.WARNING: (EXIT_BUILD_WARNING, "finished with warnings"),
@@ -162,8 +161,8 @@ def list_(
         builds = client.builds(found, limit=limit)
     columns = [
         Column[odouche.Build]("ID", lambda build: build.id),
-        Column[odouche.Build]("Status", _status),
-        Column[odouche.Build]("Result", _result, _result_style),
+        Column[odouche.Build]("Status", status_of),
+        Column[odouche.Build]("Result", result_of, result_style),
         Column[odouche.Build]("Commit", lambda build: build.commit.hash[:_HASH_LENGTH]),
         Column[odouche.Build]("Subject", _subject),
         Column[odouche.Build]("Age", lambda build: _ago(build.started_at)),
@@ -299,8 +298,8 @@ def _build_columns() -> list[Column[odouche.Build]]:
         Column[odouche.Build]("ID", lambda build: build.id),
         Column[odouche.Build]("Name", lambda build: build.name),
         Column[odouche.Build]("Branch", lambda build: build.branch_name),
-        Column[odouche.Build]("Status", _status),
-        Column[odouche.Build]("Result", _result, _result_style),
+        Column[odouche.Build]("Status", status_of),
+        Column[odouche.Build]("Result", result_of, result_style),
         Column[odouche.Build]("Info", lambda build: build.status_info),
         Column[odouche.Build]("Started", lambda build: _ago(build.started_at)),
         Column[odouche.Build]("Commit", lambda build: build.commit.hash),
@@ -362,8 +361,8 @@ def _await_build(client: odouche.Client, branch: odouche.Branch, commit: str, de
 
 def _progress(build: odouche.Build) -> str:
     """Say where a build is: its status, what it is doing, and for how long while it runs."""
-    line = f"Build {build.id}: {_status(build)}"
-    if build.status_info and build.status_info != _status(build):
+    line = f"Build {build.id}: {status_of(build)}"
+    if build.status_info and build.status_info != status_of(build):
         line += f", {build.status_info}"
     if build.started_at is not None and not build.finished:
         line += f" ({elapsed(build.started_at)})"
@@ -375,7 +374,7 @@ def _conclude(build: odouche.Build, *, as_json: bool) -> int:
 
     A dropped build has no address left.
     """
-    no_result = EXIT_BUILD_NO_RESULT, f"ended without a result ({_result(build) or _status(build)})"
+    no_result = EXIT_BUILD_NO_RESULT, f"ended without a result ({result_of(build) or status_of(build)})"
     known = None if build.result is None else _RESULT_EXITS.get(build.result)
     code, said = known or no_result
     dropped = build.status is odouche.BuildStatus.DROPPED
@@ -388,26 +387,8 @@ def _conclude(build: odouche.Build, *, as_json: bool) -> int:
     return code
 
 
-def _status(build: odouche.Build) -> str:
-    """Return the status's name, and what Odoo.sh calls it when the library does not know it."""
-    return build.status_name if build.status is odouche.BuildStatus.UNKNOWN else build.status.value
-
-
-def _result(build: odouche.Build) -> str | None:
-    """Return the result's name, and what Odoo.sh calls it when the library does not know it."""
-    if build.result is None or build.result is odouche.BuildResult.UNKNOWN:
-        return build.result_name
-    return build.result.value
-
-
-def _result_style(build: odouche.Build) -> str | None:
-    return None if build.result is None else _RESULT_STYLES.get(build.result)
-
-
 def _subject(build: odouche.Build) -> str:
-    """Return the first line of the commit message."""
-    lines = build.commit.message.strip().splitlines()
-    return lines[0] if lines else ""
+    return subject(build.commit.message)
 
 
 def _ago(moment: datetime | None) -> str | None:

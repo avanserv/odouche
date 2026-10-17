@@ -126,8 +126,11 @@ class _Outcome(TypedDict):
 
 
 def _outcome(build: Reader) -> _Outcome:
-    status = build.text("status")
-    result = build.optional_text("result")
+    return outcome(build.text("status"), build.optional_text("result"))
+
+
+def outcome(status: str, result: str | None) -> _Outcome:
+    """Map what Odoo.sh calls a build's status and result to the library's, keeping its names."""
     return {
         "status": _known(_STATUSES, status, BuildStatus.UNKNOWN, "status"),
         "status_name": status,

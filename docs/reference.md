@@ -51,6 +51,14 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.Commit
 
+::: odouche.Tracking
+
+::: odouche.TrackingKind
+
+::: odouche.TrackedBuild
+
+::: odouche.PushedCommit
+
 ## Backups
 
 ::: odouche.Backup

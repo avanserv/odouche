@@ -279,6 +279,43 @@ with odouche.Client() as client:
 - Closing the iterator closes the connection.
 - A build that is no longer among its branch's latest raises `NotFoundError`.
 
+### History
+
+`client.history(branch, timeout=...)` yields the events of a branch, newest first, as `Tracking`:
+each push with its commits, each rebuild and each move between stages. `branch` is a `Branch` or a
+branch's number. It reaches builds older than `builds` does.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    branches = {branch.name: branch for branch in client.branches("acme-shop")}
+    for event in client.history(branches["feature-invoicing"], limit=30, timeout=60):
+        print(event.created_at, event.kind, event.build and event.build.id, len(event.commits))
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The number Odoo.sh gives the event. |
+| `kind` | A `TrackingKind`: `PUSH`, `REBUILD`, `STAGE` or `UNKNOWN`. |
+| `kind_name` | What Odoo.sh calls that kind. |
+| `created_at` | When it happened, in UTC. |
+| `build` | A `TrackedBuild`: `id`, `status`, `status_name`, `result` and `result_name`, or `None`. |
+| `commits` | The `PushedCommit`s of a push, each with `hash`, `message` and `url`, and no author or date. |
+| `pusher` | Who pushed, as Odoo.sh names them, or `None`. Treat it as personal data. |
+| `source_stage`, `target_stage` | The `Stage`s of a move, or `None`. A branch's creation has a target only. |
+
+- Odoo.sh answers twenty events a request. The next twenty are asked for only when the iterator is
+  read past the last ones, and none once `limit` events, 20 by default, are yielded.
+- That the next twenty are at an offset of twenty is inferred, not seen. An event read again,
+  because a newer one pushed it down, is skipped. A page with nothing older raises
+  `UpstreamChangedError` rather than looping.
+- A page still to be asked for after `timeout` seconds raises `StreamTimeoutError`. A request
+  waits no longer than what is left of them.
+- The build is as it is now, with no commit, name or address: `client.build` has the rest of a
+  build that is still among the branch's latest.
+
 ### Logs
 
 `client.logs(project, build)` returns the logs a build has, as a list of `Log`. `project` is a

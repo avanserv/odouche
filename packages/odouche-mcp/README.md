@@ -9,7 +9,7 @@ An unofficial [Model Context Protocol](https://modelcontextprotocol.io) server f
 > It acts with your own Odoo.sh access and nothing more, and staying within your agreement with
 > Odoo is your responsibility. See [Unofficial status](https://avanserv.github.io/odouche/unofficial/).
 
-**Status: pre-alpha.** The server reports its session, lists projects, branches and builds, and reads one
+**Status: pre-alpha.** The server reports its session, lists projects, branches, a branch's history and builds, and reads one
 build and its logs, whose lines reach the agent as the build printed them, secrets included. It changes
 nothing on Odoo.sh unless it is started with `--allow-changes`, which adds a tool that starts a rebuild.
 
