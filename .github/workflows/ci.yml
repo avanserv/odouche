@@ -44,7 +44,7 @@ jobs:
       # workflow audits. The gitleaks hook is the one that proves nothing in this job: it reads
       # the staged diff, and nothing is staged. The Security Scan job covers the tree instead.
       - name: Run pre-commit
-        uses: j178/prek-action@4e14d07f9231acabce116ccfca13b13dd9755ece # v3.0.0
+        uses: j178/prek-action@1382ad72dea72f9d53832f2bcb65b3e87a947204 # v3.0.1
         with:
           extra-args: --all-files
 
