@@ -172,7 +172,7 @@ check that names production is the refusal.
 
 On a staging branch, then once on the production branch: each run takes a real backup, which
 Odoo.sh keeps for 3 days, or prepares a real file, which it keeps for 2 hours. Delete the files
-B11 to B19 write. `<staging-branch>` is a staging branch of `<project>`.
+B11 to B19 and B21 to B23 write. `<staging-branch>` is a staging branch of `<project>`.
 
 | # | Precondition | Command or action | Expected | Exit |
 | --- | --- | --- | --- | --- |
@@ -196,6 +196,10 @@ B11 to B19 write. `<staging-branch>` is a staging branch of `<project>`.
 | B18 | A `remote` backup listed | `osh backups download "<its time>" --branch <production branch> --output r.zip --yes`, with the time of a `remote` backup that has no `daily` one | That it is `remote` and Odoo.sh does not let it be downloaded. No `r.zip` | 4 |
 | B19 | Within 2 hours of B11 | `osh backups download "<B11's backup time>" --branch <staging-branch> --output n2.zip` | `Odoo.sh already holds this file`, no question and no wait. `cmp n.zip n2.zip` finds no difference | 0 |
 | B20 | A backup whose file takes more than a few seconds | `osh backups download --branch <staging-branch> --output c.zip --yes`, and press Ctrl+C while it downloads | No `c.zip` is left | 130 |
+| B21 | SSH access to the production build | `osh backups pull --output daily.sql.gz` | `Copying daily backup ...`, then `rsync` copies it. `stat -c %a daily.sql.gz` is `600`, and `zcat daily.sql.gz \| head` is SQL | 0 |
+| B22 | A manual backup on `<staging-branch>` | `osh backups pull --manual "<its time>" --output manual.sql.gz` | As B21. If the file is not found, the name's time is not UTC: record it in [Upstream backups](upstream-backups.md#on-the-production-build) | 0 |
+| B23 | `PATH` with `ssh` and `scp` but no `rsync` | `osh backups pull --output scp.sql.gz` | `scp` copies it. `stat -c %a scp.sql.gz` is `600` | 0 |
+| B24 | | `osh backups pull --branch <staging-branch> --output x.sql.gz` | That the backups are copied from the production build. Nothing is tried | 2 |
 
 ## MCP server
 

@@ -138,6 +138,9 @@ backup: `<name>_<type>.sql.gz`, `<name>_<type>.json` and a directory
 
 Seen once, on 2026-10-14. The JSON file and the directory were not read.
 
+On 2026-10-17, `rsync` copied the `daily` file and a `manual` one of production by these names:
+`<name>` is the backup's `name`, and a `manual` prefix is its `backup_datetime_utc`.
+
 ## Not seen
 
 - A manual backup on production, a second request while one runs, and a refused stage.

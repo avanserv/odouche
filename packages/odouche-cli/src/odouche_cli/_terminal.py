@@ -22,6 +22,10 @@ def stdin_is_terminal() -> bool:
     return _is_terminal(sys.stdin)
 
 
+def stdout_is_terminal() -> bool:
+    return _is_terminal(sys.stdout)
+
+
 def stderr_is_terminal() -> bool:
     return _is_terminal(sys.stderr)
 

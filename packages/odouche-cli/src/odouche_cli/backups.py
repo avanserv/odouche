@@ -1,6 +1,10 @@
 """`osh backups`: the backups of an Odoo.sh project."""
 
 import os
+import re
+import shlex
+import shutil
+import subprocess
 import sys
 from contextlib import closing
 from datetime import UTC, datetime
@@ -13,12 +17,13 @@ from rich.live import Live
 from rich.text import Text
 
 import odouche
-from odouche_cli import _terminal
+from odouche_cli import _terminal, ssh
 from odouche_cli._client import open_client
 from odouche_cli._context import (
     BranchOption,
     ContextError,
     ProjectOption,
+    find_build,
     is_given,
     project_branch,
     resolve_branch,
@@ -31,7 +36,7 @@ from odouche_cli._output import Column, Output, strip_control
 
 app = typer.Typer(
     name="backups",
-    help="List the backups of an Odoo.sh project, take one, and download one.",
+    help="List the backups of an Odoo.sh project, take one, download one, and copy one over SSH.",
     epilog="Example: osh backups list --branch staging",
     no_args_is_help=True,
 )
@@ -45,6 +50,16 @@ _LATEST = "latest"
 # `O_BINARY` is Windows' alone, where without it the zip would be written as text.
 _CREATE_PRIVATE = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_BINARY", 0)
 _PRIVATE = 0o600
+# Where the production build keeps every backup, relative to the home of `ssh`'s user there.
+_FOLDER = "backup.daily"
+_FILE_TAKEN = "%Y-%m-%d_%H%M%S"
+# The one shape of build name seen. It goes into a path the build's shell reads.
+_BUILD_NAME = re.compile(r"[a-z0-9-]+")
+# `rsync` and `scp` create the file with the remote mode under the umask: `600`.
+_PRIVATE_UMASK = 0o077
+
+# What the tests replace: the call that sets the umask `rsync` or `scp` inherits.
+_umask = os.umask
 
 
 def _branch(value: str | None) -> str | None:
@@ -123,6 +138,37 @@ NewOption = Annotated[
 DownloadYesOption = Annotated[
     bool,
     typer.Option("--yes", "-y", help="Change state without asking. Needed when stdin or stderr is not a terminal."),
+]
+PullBranchOption = Annotated[
+    str | None,
+    typer.Option(
+        "--branch",
+        callback=_branch,
+        help="The production branch, whose build holds the backups: any other is refused. "
+        "Default: the project's production branch, whatever is checked out.",
+    ),
+]
+ManualOption = Annotated[
+    str | None,
+    typer.Option(
+        "--manual",
+        metavar="TIMESTAMP",
+        help="Copy the manual backup taken at this time, in UTC, as `osh backups list` shows it, on any branch, "
+        "rather than the daily one.",
+    ),
+]
+PullOutputOption = Annotated[
+    Path | None,
+    typer.Option("--output", "-o", metavar="PATH", dir_okay=False, help="The file to write, which must not exist yet."),
+]
+PullYesOption = Annotated[
+    bool,
+    typer.Option(
+        "--yes",
+        "-y",
+        help="Allow this machine's address without asking, when `ssh` does not get in. "
+        "Needed then when stdin or stderr is not a terminal.",
+    ),
 ]
 DownloadTimeoutOption = Annotated[
     int,
@@ -277,6 +323,106 @@ def download(
     typer.echo(strip_control(f"Wrote {output}. It holds customer data: delete it once you are done with it."), err=True)
 
 
+@app.command(epilog="Example: osh backups pull --output daily.sql.gz")
+def pull(
+    ctx: typer.Context,
+    project: ProjectOption = None,
+    branch: PullBranchOption = None,
+    *,
+    manual: ManualOption = None,
+    output: PullOutputOption = None,
+    yes: PullYesOption = False,
+) -> None:
+    """Copy the daily backup of production, or a manual one, from the production build with your own `rsync` or `scp`.
+
+    The file is the database's SQL, gzipped, without the filestore. It is customer data: it is written readable by its
+    owner alone, and deleting it is yours to do. When `ssh` does not get in, it changes state on Odoo.sh as `osh ssh`
+    does: it asks to allow this machine's address, unless declined.
+    """
+    if output is None:
+        msg = "Give --output PATH to write the file to: there is no default place."
+        raise ContextError(msg, ctx=ctx)
+    _check_output(ctx, output)
+    taken = None if manual is None else _taken(ctx, manual, "--manual")
+    with open_client() as client:
+        project_name = resolve_project(ctx, project, client.projects)
+        production = _production(ctx, client.branches(project_name), project_name, branch)
+        backup = _pulled(client.backups(project_name), taken)
+        target = client.ssh_target(find_build(client, project_name, production, None))
+    source = f"{target.user}@{target.host}:{_FOLDER}/{_file_name(backup)}"
+    # Absolute, so that a colon in it is never read as a host.
+    destination = str(output.absolute())
+    copier = shutil.which("rsync")
+    if copier is not None:
+        progress = ["--progress"] if _terminal.stdout_is_terminal() else []
+        command = ["rsync", *progress, "--", source, destination]
+    else:
+        copier = shutil.which("scp")
+        command = ["scp", "--", source, destination]
+    if sys.platform == "win32":
+        ssh.refuse(f"`osh` does not hand over to `{command[0]}` on Windows.", subprocess.list2cmdline(command))
+    program = shutil.which("ssh")
+    if copier is None or program is None:
+        missing = "No `rsync` or `scp` to hand over to." if copier is None else "No `ssh` to connect with."
+        ssh.refuse(missing, shlex.join(command))
+    ssh.reach(ctx, production, target, program, yes=yes, again="osh backups pull")
+    for line in (
+        f"Copying {backup.kind_name} backup {backup.taken_at.strftime(_TAKEN)} UTC, of build {backup.build_name}.",
+        f"To: {output}. It holds customer data: delete it once you are done with it.",
+    ):
+        typer.echo(strip_control(line), err=True)
+    _umask(_PRIVATE_UMASK)
+    ssh.hand_over(copier, command)
+
+
+def _production(ctx: typer.Context, branches: list[odouche.Branch], project: str, name: str | None) -> odouche.Branch:
+    """Return the project's production branch, whose build holds every stage's backups, or refuse `name` when it is not."""
+    if name is not None:
+        named = next((branch for branch in branches if branch.name == name), None)
+        if named is None:
+            msg = f"Project {project} has no branch {name}."
+            raise odouche.NotFoundError(strip_control(msg))
+        if named.stage is not odouche.Stage.PRODUCTION:
+            msg = (
+                f"Branch {name} is {stage_of(named)}: the backups are copied from the production build. "
+                "Leave --branch out to use it."
+            )
+            raise ContextError(strip_control(msg), ctx=ctx)
+        return named
+    production = next((branch for branch in branches if branch.stage is odouche.Stage.PRODUCTION), None)
+    if production is None:
+        msg = f"Project {project} has no production branch."
+        raise odouche.NotFoundError(strip_control(msg))
+    return production
+
+
+def _pulled(listed: list[odouche.Backup], taken: datetime | None) -> odouche.Backup:
+    """Return the daily backup, or the manual one taken at `taken`, once its build name is safe in a path."""
+    if taken is None:
+        found = next((backup for backup in listed if backup.kind is odouche.BackupKind.DAILY), None)
+        missing = "Odoo.sh lists no daily backup."
+    else:
+        found = next(
+            (backup for backup in listed if backup.kind is odouche.BackupKind.MANUAL and backup.taken_at == taken),
+            None,
+        )
+        missing = f"No manual backup was taken at {taken.strftime(_TAKEN)} UTC. `osh backups list` lists them."
+        if any(backup.kind is odouche.BackupKind.DAILY and backup.taken_at == taken for backup in listed):
+            missing = f"Backup {taken.strftime(_TAKEN)} is the daily one: leave --manual out to copy it."
+    if found is None:
+        raise odouche.NotFoundError(missing)
+    if not _BUILD_NAME.fullmatch(found.build_name):
+        raise odouche.UpstreamChangedError("backups", "build_name")
+    return found
+
+
+def _file_name(backup: odouche.Backup) -> str:
+    """Return the name the production build gives the backup's SQL, as seen in its folder."""
+    if backup.kind is odouche.BackupKind.DAILY:
+        return f"{backup.build_name}_daily.sql.gz"
+    return f"{backup.taken_at.strftime(_FILE_TAKEN)}-{backup.build_name}_manual.sql.gz"
+
+
 def _prepare(
     client: odouche.Client,
     project: str,
@@ -313,26 +459,35 @@ def _download_usage(
     if output is not None and link:
         msg = "--output and --link do not go together."
         raise ContextError(msg, ctx=ctx)
-    if output is not None and (output.exists() or output.is_symlink()):
-        msg = f"{output} already exists, and is never written over."
-        raise ContextError(strip_control(msg), ctx=ctx)
-    if output is not None and not output.parent.is_dir():
-        msg = f"{output.parent} is not a directory."
-        raise ContextError(strip_control(msg), ctx=ctx)
-    # Before Odoo.sh is asked to prepare anything.
-    if output is not None and not os.access(output.parent, os.W_OK):
-        msg = f"You cannot write to {output.parent}."
-        raise ContextError(strip_control(msg), ctx=ctx)
+    if output is not None:
+        _check_output(ctx, output)
     if new and backup is not None:
         msg = "BACKUP and --new do not go together: --new downloads the backup it takes."
         raise ContextError(msg, ctx=ctx)
     if backup is None or backup == _LATEST:
         return None
+    return _taken(ctx, backup, "BACKUP", f", or {_LATEST!r}")
+
+
+def _check_output(ctx: typer.Context, output: Path) -> None:
+    """Refuse a file that exists or cannot be created, before Odoo.sh is asked anything."""
+    if output.exists() or output.is_symlink():
+        msg = f"{output} already exists, and is never written over."
+        raise ContextError(strip_control(msg), ctx=ctx)
+    if not output.parent.is_dir():
+        msg = f"{output.parent} is not a directory."
+        raise ContextError(strip_control(msg), ctx=ctx)
+    if not os.access(output.parent, os.W_OK):
+        msg = f"You cannot write to {output.parent}."
+        raise ContextError(strip_control(msg), ctx=ctx)
+
+
+def _taken(ctx: typer.Context, value: str, hint: str, other: str = "") -> datetime:
     try:
-        return datetime.strptime(backup, _TAKEN).replace(tzinfo=UTC)
+        return datetime.strptime(value, _TAKEN).replace(tzinfo=UTC)
     except ValueError:
-        msg = f"A backup is named by its time, such as '2026-10-14 12:48:50', or {_LATEST!r}."
-        raise typer.BadParameter(msg, ctx=ctx, param_hint="BACKUP") from None
+        msg = f"A backup is named by its time, such as '2026-10-14 12:48:50'{other}."
+        raise typer.BadParameter(msg, ctx=ctx, param_hint=hint) from None
 
 
 def _chosen(listed: list[odouche.Backup], branch: odouche.Branch, taken: datetime | None) -> odouche.Backup:

@@ -27,7 +27,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | Command | Description |
 | --- | --- |
 | [`osh auth`](#osh-auth) | Log in to Odoo.sh, log out, and show the session in use. |
-| [`osh backups`](#osh-backups) | List the backups of an Odoo.sh project, take one, and download one. |
+| [`osh backups`](#osh-backups) | List the backups of an Odoo.sh project, take one, download one, and copy one over SSH. |
 | [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project. |
 | [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, and start a new one. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
@@ -98,7 +98,7 @@ osh auth logout
 
 ## `osh backups`
 
-List the backups of an Odoo.sh project, take one, and download one.
+List the backups of an Odoo.sh project, take one, download one, and copy one over SSH.
 
 ```text
 osh backups [OPTIONS] COMMAND [ARGS]...
@@ -109,6 +109,7 @@ osh backups [OPTIONS] COMMAND [ARGS]...
 | [`osh backups list`](#osh-backups-list) | List a project's backups on every branch, newest first, with the time that names each one, in UTC. |
 | [`osh backups create`](#osh-backups-create) | Change state on Odoo.sh: take a manual backup of a branch's latest build, which Odoo.sh keeps for 3 days. |
 | [`osh backups download`](#osh-backups-download) | Change state on Odoo.sh: have it prepare a backup's file, then write it to `--output`, or print its link. |
+| [`osh backups pull`](#osh-backups-pull) | Copy the daily backup of production, or a manual one, from the production build with your own `rsync` or `scp`. |
 
 ### `osh backups list`
 
@@ -188,6 +189,32 @@ Example:
 
 ```bash
 osh backups download --branch staging --output staging.zip
+```
+
+### `osh backups pull`
+
+Copy the daily backup of production, or a manual one, from the production build with your own `rsync` or `scp`.
+
+The file is the database's SQL, gzipped, without the filestore. It is customer data: it is written readable by its
+owner alone, and deleting it is yours to do. When `ssh` does not get in, it changes state on Odoo.sh as `osh ssh`
+does: it asks to allow this machine's address, unless declined.
+
+```text
+osh backups pull [OPTIONS]
+```
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--branch BRANCH` | The production branch, whose build holds the backups: any other is refused. Default: the project's production branch, whatever is checked out. | |
+| `--manual TIMESTAMP` | Copy the manual backup taken at this time, in UTC, as `osh backups list` shows it, on any branch, rather than the daily one. | |
+| `--output PATH`, `-o PATH` | The file to write, which must not exist yet. | |
+| `--yes`, `-y` | Allow this machine's address without asking, when `ssh` does not get in. Needed then when stdin or stderr is not a terminal. | |
+
+Example:
+
+```bash
+osh backups pull --output daily.sql.gz
 ```
 
 ## `osh branches`

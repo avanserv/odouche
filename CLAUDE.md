@@ -8,9 +8,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 official public API; this project is an **unofficial** client for what the Odoo.sh web UI uses.
 
 Status: the workspace, tooling and CI exist. The CLI has the commands of its first milestone:
-`osh auth`, `osh projects list`, `osh branches list`, `osh backups list`, `create` and `download`,
-`osh builds list`, `show`, `watch` and `rebuild`, `osh logs` and `osh ssh`, with a reference page
-generated from them.
+`osh auth`, `osh projects list`, `osh branches list`, `osh backups list`, `create`, `download`
+and `pull`, `osh builds list`, `show`, `watch` and `rebuild`, `osh logs` and `osh ssh`, with a
+reference page generated from them.
 The MCP server has seven read-only
 tools: `get_session`, `list_projects`, `list_branches`, `list_builds`, `get_build`, `wait_for_build`
 and `read_log`. An eighth, `rebuild_branch`, changes state and is registered only with `--allow-changes`. A reference page is generated from the tools. The library has its transport, session
@@ -107,10 +107,12 @@ These are design constraints, not guidelines:
 - Headless use takes the session from the environment and keeps it in memory only.
 - Session values must not appear in logs, exceptions, `repr()`s, CLI output, or MCP tool results.
 - Every `osh` command opens its client read-only, except `osh builds rebuild`,
-  `osh backups create`, `osh backups download`, and `osh ssh` when the user's `ssh` does not get in. Each asks before it sends unless `--yes` is given.
-- `osh ssh` replaces its process with the user's own `ssh`. odouche never reads, generates or
-  uploads an SSH key, and the target from upstream is checked as a user and a host before it is
-  an argument. Before that it may try that `ssh` in batch mode with `true`, and allow the address
+  `osh backups create`, `osh backups download`, and `osh ssh` and `osh backups pull` when the
+  user's `ssh` does not get in. Each asks before it sends unless `--yes` is given.
+- `osh ssh` replaces its process with the user's own `ssh`, and `osh backups pull` with their
+  `rsync` or `scp` under umask `077`, with no flag that keeps the remote mode. odouche never reads,
+  generates or uploads an SSH key, a backup's build name is checked before it is a remote path,
+  and the target from upstream is checked as a user and a host before it is an argument. Before that it may try that `ssh` in batch mode with `true`, and allow the address
   Odoo.sh sees, never one it names. There is no MCP tool for it, opt-in or not.
 - The MCP server is read-only by default; tools that change state on Odoo.sh are opt-in and
   documented as such. Every tool documents what it does and what it can touch.

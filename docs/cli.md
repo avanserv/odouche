@@ -110,9 +110,9 @@ build of the commit you just pushed.
 
 `osh builds rebuild` starts a new build of the branch, which replaces its latest one. It is one
 of the commands that change a project, with [`osh backups create`](#taking-a-backup),
-[`osh backups download`](#downloading-a-backup) and [`osh ssh`](#a-shell-on-a-build) when it
-allows your address. Every other command that opens a
-client opens it read-only, and it sends no change.
+[`osh backups download`](#downloading-a-backup), and [`osh ssh`](#a-shell-on-a-build) and
+[`osh backups pull`](#copying-a-backup-over-ssh) when they allow your address. Every other command
+that opens a client opens it read-only, and it sends no change.
 
 - Only a development or a staging branch is rebuilt. Any other stage exits 9 before anything is
   asked or sent.
@@ -182,6 +182,27 @@ and deleting it once you are done is yours to do.
   does no harm.
 
 In a script: `osh backups download --branch staging --new --yes --output staging.zip`.
+
+## Copying a backup over SSH
+
+`osh backups pull` copies a backup's SQL, gzipped and without the filestore, from the production
+build with your own `rsync`, or `scp` without it. Odoo.sh prepares nothing: the production build
+keeps the latest daily backup of production, and the manual backups of every stage, in
+`~/backup.daily`. `osh` reads no key, and its process becomes `rsync` or `scp`, so the exit code is
+then theirs.
+
+- It always connects to the production build, whatever is checked out. `--branch` naming another
+  stage exits 2 before anything is tried.
+- Without `--manual` it copies the daily backup. `--manual` takes the time of a manual backup, in
+  UTC, as `osh backups list` shows it, quoted: `"2026-10-14 12:48:50"`.
+- `--output` is required, and is never written over. The file is customer data, created readable
+  by its owner alone (mode `600`); deleting it is yours to do.
+- An address not allowed is handled as [`osh ssh`](#a-shell-on-a-build) does it, on the
+  production branch, with `--yes` to allow without asking.
+- Where there is no `rsync`, `scp` or `ssh`, as on native Windows, the command to run by hand is
+  shown and `osh` exits 14.
+
+In a script: `osh backups pull --yes --output daily.sql.gz`.
 
 ## Reading a log
 
