@@ -246,7 +246,7 @@ def test_wait_shows_the_backup_once_it_is_listed(client: type[StubClient]):
     shown = dict(line.split(maxsplit=1) for line in result.stdout.splitlines() if len(line.split()) > 1)
     assert shown["Kind"] == "manual"
     assert shown["Build"] == "acme-staging-124"
-    assert result.stderr.splitlines()[-1] == "Waiting for Odoo.sh to list it."
+    assert result.stderr.splitlines()[-1] == "Waiting for Odoo.sh to finish it."
 
 
 def test_wait_as_json_is_the_backup(client: type[StubClient]):
@@ -258,7 +258,7 @@ def test_wait_as_json_is_the_backup(client: type[StubClient]):
 
 def test_a_wait_that_times_out_exits_8_and_says_where_to_look(client: type[StubClient]):
     client.looks = (None,)
-    client.late = odouche.StreamTimeoutError("The backup of build 124 was not listed at the timeout.")
+    client.late = odouche.StreamTimeoutError("The backup of build 124 was not finished at the timeout.")
 
     result = run(*CREATE, *ON_STAGING, "--yes", "--wait")
 
@@ -266,7 +266,7 @@ def test_a_wait_that_times_out_exits_8_and_says_where_to_look(client: type[StubC
     assert result.stdout == ""
     assert result.stderr.splitlines()[-2:] == [
         "The backup may still be coming. Look with `osh backups list --branch staging`.",
-        "The backup of build 124 was not listed at the timeout.",
+        "The backup of build 124 was not finished at the timeout.",
     ]
 
 

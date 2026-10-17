@@ -66,6 +66,9 @@ current build. Fixture: `dump.json`.
   `create_date`, `notif_type`, `level`, `name`, `content` (HTML) and `buttons`.
   `POST /app/project/<project id>/mark_notifications_seen`, no params, answers `true`.
 - `get_info`'s `active_repo.dump_in_progress` was `false` once the backup was ready.
+- A download preparation sent as soon as a new backup was listed was refused with an error the
+  [reference](upstream.md#common-shape) does not name. `dump_in_progress` is `true` for about 20
+  seconds after the backup is listed.
 - The page learnt of the notification without asking for it, so over the
   [bus](upstream.md#build-status-changes). Its frames were not captured.
 

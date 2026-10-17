@@ -178,8 +178,8 @@ B11 to B19 write. `<staging-branch>` is a staging branch of `<project>`.
 | --- | --- | --- | --- | --- |
 | B1 | | `osh backups create --branch <staging-branch>`, and answer `n` | stderr names the project, the branch with its stage, the latest build and the 3 days, asks, then says `Nothing was sent.` `osh backups list` is unchanged | 1 |
 | B2 | | `osh backups create --branch <staging-branch> --comment "manual test"`, and answer `y` | `A backup of build <id> was asked for.`, then the `osh backups list` command to look with. About a minute later, that command lists a `manual` backup of that build | 0 |
-| B3 | | `osh backups create --branch <staging-branch> --yes --wait` | No question, `Waiting for Odoo.sh to list it.`, then the new backup as `osh backups list` shows it | 0 |
-| B4 | | `osh backups create --branch <staging-branch> --yes --wait --timeout 5` | That the backup may still be coming, then that it was not listed at the timeout. `osh backups list` shows it a minute later | 8 |
+| B3 | | `osh backups create --branch <staging-branch> --yes --wait` | No question, `Waiting for Odoo.sh to finish it.`, then the new backup as `osh backups list` shows it | 0 |
+| B4 | | `osh backups create --branch <staging-branch> --yes --wait --timeout 5` | That the backup may still be coming, then that it was not finished at the timeout. `osh backups list` shows it a minute later | 8 |
 | B5 | | `osh backups create --branch <staging-branch> --timeout 5` | That `--timeout` goes with `--wait` only | 2 |
 | B6 | | `osh backups create --branch <staging-branch> < /dev/null` | That the backup cannot be confirmed, with `--yes` as the way. Nothing is sent | 2 |
 | B7 | | `osh backups create --branch <dev-branch>` | That a branch in the development stage is not backed up. No summary and no question | 9 |

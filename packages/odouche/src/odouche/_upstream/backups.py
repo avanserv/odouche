@@ -73,26 +73,31 @@ def allow(stage: Stage) -> None:
 
 
 def wait(transport: Transport, project: str, request: BackupRequest, *, timeout: float) -> Generator[Backup | None]:
-    """Yield `None` after each look that does not find the backup asked for, then the backup."""
+    """Yield `None` after each look that does not find the backup asked for finished, then the backup."""
     if timeout <= 0:
         raise ValueError("A timeout is more than 0")
     deadline = _monotonic() + timeout
-    return _wait(transport, _technical_name(transport, project), request, deadline)
+    return _wait(transport, project, _technical_name(transport, project), request, deadline)
 
 
 def _wait(
-    transport: Transport, technical_name: str, request: BackupRequest, deadline: float
+    transport: Transport, project: str, technical_name: str, request: BackupRequest, deadline: float
 ) -> Generator[Backup | None]:
     while True:
         found = _manual(_listed(transport, technical_name), request.build.name)
-        if found and (request.previous is None or found[0].taken_at > request.previous):
+        # Listed some 20 seconds before it is finished, and Odoo.sh refuses a file of it until then.
+        if (
+            found
+            and (request.previous is None or found[0].taken_at > request.previous)
+            and not _dumping(transport, project)
+        ):
             yield found[0]
             return
         yield None
         remaining = deadline - _monotonic()
         if remaining <= 0:
             raise StreamTimeoutError(
-                f"The backup of build {request.build.id} was not listed at the timeout.", operation=_OPERATION
+                f"The backup of build {request.build.id} was not finished at the timeout.", operation=_OPERATION
             )
         _sleep(min(_INTERVAL, remaining))
 
@@ -306,6 +311,18 @@ def _parts(url: httpx2.URL) -> tuple[object, ...]:
 
 def _notifications(transport: Transport, project: str) -> list[Reader]:
     """Return the project's notifications, which `get_info` gives under the project's number."""
+    result = _info(transport, project)
+    key = str(result.child("active_repo").integer("id"))
+    notifications = result.child("notifications")
+    return notifications.child(key).items("items") if notifications.has(key) else []
+
+
+def _dumping(transport: Transport, project: str) -> bool:
+    """Tell whether Odoo.sh is still making a backup or a file of the project."""
+    return _info(transport, project).child("active_repo").boolean("dump_in_progress")
+
+
+def _info(transport: Transport, project: str) -> Reader:
     answer = Reader(
         _INFO,
         transport.call(
@@ -315,7 +332,4 @@ def _notifications(transport: Transport, project: str) -> list[Reader]:
             not_found=f"The session's user can reach no project named {project!r}.",
         ),
     )
-    result = answer.child("result")
-    key = str(result.child("active_repo").integer("id"))
-    notifications = result.child("notifications")
-    return notifications.child(key).items("items") if notifications.has(key) else []
+    return answer.child("result")

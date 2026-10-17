@@ -25,6 +25,7 @@ BUILDS = "/app/branch/51044/builds"
 PROJECTS = "/app/projects"
 BRANCHES = "/app/project/acme-corp-odoo-addons-4217/branches"
 BACKUPS = "/app/project/acme-corp-odoo-addons-4217/backups"
+INFO = "/app/project/acme-shop/get_info"
 LATEST = 88240
 DUMP = f"/app/build/{LATEST}/dump"
 NAME = "acme-shop-feature-invoicing-88240"
@@ -256,3 +257,31 @@ def test_a_wait_needs_a_timeout(client, upstream, clock, timeout):
         client.wait_for_backup("acme-shop", request, timeout=timeout)
 
     assert upstream.requests == []
+
+
+def test_the_wait_ends_only_once_odoo_sh_has_finished_the_backup(client, upstream, clock, appears):
+    request = client.create_backup("acme-shop", BRANCH)
+    appears(1)
+    info = upstream.bodies[INFO]
+    looks = 0
+
+    def finished_at_the_third_look(_):
+        nonlocal looks
+        looks += 1
+        return httpx2.Response(
+            200,
+            json=copy.deepcopy(info)
+            | {
+                "result": info["result"]
+                | {"active_repo": info["result"]["active_repo"] | {"dump_in_progress": looks < 3}}
+            },
+        )
+
+    upstream.bodies[INFO] = finished_at_the_third_look
+
+    seen = list(client.wait_for_backup("acme-shop", request, timeout=60))
+
+    assert seen[:2] == [None, None]
+    assert seen[2] is not None
+    assert seen[2].build_name == NAME
+    assert looks == 3

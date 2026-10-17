@@ -72,7 +72,9 @@ YesOption = Annotated[
 ]
 WaitOption = Annotated[
     bool,
-    typer.Option("--wait", help="Wait until Odoo.sh lists the backup, which takes about a minute, and show it."),
+    typer.Option(
+        "--wait", help="Wait until Odoo.sh has listed and finished the backup, which takes about a minute, and show it."
+    ),
 ]
 WaitTimeoutOption = Annotated[
     int,
@@ -197,7 +199,7 @@ def create(
         if not wait:
             typer.echo(strip_control(f"Odoo.sh lists it about a minute later: `{listed}`."), err=True)
             return
-        typer.echo("Waiting for Odoo.sh to list it.", err=True)
+        typer.echo("Waiting for Odoo.sh to finish it.", err=True)
         try:
             with closing(client.wait_for_backup(project_name, request, timeout=timeout)) as waited:
                 backup = next(listed_now for listed_now in waited if listed_now is not None)
@@ -359,7 +361,7 @@ def _chosen(listed: list[odouche.Backup], branch: odouche.Branch, taken: datetim
 def _new_backup(client: odouche.Client, project: str, branch: odouche.Branch, timeout: int) -> odouche.Backup:
     # Sent once: an error is reported, never retried.
     request = client.create_backup(project, branch)
-    typer.echo(f"A backup of build {request.build.id} was asked for. Waiting for Odoo.sh to list it.", err=True)
+    typer.echo(f"A backup of build {request.build.id} was asked for. Waiting for Odoo.sh to finish it.", err=True)
     try:
         with closing(client.wait_for_backup(project, request, timeout=timeout)) as waited:
             return next(listed for listed in waited if listed is not None)

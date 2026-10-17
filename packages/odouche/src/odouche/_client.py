@@ -125,11 +125,12 @@ class Client:
     def wait_for_backup(
         self, project: Project | str, request: BackupRequest, *, timeout: float
     ) -> Generator[Backup | None]:
-        """Yield the backup `create_backup` asked for once Odoo.sh lists it, and end.
+        """Yield the backup `create_backup` asked for once Odoo.sh has finished it, and end.
 
-        Odoo.sh is asked for the project's backups every five seconds, and `None` is yielded after
-        each answer that does not list it yet, so a caller can stop the wait between two. Raises
-        `StreamTimeoutError` after `timeout` seconds.
+        Odoo.sh is asked for the project's backups every five seconds, then whether it is still
+        making it, and `None` is yielded after each look that does not find it finished, so a
+        caller can stop the wait between two. Odoo.sh lists a backup before it is finished, and
+        refuses a file of it until then. Raises `StreamTimeoutError` after `timeout` seconds.
         """
         return backups.wait(self._transport, _project_name(project), request, timeout=timeout)
 

@@ -144,7 +144,7 @@ does.
 - `--comment` is kept with the backup, as the page's dialog asks.
 - Odoo.sh answers nothing about the backup, which it lists about a minute later. Without `--wait`
   the command says so and ends. With `--wait` it asks Odoo.sh every five seconds until the backup
-  is listed, then shows it as `osh backups list` does. `--timeout` bounds the wait, 600 seconds by
+  is listed and finished, then shows it as `osh backups list` does. `--timeout` bounds the wait, 600 seconds by
   default; past it the command exits 8, and the backup may still come.
 - The request is sent once. When Odoo.sh does not confirm it, the command exits 10: look at
   `osh backups list` before running it again, since a second request takes a second backup.

@@ -411,8 +411,9 @@ with odouche.Client() as client:
 - `create_backup` takes the project and the branch, each as a model or by its name or number,
   and an optional `comment`, and returns a `BackupRequest`, which names the `build` backed up. Odoo.sh answers nothing about the backup, so `client.wait_for_backup(project,
   request, timeout=...)` asks for the project's backups every five seconds and yields `None`
-  until the new manual backup of that build is listed, then that `Backup`. It raises
-  `StreamTimeoutError` at the timeout. A backup has been seen listed 58 seconds after the request.
+  until the new manual backup of that build is listed and Odoo.sh has finished it, then that
+  `Backup`. It raises `StreamTimeoutError` at the timeout. A backup has been seen listed 58
+  seconds after the request and finished 19 seconds later; Odoo.sh refuses a file of it until then.
 - Only a staging or a production branch is backed up, checked as for a rebuild, with
   `client.check_backup(branch)`. A backup has only been observed on a staging branch.
 

@@ -147,7 +147,7 @@ osh backups create [OPTIONS]
 | `--branch BRANCH` | The branch's name. Default: the git checkout's. | `OSH_BRANCH` |
 | `--comment COMMENT` | The comment Odoo.sh keeps with the backup, as the page's dialog asks. | |
 | `--yes`, `-y` | Take the backup without asking. Needed when stdin or stderr is not a terminal. | |
-| `--wait` | Wait until Odoo.sh lists the backup, which takes about a minute, and show it. | |
+| `--wait` | Wait until Odoo.sh has listed and finished the backup, which takes about a minute, and show it. | |
 | `--timeout SECONDS` | The longest to wait for the backup to be listed. Goes with `--wait` only. At least 1. Default: `600`. | |
 
 Example:
