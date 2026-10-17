@@ -2,13 +2,14 @@ import copy
 import getpass
 import re
 from pathlib import Path
+from urllib.parse import urlencode
 
 import httpx2
 import pytest
 
 import odouche
 from odouche import KEYRING_ENTRY, KEYRING_SERVICE, Secret, _login
-from odouche._upstream import logs
+from odouche._upstream import backups as backups_layer, logs
 
 
 ROOT = Path(__file__).parents[3]
@@ -19,6 +20,7 @@ BLOCK = re.compile(r"^```python\n(.*?)^```$", re.MULTILINE | re.DOTALL)
 ENTRY = re.compile(r"^::: (\S+)$", re.MULTILINE)
 BUILDS = "/app/branch/51044/builds"
 BACKUPS = "/app/project/acme-corp-odoo-addons-4217/backups"
+INFO = "/app/project/acme-shop/get_info"
 LOG = b"Installing modules\nModules loaded\n"
 # What the guide is to show, each by a call only its example makes.
 SHOWN = [
@@ -33,6 +35,7 @@ SHOWN = [
     ".follow_log(",
     ".rebuild(",
     ".create_backup(",
+    ".download(",
     "except odouche.OdoucheError",
 ]
 
@@ -59,8 +62,10 @@ def log(request):
 
 
 @pytest.fixture
-def odoo_sh(upstream, backend, session, monkeypatch):
+def odoo_sh(upstream, backend, session, monkeypatch, tmp_path):
     """Stand in for Odoo.sh, the keyring, the browser and the time, for an example to run as written."""
+    # Where an example writes its file.
+    monkeypatch.chdir(tmp_path)
     listed = upstream.bodies[BUILDS]["result"][0]["builds"]
     # A finished build on a worker: a watch of it ends, and it has logs.
     listed[0].update(listed[1] | {"id": listed[0]["id"]})
@@ -83,9 +88,29 @@ def odoo_sh(upstream, backend, session, monkeypatch):
         return httpx2.Response(200, json=upstream.load("dump.json"))
 
     upstream.bodies[f"/app/build/{listed[0]['id']}/dump"] = dump
+    # The staging backup's build, on a worker that has prepared its file.
+    staging = copy.deepcopy(upstream.bodies[BUILDS])
+    staging["result"][0]["branch_info"] |= {"id": 51020, "name": "staging"}
+    staging["result"][0]["builds"] = [listed[1] | {"id": 88124, "name": backups[0]["name"]}]
+    upstream.bodies["/app/branch/51020/builds"] = staging
+    worker, taken = listed[1]["worker_url"], backups[0]["backup_datetime_utc"]
+    link = f"{worker}/paas/build/88124/download/dump?{urlencode({'backup_datetime_utc': taken, 'test_dump': 1, 'filestore': 1})}"
+    ready = {"id": 9001, "notif_type": "dump", "buttons": [{"type": "download", "url": link}]}
+
+    def prepare(_):
+        upstream.bodies[INFO]["result"]["notifications"]["4217"]["items"].append(ready)
+        return httpx2.Response(200, json=upstream.load("dump.json"))
+
+    upstream.bodies["/app/build/88124/dump"] = prepare
+    upstream.bodies["/paas/build/88124/token"] = lambda _: httpx2.Response(
+        302, headers={"Location": link.replace("?", "?token=t0k3n&")}
+    )
+    upstream.bodies["/paas/build/88124/download/dump"] = lambda _: httpx2.Response(200, content=b"PK")
     now = [0.0]
     monkeypatch.setattr(logs, "_monotonic", lambda: now[0])
     monkeypatch.setattr(logs, "_sleep", lambda seconds: now.__setitem__(0, now[0] + seconds))
+    monkeypatch.setattr(backups_layer, "_monotonic", lambda: now[0])
+    monkeypatch.setattr(backups_layer, "_sleep", lambda seconds: now.__setitem__(0, now[0] + seconds))
     monkeypatch.setattr(_login, "_find", lambda: None)
     monkeypatch.setattr(_login, "_transport", upstream.connect)
     monkeypatch.setattr(getpass, "getpass", lambda _: session)

@@ -27,7 +27,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | Command | Description |
 | --- | --- |
 | [`osh auth`](#osh-auth) | Log in to Odoo.sh, log out, and show the session in use. |
-| [`osh backups`](#osh-backups) | List the backups of an Odoo.sh project, and take one. |
+| [`osh backups`](#osh-backups) | List the backups of an Odoo.sh project, take one, and download one. |
 | [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project. |
 | [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, and start a new one. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
@@ -98,7 +98,7 @@ osh auth logout
 
 ## `osh backups`
 
-List the backups of an Odoo.sh project, and take one.
+List the backups of an Odoo.sh project, take one, and download one.
 
 ```text
 osh backups [OPTIONS] COMMAND [ARGS]...
@@ -108,6 +108,7 @@ osh backups [OPTIONS] COMMAND [ARGS]...
 | --- | --- |
 | [`osh backups list`](#osh-backups-list) | List a project's backups on every branch, newest first, with the time that names each one, in UTC. |
 | [`osh backups create`](#osh-backups-create) | Change state on Odoo.sh: take a manual backup of a branch's latest build, which Odoo.sh keeps for 3 days. |
+| [`osh backups download`](#osh-backups-download) | Change state on Odoo.sh: have it prepare a backup's file, then write it to `--output`, or print its link. |
 
 ### `osh backups list`
 
@@ -153,6 +154,40 @@ Example:
 
 ```bash
 osh backups create --branch staging --wait
+```
+
+### `osh backups download`
+
+Change state on Odoo.sh: have it prepare a backup's file, then write it to `--output`, or print its link.
+
+The file is a zip of the database, neutralized unless `--exact` is given, and of its filestore unless
+`--no-filestore` is. It is customer data: it is written readable by its owner alone, and deleting it is yours to do.
+It asks first, unless `--yes` is given.
+
+```text
+osh backups download [OPTIONS] [BACKUP]
+```
+
+| Argument | Description |
+| --- | --- |
+| `[BACKUP]` | The time that names the backup, in UTC, as `osh backups list` shows it, or `latest`: the newest that can be downloaded. Default: latest. |
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--branch BRANCH` | The branch's name. Default: the git checkout's. | `OSH_BRANCH` |
+| `--output PATH`, `-o PATH` | The file to write, which must not exist yet. Needed unless `--link` is given. | |
+| `--link` | Print the page's link to the prepared file instead of downloading it. It opens only in a browser signed in to Odoo.sh. | |
+| `--exact` | The exact database, rather than the neutralized one the page offers first. | |
+| `--no-filestore` | Leave the filestore out of the file. | |
+| `--new` | Take a backup of the branch's latest build first, and download that one. | |
+| `--yes`, `-y` | Change state without asking. Needed when stdin or stderr is not a terminal. | |
+| `--timeout SECONDS` | The longest to wait for the backup, with `--new`, and for the file, each. At least 1. Default: `600`. | |
+
+Example:
+
+```bash
+osh backups download --branch staging --output staging.zip
 ```
 
 ## `osh branches`

@@ -80,10 +80,18 @@ the branch's current build.
 - `test_dump` is the dialog's choice between a neutralized database (`true`) and an exact one;
   `filestore` whether the filestore is included.
 - The answer is the same empty one as the create's.
-- The download was asked for 64 seconds later, after a second notification was marked seen. That
-  notification was not captured.
+- It also worked on a build that was no longer its branch's newest, the one the backup was taken
+  from.
+- While it ran, `get_info`'s `active_repo.dump_in_progress` was `true`, and the
+  [download](#download) answered 404 at hop 3.
+- Hop 3 answered the file 21 seconds after the request, for a 7 MB zip. 28 seconds after the request, the
+  project gained a notification (`notif_type` `dump`, name `Database dump ready`): "Your database
+  dump is ready. It will be available for 2 hours." Its one button has `type` `download`, `text`
+  `null` and the page's link as `url`, with the same three values. `dump_in_progress` turned
+  `false` a few seconds later.
 
-Seen once, with `test_dump` and `filestore` both `true`. The three other combinations were not
+Seen twice, with `test_dump` and `filestore` both `true`, once from the page and once from a
+script that asked hop 3 and `get_info` every 5 seconds. The three other combinations were not
 captured; that they send `false` is inferred from the shape.
 
 ## Download
@@ -101,13 +109,18 @@ The page's link is on the worker of the build, with the same three values:
 - The link itself grants nothing: without a `www.odoo.sh` session, hop 2 has none to hand over.
   The `token` grants the file. It is 32 letters and digits, appears in no other answer, and is
   not the project's `access_token`.
-- Hop 3 sent the cookie set at hop 1. Whether the `token` alone is enough is unknown.
+- The worker is the build's `worker_url`, a host such as `eupd00.odoo.com`, not the build's own
+  address.
+- Hop 2 hands over a `token` before the file is ready too: hop 3 then answers 404 with an HTML
+  page. A second hop 2 once the file was ready gave a `token` that worked as well.
+- The page sent the cookie set at hop 1 to hop 3, but the `token` alone is enough: without hop 1
+  and without any cookie, hop 3 answered the file.
 - The file came with `Content-Length` and
   `Content-Disposition: attachment; filename*=UTF-8''<build name>_<YYYY-MM-DD_HHMMSS>_test_fs.zip`,
   as `application/octet-stream`. The zip held `dump.sql` first.
 - The worker's cookie lasts 7 days.
 
-Seen once, on a staging build.
+Seen twice, on a staging build.
 
 ## On the production build
 
@@ -126,6 +139,7 @@ Seen once, on 2026-10-14. The JSON file and the directory were not read.
 
 - A manual backup on production, a second request while one runs, and a refused stage.
 - Whether a development branch has the tab.
-- The bus frames for both notifications, and the second notification's content.
+- The bus frames for both notifications.
 - How a `remote` backup is made downloadable.
-- How long a manual backup's download, or a `token`, lasts.
+- How long a `token` lasts, and whether a prepared file is gone after the 2 hours its notification
+  gives.

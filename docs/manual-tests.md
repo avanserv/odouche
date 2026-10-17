@@ -171,7 +171,8 @@ check that names production is the refusal.
 ## Backups
 
 On a staging branch, then once on the production branch: each run takes a real backup, which
-Odoo.sh keeps for 3 days. `<staging-branch>` is a staging branch of `<project>`.
+Odoo.sh keeps for 3 days, or prepares a real file, which it keeps for 2 hours. Delete the files
+B11 to B19 write. `<staging-branch>` is a staging branch of `<project>`.
 
 | # | Precondition | Command or action | Expected | Exit |
 | --- | --- | --- | --- | --- |
@@ -183,6 +184,18 @@ Odoo.sh keeps for 3 days. `<staging-branch>` is a staging branch of `<project>`.
 | B6 | | `osh backups create --branch <staging-branch> < /dev/null` | That the backup cannot be confirmed, with `--yes` as the way. Nothing is sent | 2 |
 | B7 | | `osh backups create --branch <dev-branch>` | That a branch in the development stage is not backed up. No summary and no question | 9 |
 | B8 | | `osh backups create --branch <production branch> --yes --wait` | The new backup, as in B3. Record what Odoo.sh answered in [Upstream backups](upstream-backups.md) | 0 |
+| B9 | | `osh backups download --branch <staging-branch>` | That `--output` or `--link` is needed. Nothing is asked of Odoo.sh | 2 |
+| B10 | `x.zip` exists | `osh backups download --branch <staging-branch> --output x.zip` | That it exists and is never written over. `x.zip` is unchanged | 2 |
+| B11 | A manual backup on `<staging-branch>` | `osh backups download --branch <staging-branch> --output n.zip`, and answer `y` | The summary, the question, the wait, then `Wrote n.zip`. `stat -c %a n.zip` is `600`, and `unzip -l n.zip` lists `dump.sql` and `filestore/` | 0 |
+| B12 | The same | `osh backups download --branch <staging-branch> --output e.zip --exact --yes` | As B11. Record what the file holds and whether the database is neutralized in [Upstream backups](upstream-backups.md) | 0 |
+| B13 | The same | `osh backups download --branch <staging-branch> --output s.zip --no-filestore --yes` | As B11, and `unzip -l s.zip` lists no `filestore/`. Record it as for B12 | 0 |
+| B14 | The same | `osh backups download --branch <staging-branch> --output es.zip --exact --no-filestore --yes` | As B13 for the exact database | 0 |
+| B15 | The same | `osh backups download --branch <staging-branch> --link --yes`, then open the link in a browser signed in to Odoo.sh, then in a private window | A link without `token` on stdout. The signed-in browser downloads the file; the private window does not | 0 |
+| B16 | The same | `osh --debug backups download --branch <staging-branch> --output d.zip --yes 2>&1 \| grep -c token=` | `0`: no token anywhere | 1 (grep's) |
+| B17 | | `osh backups download --branch <staging-branch> --new --yes --output new.zip` | One run takes a backup, waits for it, prepares its file and writes it, as B11 | 0 |
+| B18 | A `remote` backup listed | `osh backups download "<its time>" --branch <production branch> --output r.zip --yes`, with the time of a `remote` backup that has no `daily` one | That it is `remote` and Odoo.sh does not let it be downloaded. No `r.zip` | 4 |
+| B19 | Within 2 hours of B11 | `osh backups download "<B11's backup time>" --branch <staging-branch> --output n2.zip` | `Odoo.sh already holds this file`, no question and no wait. `cmp n.zip n2.zip` finds no difference | 0 |
+| B20 | A backup whose file takes more than a few seconds | `osh backups download --branch <staging-branch> --output c.zip --yes`, and press Ctrl+C while it downloads | No `c.zip` is left | 130 |
 
 ## MCP server
 
