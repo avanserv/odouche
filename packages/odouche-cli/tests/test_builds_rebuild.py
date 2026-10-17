@@ -33,8 +33,9 @@ URL = "https://acme-feature-x-105.dev.odoo.com"
 ON_FEATURE = ("--project", "acme", "--branch", "feature-x")
 REBUILD = ("builds", "rebuild")
 BACKUP = ("backups", "create")
+DOWNLOAD = ("backups", "download")
 # The commands that open a client that writes.
-WRITERS = {REBUILD, BACKUP}
+WRITERS = {REBUILD, BACKUP, DOWNLOAD}
 
 
 def build(number: int, **changes: object) -> Build:
@@ -148,6 +149,38 @@ class StubClient:
     def create_backup(self, project: str, branch: Branch, *, comment: str = "") -> odouche.BackupRequest:
         self.calls.append(f"backup {branch.name}")
         return odouche.BackupRequest(build=STARTED, previous=None)
+
+    def wait_for_backup(
+        self, project: str, request: odouche.BackupRequest, *, timeout: float
+    ) -> Iterator[odouche.Backup]:
+        yield odouche.Backup(
+            kind=odouche.BackupKind.MANUAL,
+            kind_name="manual",
+            taken_at=NOW,
+            build_name=request.build.name,
+            branch_name=request.build.branch_name,
+            commit_hash=request.build.commit.hash,
+            downloadable=True,
+            size=None,
+        )
+
+    def prepare_download(self, project: str, backup: odouche.Backup, **_: bool) -> odouche.PreparedDownload:
+        self.calls.append(f"prepare {backup.build_name}")
+        return odouche.PreparedDownload(
+            backup=backup,
+            build=STARTED,
+            worker_url="https://eupd00.odoo.com",
+            neutralized=True,
+            filestore=True,
+            link="https://eupd00.odoo.com/paas/build/105/download/dump",
+            previous=0,
+        )
+
+    def find_download(self, project: str, backup: odouche.Backup, **_: bool) -> odouche.PreparedDownload | None:
+        return None
+
+    def wait_for_download(self, project: str, prepared: odouche.PreparedDownload, *, timeout: float) -> Iterator[None]:
+        yield None
 
     def watch_build(self, project: str, build: Build, *, timeout: float) -> Iterator[Build]:
         self.calls.append(f"watch {project} {build.id} {timeout:g}")
@@ -521,7 +554,11 @@ def commands(command: Any, path: tuple[str, ...] = ()) -> Iterator[tuple[str, ..
 
 COMMANDS = sorted(commands(typer.main.get_command(app)))
 # What a command needs to run to its end, when the project and the branch in the environment are not enough.
-ARGUMENTS: dict[tuple[str, ...], tuple[str, ...]] = {REBUILD: ("--yes",), BACKUP: ("--yes",)}
+ARGUMENTS: dict[tuple[str, ...], tuple[str, ...]] = {
+    REBUILD: ("--yes",),
+    BACKUP: ("--yes",),
+    DOWNLOAD: ("--yes", "--new", "--link"),
+}
 # The commands that build no client.
 CLIENTLESS = {("auth", "logout")}
 

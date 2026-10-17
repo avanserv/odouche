@@ -52,6 +52,8 @@ _UNEXPLAINED = "builtins.Exception"
 _SESSION_ALPHABET = re.compile(r"[A-Za-z0-9_-]+")
 _WORKER = re.compile(r"https://[a-z0-9-]+\.odoo\.com")
 _CONTENT_RANGE = re.compile(r"bytes (\d+)-\d+/\d+")
+_GRANT = "token"
+_GRANT_ALPHABET = re.compile(r"[A-Za-z0-9]+")
 _PHASE = 10.0
 _READ = 30.0
 _TIMEOUT = httpx2.Timeout(connect=_PHASE, read=_READ, write=_PHASE, pool=_PHASE)
@@ -79,7 +81,18 @@ class _WithoutQuery(logging.Filter):
         return True
 
 
+class _EventOnly(logging.Filter):
+    """Cuts a record of the connection layer to its event: its values are headers, a token's and a cookie's."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        record.msg = record.getMessage().split(" ", 1)[0]
+        record.args = None
+        return True
+
+
 logging.getLogger("httpx2").addFilter(_WithoutQuery())
+for _layer in ("http11", "http2", "connection", "proxy", "socks"):
+    logging.getLogger(f"httpcore2.{_layer}").addFilter(_EventOnly())
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,6 +115,17 @@ class Part:
 
     first: int
     """Where its first byte is in the file."""
+
+    chunks: Iterator[bytes]
+    """Its bytes as they arrive. Raises `UpstreamUnavailableError` when the connection drops."""
+
+
+@dataclass(frozen=True, slots=True)
+class Body:
+    """A worker's file that one request was answered with, whole."""
+
+    size: int | None
+    """Its bytes, from `Content-Length`, or `None` when the worker does not say."""
 
     chunks: Iterator[bytes]
     """Its bytes as they arrive. Raises `UpstreamUnavailableError` when the connection drops."""
@@ -391,6 +415,42 @@ class Transport:
             response.close()
 
     @contextmanager
+    def worker_download(
+        self, operation: str, worker: str, handover: str, path: str, query: Mapping[str, str]
+    ) -> Generator[Body]:
+        """Open one `GET` of a worker's file, with the token Odoo.sh hands over for it at `handover`.
+
+        The token is asked of `HOST` with the session, then sent to the worker alone, at `path`
+        with `query` and nowhere else Odoo.sh may redirect to. The file is asked for once.
+        """
+        url = _worker_url(operation, worker, path).copy_with(params=query)
+        answer = self._attempt(
+            operation, "GET", _url(handover), {"redirect": url.raw_path.decode(), "base_url": worker}, retry=True
+        )
+        if answer.status != httpx2.codes.FOUND:
+            raise _error(operation, answer, None) or UpstreamChangedError(operation, "status", status=answer.status)
+        token = _handed_over(operation, url, answer.location)
+        request = self._client.build_request(
+            "GET",
+            # First, where Odoo.sh puts it.
+            url.copy_with(params={_GRANT: token.expose_secret(), **query}),
+            # A compressed answer would not count in the file's bytes.
+            headers={"Accept-Encoding": "identity"},
+        )
+        response = failure = None
+        try:
+            response = self._client.send(request, stream=True)
+        except httpx2.RequestError as error:
+            failure = type(error).__name__
+        _logger.debug("GET %s: %s", url.path, failure or cast("httpx2.Response", response).status_code)
+        if response is None:
+            raise _unavailable(operation, str(failure))
+        try:
+            yield _body(operation, response)
+        finally:
+            response.close()
+
+    @contextmanager
     def bus(self, operation: str, within: float | None = None) -> Generator[Socket]:
         """Open the bus socket with the session. It is not repeated, and holds no other request back.
 
@@ -548,6 +608,31 @@ def _chunks(operation: str, response: httpx2.Response) -> Iterator[bytes]:
             return
         yield chunk
     raise _unavailable(operation, failure)
+
+
+def _handed_over(operation: str, asked: httpx2.URL, location: str | None) -> Secret:
+    """Return the token of a redirect to `asked`, which is all it may add to `asked`."""
+    try:
+        url = httpx2.URL(location or "")
+    except httpx2.InvalidURL:
+        url = None
+    if url is not None and (url.scheme, url.host, url.port, url.path) == (asked.scheme, asked.host, None, asked.path):
+        added = list(url.params.multi_items())
+        tokens = [value for key, value in added if key == _GRANT]
+        rest = sorted(item for item in added if item[0] != _GRANT)
+        if len(tokens) == 1 and _GRANT_ALPHABET.fullmatch(tokens[0]) and rest == sorted(asked.params.multi_items()):
+            return Secret(tokens[0])
+    raise UpstreamChangedError(operation, "Location", status=httpx2.codes.FOUND)
+
+
+def _body(operation: str, response: httpx2.Response) -> Body:
+    status = response.status_code
+    if status != httpx2.codes.OK:
+        raise cast("OdoucheError", _error(operation, _Answer(status, response.headers.get("Location")), None))
+    length = response.headers.get("Content-Length")
+    if length is not None and not length.isdecimal():
+        raise UpstreamChangedError(operation, "Content-Length", status=status)
+    return Body(None if length is None else int(length), _chunks(operation, response))
 
 
 def _json(content: bytes) -> object:

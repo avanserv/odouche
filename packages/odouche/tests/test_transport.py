@@ -568,3 +568,18 @@ def test_the_session_is_exposed_only_where_it_is_sent_or_stored():
     )
 
     assert exposing == ["_session.py", "_upstream/transport.py", "secret.py"]
+
+
+@pytest.mark.parametrize("layer", ["http11", "http2", "connection", "proxy", "socks"])
+def test_the_connection_layer_logs_its_events_without_their_values(caplog, layer):
+    headers = [
+        (b"Location", b"https://eupd00.odoo.com/x?token=t0k3n"),
+        (b"Set-Cookie", f"session_id={SESSION}".encode()),
+    ]
+
+    with caplog.at_level(logging.DEBUG, logger=f"httpcore2.{layer}"):
+        logging.getLogger(f"httpcore2.{layer}").debug(
+            f"receive_response_headers.complete return_value={(b'HTTP/1.1', 302, b'Found', headers)!r}"
+        )
+
+    assert caplog.messages == ["receive_response_headers.complete"]

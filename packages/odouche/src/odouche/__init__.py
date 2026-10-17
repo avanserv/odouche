@@ -24,6 +24,7 @@ from odouche.errors import (
 )
 from odouche.models import (
     Backup,
+    BackupFile,
     BackupKind,
     BackupRequest,
     Branch,
@@ -36,6 +37,7 @@ from odouche.models import (
     LogKind,
     LogLine,
     LogoutResult,
+    PreparedDownload,
     Project,
     SessionInfo,
     SessionSource,
@@ -50,6 +52,7 @@ __all__ = [
     "KEYRING_SERVICE",
     "SESSION_ENV",
     "Backup",
+    "BackupFile",
     "BackupKind",
     "BackupRequest",
     "Branch",
@@ -72,6 +75,7 @@ __all__ = [
     "OdoucheError",
     "OutcomeUnknownError",
     "PermissionDeniedError",
+    "PreparedDownload",
     "Project",
     "ReadOnlyError",
     "Secret",

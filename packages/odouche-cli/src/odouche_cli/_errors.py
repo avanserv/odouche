@@ -40,6 +40,9 @@ EXIT_OUTCOME_UNKNOWN = 10
 # What a command exits with when what it waited for did not come in time.
 EXIT_TIMEOUT = 8
 
+# What `osh backups download` exits with when the disk refuses the file.
+EXIT_NOT_WRITTEN = 15
+
 # What a shell reports for a command that SIGPIPE ended.
 EXIT_CLOSED_PIPE = 141
 
@@ -63,7 +66,11 @@ EXIT_CODES: tuple[tuple[type[odouche.OdoucheError], int, str | None], ...] = (
 )
 
 # Where to look after an unconfirmed change, by the operation the library names, when it is not a build.
-_OUTCOME_HINTS = {"backup": "`osh backups list` shows whether the backup was taken."}
+_OUTCOME_HINTS = {
+    "backup": "`osh backups list` shows whether the backup was taken.",
+    "download preparation": "Preparing the file again does no harm: run the command again, naming the backup rather "
+    "than giving --new.",
+}
 
 DebugOption = Annotated[
     bool,

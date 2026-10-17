@@ -109,8 +109,9 @@ build of the commit you just pushed.
 ## Rebuilding a branch
 
 `osh builds rebuild` starts a new build of the branch, which replaces its latest one. It is one
-of the three commands that change a project, with [`osh backups create`](#taking-a-backup) and
-[`osh ssh`](#a-shell-on-a-build) when it allows your address. Every other command that opens a
+of the commands that change a project, with [`osh backups create`](#taking-a-backup),
+[`osh backups download`](#downloading-a-backup) and [`osh ssh`](#a-shell-on-a-build) when it
+allows your address. Every other command that opens a
 client opens it read-only, and it sends no change.
 
 - Only a development or a staging branch is rebuilt. Any other stage exits 9 before anything is
@@ -143,12 +144,44 @@ does.
 - `--comment` is kept with the backup, as the page's dialog asks.
 - Odoo.sh answers nothing about the backup, which it lists about a minute later. Without `--wait`
   the command says so and ends. With `--wait` it asks Odoo.sh every five seconds until the backup
-  is listed, then shows it as `osh backups list` does. `--timeout` bounds the wait, 600 seconds by
+  is listed and finished, then shows it as `osh backups list` does. `--timeout` bounds the wait, 600 seconds by
   default; past it the command exits 8, and the backup may still come.
 - The request is sent once. When Odoo.sh does not confirm it, the command exits 10: look at
   `osh backups list` before running it again, since a second request takes a second backup.
 
 In a script: `osh backups create --branch staging --yes --wait`.
+
+## Downloading a backup
+
+`osh backups download` has Odoo.sh prepare a backup's file, then writes it to the path `--output`
+names. The file is a zip of the database, as `dump.sql`, and of its filestore. It is customer data:
+it is created readable by its owner alone (mode `600`), it is never written over an existing file,
+and deleting it once you are done is yours to do.
+
+- `BACKUP` is the time that names the backup, in UTC, as `osh backups list` shows it, quoted:
+  `"2026-10-14 12:48:50"`. Without it, or with `latest`, it is the branch's newest backup that can
+  be downloaded. A `remote` backup cannot be: download the `daily` one of the same time.
+- `--output` or `--link` is required, so the file never lands somewhere you forget it holds a
+  database. Without either, the command exits 2 before asking Odoo.sh anything.
+- The database is neutralized, as the page offers it first. `--exact` asks for the real one, and
+  `--no-filestore` leaves the filestore out. Only the neutralized one with its filestore has been
+  observed.
+- Preparing the file changes state on Odoo.sh, so the command asks first and takes `--yes`, as
+  [a rebuild](#rebuilding-a-branch) does. It then waits for Odoo.sh to say the file is ready,
+  which took 30 seconds for a small database, up to `--timeout` (600 seconds by default; past it,
+  exit 8). Odoo.sh keeps a prepared file for 2 hours.
+- When Odoo.sh already holds the file of that backup, prepared with the same choices and still
+  there, the command takes it: no question, no preparation and no wait. With no terminal,
+  `--yes` is still required, so a script does not depend on what Odoo.sh holds.
+- A download that fails or is interrupted removes the partial file.
+- `--link` prints the page's link to the prepared file on stdout instead. It opens only in a
+  browser signed in to Odoo.sh, and grants nothing to anyone else.
+- `--new` [takes a backup](#taking-a-backup) of the branch's latest build first, waits for it,
+  and downloads it, with one question for both. It never takes a file Odoo.sh holds.
+- When Odoo.sh does not confirm the preparation, the command exits 10. Preparing the file again
+  does no harm.
+
+In a script: `osh backups download --branch staging --new --yes --output staging.zip`.
 
 ## Reading a log
 
@@ -255,19 +288,20 @@ on stdout. Three commands do otherwise:
 | --- | --- | --- |
 | 0 | Success. `osh auth logout` with nothing to log out of is one. | Every command |
 | 1 | Unexpected error, which is a bug to report, or a prompt or a question that was declined. | Every command |
-| 2 | Usage error: an unknown option, a value an option does not take, options that do not go together, no [project or branch](#project-and-branch), or a rebuild, a backup or an IP allow that cannot be confirmed. | Every command |
+| 2 | Usage error: an unknown option, a value an option does not take, options that do not go together, no [project or branch](#project-and-branch), a download with neither `--output` nor `--link`, or to a file that exists or a directory you cannot write to, or a rebuild, a backup, a download or an IP allow that cannot be confirmed. | Every command |
 | 3 | No session, or an expired one. Run `osh auth login`. | Every command that needs the session |
-| 4 | The project, branch, build or log is not one the logged-in user can reach. A build that is not among the branch's latest ones is not, and neither is the build of a branch that has none. | Every command that takes a project |
+| 4 | The project, branch, build, backup or log is not one the logged-in user can reach. A build that is not among the branch's latest ones is not, and neither is the build of a branch that has none, or a backup that cannot be downloaded. | Every command that takes a project |
 | 5 | The session is not allowed to do this. | Every command that asks Odoo.sh |
 | 6 | Odoo.sh answered in a shape `osh` does not read. Please report it. | Every command that asks Odoo.sh |
 | 7 | Odoo.sh could not be reached, or answered with a server error. | Every command that asks Odoo.sh |
-| 8 | A followed log, a login or a backup's wait reached its timeout, or `ssh` did not get in once the IP was allowed. | `osh logs --follow --timeout`, `osh auth login`, `osh backups create --wait`, `osh ssh` |
-| 9 | Refused, and nothing was changed: a read-only run, or a branch in a stage `osh` does not change. | `osh builds rebuild`, `osh backups create` |
-| 10 | A change was sent and Odoo.sh did not confirm it. `osh builds list` shows whether a build was started, `osh backups list` whether a backup was taken; `osh ssh` can be run again. | `osh builds rebuild`, `osh backups create`, `osh ssh` |
+| 8 | A followed log, a login, or a backup's or a download's wait reached its timeout, or `ssh` did not get in once the IP was allowed. | `osh logs --follow --timeout`, `osh auth login`, `osh backups create --wait`, `osh backups download`, `osh ssh` |
+| 9 | Refused, and nothing was changed: a read-only run, or a branch in a stage `osh` does not change. | `osh builds rebuild`, `osh backups create`, `osh backups download --new` |
+| 10 | A change was sent and Odoo.sh did not confirm it. `osh builds list` shows whether a build was started, `osh backups list` whether a backup was taken; `osh ssh` and `osh backups download` can be run again. | `osh builds rebuild`, `osh backups create`, `osh backups download`, `osh ssh` |
 | 11 | No usable keyring: none to store the session in, or one that stayed locked. | `osh auth login`, `osh auth logout`, every command that reads the stored session |
 | 12 | The login ended without a session. | `osh auth login` |
 | 13 | Any other error from the library. | Every command |
 | 14 | No `ssh` to hand over to, or native Windows. The command to run is shown. | `osh ssh` |
+| 15 | The disk refused the file: full, or no longer writable. Nothing of it is left. | `osh backups download` |
 | 20 | The build failed. `osh logs` is the next step. | `osh builds watch`, `osh builds rebuild --watch` |
 | 21 | The build finished with warnings. | `osh builds watch`, `osh builds rebuild --watch` |
 | 22 | The build ended without a result. It was dropped for a newer build, killed or skipped, or its result is one `osh` does not know. | `osh builds watch`, `osh builds rebuild --watch` |

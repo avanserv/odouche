@@ -2,6 +2,7 @@
 
 import ipaddress
 from collections.abc import Callable, Generator
+from contextlib import AbstractContextManager
 from typing import Self
 
 from odouche._session import SessionStore
@@ -9,6 +10,7 @@ from odouche._upstream import allow_ip, backups, branches, builds, logs, project
 from odouche._upstream.transport import Transport
 from odouche.models import (
     Backup,
+    BackupFile,
     BackupRequest,
     Branch,
     Build,
@@ -16,6 +18,7 @@ from odouche.models import (
     Log,
     LogKind,
     LogLine,
+    PreparedDownload,
     Project,
     SessionInfo,
     SshTarget,
@@ -122,13 +125,66 @@ class Client:
     def wait_for_backup(
         self, project: Project | str, request: BackupRequest, *, timeout: float
     ) -> Generator[Backup | None]:
-        """Yield the backup `create_backup` asked for once Odoo.sh lists it, and end.
+        """Yield the backup `create_backup` asked for once Odoo.sh has finished it, and end.
 
-        Odoo.sh is asked for the project's backups every five seconds, and `None` is yielded after
-        each answer that does not list it yet, so a caller can stop the wait between two. Raises
-        `StreamTimeoutError` after `timeout` seconds.
+        Odoo.sh is asked for the project's backups every five seconds, then whether it is still
+        making it, and `None` is yielded after each look that does not find it finished, so a
+        caller can stop the wait between two. Odoo.sh lists a backup before it is finished, and
+        refuses a file of it until then. Raises `StreamTimeoutError` after `timeout` seconds.
         """
         return backups.wait(self._transport, _project_name(project), request, timeout=timeout)
+
+    def prepare_download(
+        self, project: Project | str, backup: Backup, *, neutralized: bool = True, filestore: bool = True
+    ) -> PreparedDownload:
+        """Change state on Odoo.sh: ask it to prepare the file of a backup of a project.
+
+        The database is neutralized unless `neutralized` is false, which asks for the exact one,
+        and the file holds the filestore unless `filestore` is false. Only the first combination
+        has been seen. `wait_for_download` waits until the file is ready, and Odoo.sh keeps it for
+        2 hours from then.
+
+        The request is sent once, on the build the backup was taken from. Raises `ValueError` for
+        a backup that is not `downloadable`, `NotFoundError` when that build is no longer among
+        its branch's latest, `OutcomeUnknownError` when the request left and Odoo.sh did not
+        confirm it, and `ReadOnlyError` on a read-only client.
+        """
+        return backups.prepare(
+            self._transport, _project_name(project), backup, neutralized=neutralized, filestore=filestore
+        )
+
+    def find_download(
+        self, project: Project | str, backup: Backup, *, neutralized: bool = True, filestore: bool = True
+    ) -> PreparedDownload | None:
+        """Return the file of a backup that Odoo.sh already holds, prepared with these choices, or `None`.
+
+        It only reads, on a read-only client too. A notification of Odoo.sh names the file, and
+        the file is then opened once and closed, to tell it is still there. `download` takes what
+        it returns, with no wait. Raises as `prepare_download` does before its request.
+        """
+        return backups.find(
+            self._transport, _project_name(project), backup, neutralized=neutralized, filestore=filestore
+        )
+
+    def wait_for_download(
+        self, project: Project | str, prepared: PreparedDownload, *, timeout: float
+    ) -> Generator[None]:
+        """Yield `None` until the file `prepare_download` asked for is ready, and end once it is.
+
+        Odoo.sh is asked for the project's notifications every five seconds, and the file is ready
+        when one links to it. Raises `StreamTimeoutError` after `timeout` seconds.
+        """
+        return backups.wait_download(self._transport, _project_name(project), prepared, timeout=timeout)
+
+    def download(self, prepared: PreparedDownload) -> AbstractContextManager[BackupFile]:
+        """Open a prepared backup's file, to be read as it arrives. Leaving the context closes the connection.
+
+        The file is asked of its build's worker with a token Odoo.sh hands over for it, which is
+        sent nowhere else and kept nowhere. Raises `NotFoundError` when the file is not ready or
+        Odoo.sh no longer keeps it, and `UpstreamUnavailableError` from `chunks` when the
+        connection drops before its last byte.
+        """
+        return backups.download(self._transport, prepared)
 
     def builds(self, branch: Branch | int, *, limit: int = builds.DEFAULT_LIMIT) -> list[Build]:
         """List the latest builds of a branch, given as a `Branch` or by its number, newest first.

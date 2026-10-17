@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 official public API; this project is an **unofficial** client for what the Odoo.sh web UI uses.
 
 Status: the workspace, tooling and CI exist. The CLI has the commands of its first milestone:
-`osh auth`, `osh projects list`, `osh branches list`, `osh backups list` and `create`,
+`osh auth`, `osh projects list`, `osh branches list`, `osh backups list`, `create` and `download`,
 `osh builds list`, `show`, `watch` and `rebuild`, `osh logs` and `osh ssh`, with a reference page
 generated from them.
 The MCP server has seven read-only
@@ -16,7 +16,7 @@ tools: `get_session`, `list_projects`, `list_branches`, `list_builds`, `get_buil
 and `read_log`. An eighth, `rebuild_branch`, changes state and is registered only with `--allow-changes`. A reference page is generated from the tools. The library has its transport, session
 store, login, logout and a client that
 reports the session's user, lists projects, branches, builds and backups, takes a backup and waits
-for it, watches a build, reads and
+for it, prepares a backup's file and downloads it, watches a build, reads and
 follows a build's logs, triggers a rebuild, gives the SSH target of a build and allows the
 caller's IP for SSH. The architecture
 and security sections below are
@@ -107,7 +107,7 @@ These are design constraints, not guidelines:
 - Headless use takes the session from the environment and keeps it in memory only.
 - Session values must not appear in logs, exceptions, `repr()`s, CLI output, or MCP tool results.
 - Every `osh` command opens its client read-only, except `osh builds rebuild`,
-  `osh backups create`, and `osh ssh` when the user's `ssh` does not get in. Each asks before it sends unless `--yes` is given.
+  `osh backups create`, `osh backups download`, and `osh ssh` when the user's `ssh` does not get in. Each asks before it sends unless `--yes` is given.
 - `osh ssh` replaces its process with the user's own `ssh`. odouche never reads, generates or
   uploads an SSH key, and the target from upstream is checked as a user and a host before it is
   an argument. Before that it may try that `ssh` in batch mode with `true`, and allow the address

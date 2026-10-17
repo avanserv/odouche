@@ -376,6 +376,7 @@ Every other call of the client only reads. These are the calls that change somet
 | `client.rebuild(branch)` | Starts a new build of the branch, which replaces its latest one. |
 | `client.allow_ip(branch)` | Lets this machine's address connect with `ssh` for one hour, to the branch's builds and, as [seen](upstream.md#allow-an-ip), the project's others. |
 | `client.create_backup(project, branch)` | Takes a manual backup of the branch's latest build, which Odoo.sh keeps for three days. |
+| `client.prepare_download(project, backup)` | Has Odoo.sh prepare the backup's file, which it keeps for 2 hours. |
 
 ```python
 import odouche
@@ -410,8 +411,9 @@ with odouche.Client() as client:
 - `create_backup` takes the project and the branch, each as a model or by its name or number,
   and an optional `comment`, and returns a `BackupRequest`, which names the `build` backed up. Odoo.sh answers nothing about the backup, so `client.wait_for_backup(project,
   request, timeout=...)` asks for the project's backups every five seconds and yields `None`
-  until the new manual backup of that build is listed, then that `Backup`. It raises
-  `StreamTimeoutError` at the timeout. A backup has been seen listed 58 seconds after the request.
+  until the new manual backup of that build is listed and Odoo.sh has finished it, then that
+  `Backup`. It raises `StreamTimeoutError` at the timeout. A backup has been seen listed 58
+  seconds after the request and finished 19 seconds later; Odoo.sh refuses a file of it until then.
 - Only a staging or a production branch is backed up, checked as for a rebuild, with
   `client.check_backup(branch)`. A backup has only been observed on a staging branch.
 
@@ -424,6 +426,41 @@ with odouche.Client() as client:
     for backup in client.wait_for_backup("acme-shop", request, timeout=600):
         if backup is not None:
             print(backup.taken_at)
+```
+
+- `prepare_download` takes the project and a `Backup` that is `downloadable`, and
+  `neutralized=False` for the exact database or `filestore=False` to leave the filestore out. It
+  returns a `PreparedDownload`, whose `link` is the page's link to the file. It is sent on the build
+  the backup was taken from, and raises `NotFoundError` once that build is no longer among its
+  branch's latest. `client.wait_for_download(project, prepared, timeout=...)` asks for the
+  project's notifications every five seconds and yields `None` until Odoo.sh says the file is
+  ready, which took 30 seconds for a small database. Preparing twice does no harm.
+- `client.find_download(project, backup)` takes the same choices and returns the
+  `PreparedDownload` of a file Odoo.sh already holds, or `None`. It only reads: it looks for the
+  notification of the file, then opens the file once to tell it is still there. Odoo.sh says it
+  keeps a file for 2 hours.
+- `client.download(prepared)` is a context manager that gives a `BackupFile`: its `size`, when
+  Odoo.sh says it, and its `chunks` as they arrive. Odoo.sh hands over a token for the file, which
+  is sent to the build's worker alone and kept nowhere: the token grants the file to whoever holds
+  it. Where the file is written, and who may read it, is the caller's to decide.
+
+```python
+import os
+
+import odouche
+
+
+with odouche.Client() as client:
+    backup = next(found for found in client.backups("acme-shop") if found.downloadable)
+    prepared = client.find_download("acme-shop", backup)
+    if prepared is None:
+        prepared = client.prepare_download("acme-shop", backup)
+        for _ in client.wait_for_download("acme-shop", prepared, timeout=600):
+            pass
+    private = os.open("backup.zip", os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with client.download(prepared) as file, open(private, "wb") as out:
+        for chunk in file.chunks:
+            out.write(chunk)
 ```
 
 ## Errors

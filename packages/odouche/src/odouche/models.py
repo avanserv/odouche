@@ -1,5 +1,6 @@
 """What the library returns: its own models, not the payloads of Odoo.sh."""
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
@@ -253,6 +254,43 @@ class BackupRequest:
 
     previous: datetime | None
     """When the newest manual backup of that build listed before the request was taken, which a wait looks past."""
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedDownload:
+    """A backup's file that Odoo.sh was asked to prepare, which it keeps for 2 hours once ready."""
+
+    backup: Backup
+    """The backup the file is made from."""
+
+    build: Build
+    """The build the backup was taken from, which the file is asked of."""
+
+    worker_url: str
+    """The address of the worker that holds the build, where the file is."""
+
+    neutralized: bool
+    """Whether the database is neutralized, as the page's dialog offers, rather than exact."""
+
+    filestore: bool
+    """Whether the file holds the filestore as well as the database."""
+
+    link: str
+    """The page's link to the file. It opens only in a browser signed in to Odoo.sh."""
+
+    previous: int
+    """The number of the project's newest notification before the request, which a wait looks past."""
+
+
+@dataclass(frozen=True, slots=True)
+class BackupFile:
+    """A prepared backup's file as it arrives: a zip of the database's SQL, and of its filestore when asked."""
+
+    size: int | None
+    """Its bytes, or `None` when Odoo.sh does not say."""
+
+    chunks: Iterator[bytes]
+    """Its bytes as they arrive. Raises `UpstreamUnavailableError` when the connection drops early."""
 
 
 class SessionSource(StrEnum):
