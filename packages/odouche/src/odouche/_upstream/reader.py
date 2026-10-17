@@ -39,9 +39,7 @@ class Reader:
 
     def optional_text(self, key: str) -> str | None:
         """Return a string field, or `None` when Odoo.sh answers `false` or `null` for an absent value."""
-        if key in self._fields and (self._fields[key] is False or self._fields[key] is None):
-            return None
-        return self._read(key, str)
+        return None if self._absent(key) else self._read(key, str)
 
     def has(self, key: str) -> bool:
         """Tell whether a field is there, whatever it holds."""
@@ -54,6 +52,17 @@ class Reader:
             raise UpstreamChangedError(self._operation, self._path(key))
         return value[0], value[1]
 
+    def label(self, key: str) -> str:
+        """Return the value of a selection field given with its label, as `["dropped", "Dropped"]`."""
+        value = self._read(key, list)
+        if len(value) != 2 or type(value[0]) is not str or type(value[1]) is not str:  # noqa: PLR2004
+            raise UpstreamChangedError(self._operation, self._path(key))
+        return value[0]
+
+    def optional_label(self, key: str) -> str | None:
+        """Return the value of a selection field given with its label, or `None` when Odoo.sh answers `false`."""
+        return None if self._absent(key) else self.label(key)
+
     def changed(self, key: str) -> UpstreamChangedError:
         """Return the error for a field whose value is of the right type and still not readable."""
         return UpstreamChangedError(self._operation, self._path(key))
@@ -62,10 +71,17 @@ class Reader:
         """Return the reader of an object field."""
         return self._object(self._path(key), self._fields.get(key))
 
+    def optional_child(self, key: str) -> Self | None:
+        """Return the reader of an object field, or `None` when Odoo.sh answers `false` or `null`."""
+        return None if self._absent(key) else self.child(key)
+
     def items(self, key: str) -> list[Self]:
         """Return the readers of a field that is a list of objects."""
         at = self._path(key)
         return [self._object(f"{at}[{index}]", item) for index, item in enumerate(self._read(key, list))]
+
+    def _absent(self, key: str) -> bool:
+        return key in self._fields and (self._fields[key] is False or self._fields[key] is None)
 
     def _path(self, key: str) -> str:
         return f"{self._at}.{key}" if self._at else key

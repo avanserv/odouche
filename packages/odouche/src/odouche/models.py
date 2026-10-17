@@ -149,6 +149,83 @@ class Build:
         return self.status in _FINISHED
 
 
+class TrackingKind(StrEnum):
+    """What happened to a branch, as its history on Odoo.sh records it."""
+
+    PUSH = "push"
+    REBUILD = "rebuild"
+    STAGE = "stage"
+    """The branch was created in a stage or moved to another."""
+    UNKNOWN = "unknown"
+    """An event the library does not know. The tracking's `kind_name` holds what Odoo.sh calls it."""
+
+
+@dataclass(frozen=True, slots=True)
+class PushedCommit:
+    """A commit of a push, as the history gives it: with no author and no date."""
+
+    hash: str
+    """The commit's full hash."""
+
+    message: str
+    """The whole commit message."""
+
+    url: str
+    """The address of the commit on GitHub."""
+
+
+@dataclass(frozen=True, slots=True)
+class TrackedBuild:
+    """The build an event of a branch's history made, as it is now. `Client.build` has the rest of it."""
+
+    id: int
+    """The number Odoo.sh gives the build."""
+
+    status: BuildStatus
+    """Where the build is in its life."""
+
+    status_name: str
+    """What Odoo.sh calls that status, such as `progress`."""
+
+    result: BuildResult | None
+    """How the build ended, or `None` when Odoo.sh gives none."""
+
+    result_name: str | None
+    """What Odoo.sh calls that result, such as `success`."""
+
+
+@dataclass(frozen=True, slots=True)
+class Tracking:
+    """One event of a branch's history: a push, a rebuild or a move between stages."""
+
+    id: int
+    """The number Odoo.sh gives the event."""
+
+    kind: TrackingKind
+    """What happened."""
+
+    kind_name: str
+    """What Odoo.sh calls it, such as `push`."""
+
+    created_at: datetime
+    """When it happened, in UTC."""
+
+    build: TrackedBuild | None
+    """The build it made, or `None`, as for the stage event that created the branch."""
+
+    commits: tuple[PushedCommit, ...]
+    """The commits of a push, in the order Odoo.sh gives them. Empty for any other event."""
+
+    pusher: str | None
+    """Who pushed, as Odoo.sh names them. It is another person's personal data, carried as given."""
+
+    source_stage: Stage | None
+    """The stage a branch moved from, or `None`, as for one just created or any event but a move."""
+
+    target_stage: Stage | None
+    """The stage a branch moved to or was created in, or `None` for any event but a stage one."""
+
+
 @dataclass(frozen=True, slots=True)
 class SshTarget:
     """Where `ssh` reaches a build: the user to log in as and the host."""

@@ -122,6 +122,7 @@ class Upstream:
             "/app/project/acme-corp-odoo-addons-4217/branches": self.load("branches.json"),
             "/app/project/acme-corp-odoo-addons-4217/backups": self.load("backups.json"),
             "/app/branch/51044/builds": self.load("builds.json"),
+            "/app/branch/51044/history": self.load("history.json"),
             "/app/user/profile": self.load("user_profile.json"),
             "/app/project/acme-shop/get_info": self.load("project_info.json"),
             "/paas/build/88212/logs/list": self.load("build_logs_list.json"),

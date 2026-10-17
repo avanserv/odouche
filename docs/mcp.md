@@ -98,6 +98,11 @@ The branches come in the order Odoo.sh answers them.
 `branch` is the git branch's name, as for every tool that takes one. Odoo.sh has only been seen to
 answer the latest builds of a branch: older ones are out of reach.
 
+### `list_history`
+
+Each push comes with its commits, so an older build than `list_builds` reaches is found here by
+its number and commit. The build of an event holds its number, status and result only.
+
 ### `get_build`
 
 Without `build_id`, it reads the branch's latest build. A build older than the branch's latest

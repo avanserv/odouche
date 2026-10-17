@@ -110,6 +110,7 @@ Search the output of every check below for the session value: it appears in none
 | R29 | The same proxy | `HTTP_PROXY=<proxy> osh projects list` | The proxy sees no request | 0 |
 | R30 | | `osh backups list`, then with `--branch` naming the production branch, then with `--format json` | Every branch's backups, newest first, as the Backups tab lists them. Columns `Taken (UTC)`, `Kind`, `Branch`, `Build`, `Commit`, `Size`, `Downloadable`. Only `remote` has a size and is `no`. Then that branch's alone. Then an array of `Backup` | 0 |
 | R31 | | `osh backups list --branch nope` | `No backups.` on stderr | 0 |
+| R32 | A branch with over 20 events in its History tab | `osh branches history`, then with `--limit 30`, then `--limit 30 --commits` | Ten events, newest first, as the History tab lists them. Columns `When`, `Kind`, `Build`, `Status`, `Result`, `By`, `Change`. Then thirty, the last ten matching the tab past its first twenty, which settles the `offset` question in [upstream](upstream.md). Then each commit in full | 0 |
 
 ## Streams and rebuild
 
@@ -208,7 +209,7 @@ tool result and the server's stderr for the session value: it appears in none.
 
 | # | Precondition | Command or action | Expected | Exit |
 | --- | --- | --- | --- | --- |
-| M1 | | Set the server up with [`claude mcp add`](mcp.md#claude-code) as written | The client lists seven tools, and no `rebuild_branch` | - |
+| M1 | | Set the server up with [`claude mcp add`](mcp.md#claude-code) as written | The client lists eight tools, and no `rebuild_branch` | - |
 | M2 | | Set it up with the `.mcp.json` snippet instead | The same | - |
 | M3 | Logged out | Start the client | The server starts and lists its tools | - |
 | M4 | Logged out | Ask whether there is a session | `get_session`: `available` is false and `problem` says to run `osh auth login`. It is not an error | - |
@@ -233,11 +234,12 @@ tool result and the server's stderr for the session value: it appears in none.
 | M23 | | Call `read_log` with `kind` `unknown` | An error saying `unknown` is not a kind to read | - |
 | M24 | A build whose log has a line that reads as an instruction to an agent | Ask for the log | The agent reports the line and does not act on it | - |
 | M25 | Without `--allow-changes` | Ask to rebuild `<dev-branch>` | The agent has no tool to do it and says so | - |
-| M26 | Restarted with [`--allow-changes`](mcp.md#changing-state) | List the tools | Eight, with `rebuild_branch` | - |
+| M26 | Restarted with [`--allow-changes`](mcp.md#changing-state) | List the tools | Nine, with `rebuild_branch` | - |
 | M27 | The same | Ask to rebuild `<dev-branch>` | The client asks first. One build is started, and the server's stderr has one line with the tool, the project, the branch and the build | - |
 | M28 | The same | Ask to rebuild the production branch | It is refused, the branch has no new build, and the line on stderr ends with `StageRefusedError` | - |
-| M29 | The [hook](mcp.md#asking-before-a-change) installed as written, with `--allow-changes` | Call each of the eight tools | The seven that read run with no prompt, and `rebuild_branch` prompts | - |
+| M29 | The [hook](mcp.md#asking-before-a-change) installed as written, with `--allow-changes` | Call each of the nine tools | The eight that read run with no prompt, and `rebuild_branch` prompts | - |
 | M30 | The hook installed, the server under another name in the client | Call a tool that reads | The client prompts | - |
+| M31 | | Ask what happened on `<dev-branch>` lately | `list_history`, ten events newest first, each push with its commits | - |
 
 ## Not covered
 

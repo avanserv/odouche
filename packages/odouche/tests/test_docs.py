@@ -30,6 +30,7 @@ SHOWN = [
     ".branches(",
     ".backups(",
     ".builds(",
+    ".history(",
     ".watch_build(",
     ".read_log(",
     ".follow_log(",

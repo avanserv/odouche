@@ -1,6 +1,6 @@
-"""The tools that read projects, branches and builds.
+"""The tools that read projects, branches, a branch's history and builds.
 
-Branch names, commit messages and author names are written by third parties. They are returned in
+Branch names, commit messages, and author and pusher names are written by third parties. They are returned in
 the fields of the library's models only, never in a sentence the server writes.
 """
 
@@ -20,6 +20,12 @@ DEFAULT_BUILDS = 4
 MAX_BUILDS = 20
 """The most builds one call returns."""
 
+DEFAULT_HISTORY = 10
+MAX_HISTORY = 100
+"""The most events of a branch's history one call returns."""
+HISTORY_TIMEOUT = 60
+"""The seconds a call has to read the pages of a branch's history."""
+
 
 @dataclass(frozen=True)
 class Projects:
@@ -36,6 +42,12 @@ class Branches:
 @dataclass(frozen=True)
 class Builds:
     builds: list[odouche.Build]
+    truncated: bool
+
+
+@dataclass(frozen=True)
+class History:
+    events: list[odouche.Tracking]
     truncated: bool
 
 
@@ -67,6 +79,15 @@ def list_builds(project: str, branch: str, limit: int = DEFAULT_BUILDS) -> Build
         # One more than asked for tells whether there are more.
         found = client.builds(find_branch(client, project, branch), limit=limit + 1)
     return Builds(found[:limit], truncated=len(found) > limit)
+
+
+def list_history(project: str, branch: str, limit: int = DEFAULT_HISTORY) -> History:
+    """List the history of a branch of a project, newest first: each push with its commits, each rebuild and each move between stages."""
+    limit = capped(limit, MAX_HISTORY)
+    with open_client() as client:
+        found = client.history(find_branch(client, project, branch), limit=limit + 1, timeout=HISTORY_TIMEOUT)
+        events = list(found)
+    return History(events[:limit], truncated=len(events) > limit)
 
 
 def get_build(project: str, branch: str, build_id: int | None = None) -> BuildRead:

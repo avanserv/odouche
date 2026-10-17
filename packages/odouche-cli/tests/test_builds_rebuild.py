@@ -139,6 +139,9 @@ class StubClient:
     def builds(self, branch: Branch, *, limit: int = 4) -> list[Build]:
         return [] if self.latest is None else [self.latest][:limit]
 
+    def history(self, branch: Branch, *, limit: int = 20, timeout: float) -> list[odouche.Tracking]:
+        return []
+
     def latest_build(self, branch: Branch) -> Build | None:
         self.calls.append(f"latest {branch.name}")
         return self.latest
