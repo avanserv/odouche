@@ -16,7 +16,7 @@ from typer.testing import CliRunner, Result
 
 import odouche
 from odouche import Branch, Build, BuildResult, BuildStatus, Commit, Log, LogKind, LogLine, Stage
-from odouche_cli import _terminal, _time, builds, ssh
+from odouche_cli import _terminal, _time, backups, builds, ssh
 from odouche_cli._context import BRANCH_ENV, PROJECT_ENV
 from odouche_cli.app import app
 
@@ -34,6 +34,7 @@ ON_FEATURE = ("--project", "acme", "--branch", "feature-x")
 REBUILD = ("builds", "rebuild")
 BACKUP = ("backups", "create")
 DOWNLOAD = ("backups", "download")
+PULL = ("backups", "pull")
 # The commands that open a client that writes.
 WRITERS = {REBUILD, BACKUP, DOWNLOAD}
 
@@ -69,6 +70,16 @@ def done(made: Build, result: BuildResult = BuildResult.SUCCESS) -> Build:
 
 
 LATEST = done(build(104), BuildResult.FAILED)
+DAILY = odouche.Backup(
+    kind=odouche.BackupKind.DAILY,
+    kind_name="daily",
+    taken_at=datetime(2026, 10, 14, 3, 0, tzinfo=UTC),
+    build_name="acme-main-104",
+    branch_name="main",
+    commit_hash="a" * 40,
+    downloadable=True,
+    size=None,
+)
 STARTED = build(105)
 LOST = odouche.OutcomeUnknownError(
     "The rebuild of branch 4 was sent, and its build was not found. Look before trying again."
@@ -84,6 +95,7 @@ class StubClient:
     """Stands in for `odouche.Client`: rebuilds as the library does, and answers what every command reads."""
 
     branch: Branch = FEATURE
+    listed: tuple[odouche.Backup, ...] = ()
     latest: Build | None = LATEST
     changes: tuple[Build, ...] = (STARTED, done(STARTED))
     """What a watch of the new build goes through."""
@@ -122,7 +134,7 @@ class StubClient:
         return [self.branch]
 
     def backups(self, project: str) -> list[odouche.Backup]:
-        return []
+        return list(self.listed)
 
     def builds(self, branch: Branch, *, limit: int = 4) -> list[Build]:
         return [] if self.latest is None else [self.latest][:limit]
@@ -558,6 +570,7 @@ ARGUMENTS: dict[tuple[str, ...], tuple[str, ...]] = {
     REBUILD: ("--yes",),
     BACKUP: ("--yes",),
     DOWNLOAD: ("--yes", "--new", "--link"),
+    PULL: ("--output", "daily.sql.gz"),
 }
 # The commands that build no client.
 CLIENTLESS = {("auth", "logout")}
@@ -576,10 +589,15 @@ def test_only_the_writers_build_a_client_that_writes(
     monkeypatch.setenv(BRANCH_ENV, "feature-x")
     # Rebuilt and backed up both.
     client.branch = replace(FEATURE, stage=Stage.STAGING, stage_name="staging")
+    if path == PULL:
+        # Copied from production alone.
+        client.branch = replace(FEATURE, stage=Stage.PRODUCTION, stage_name="production")
+        client.listed = (DAILY,)
     monkeypatch.delenv(odouche.SESSION_ENV, raising=False)
     monkeypatch.setattr(odouche, "login", lambda **_: None)
     monkeypatch.setattr(ssh, "_exec", lambda *_: None)
     monkeypatch.setattr(ssh, "_run", lambda command, **_: subprocess.CompletedProcess(command, 0))
+    monkeypatch.setattr(backups, "_umask", lambda _: 0)
     monkeypatch.setattr(shutil, "which", lambda _: "/usr/bin/ssh")
     monkeypatch.setattr(odouche, "logout", lambda: odouche.LogoutResult(None, False, False, None))  # noqa: FBT003
 

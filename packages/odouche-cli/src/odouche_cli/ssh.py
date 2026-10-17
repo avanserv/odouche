@@ -93,16 +93,31 @@ def ssh(
         target = client.ssh_target(find_build(client, project_name, found, None))
     command = ["ssh", "-l", target.user, target.host, *(args or [])]
     if sys.platform == "win32":
-        _refuse("`osh` does not hand over to `ssh` on Windows.", subprocess.list2cmdline(command))
+        refuse("`osh` does not hand over to `ssh` on Windows.", subprocess.list2cmdline(command))
     program = shutil.which("ssh")
     if program is None:
-        _refuse("No `ssh` to hand over to.", shlex.join(command))
-    # The session is not `ssh`'s to inherit.
+        refuse("No `ssh` to hand over to.", shlex.join(command))
+    reach(ctx, found, target, program, yes=yes, again="osh ssh")
+    hand_over(program, command)
+
+
+def reach(
+    ctx: typer.Context, branch: odouche.Branch, target: odouche.SshTarget, program: str, *, yes: bool, again: str
+) -> None:
+    """Make sure the user's `ssh`, at `program`, gets into the build, allowing this machine's address once agreed.
+
+    `again` is the command the user is told to run again when the address is still kept out.
+    """
+    # The session is not `ssh`'s to inherit, nor that of a program `ssh` runs under.
     if odouche.SESSION_ENV in os.environ:
         del os.environ[odouche.SESSION_ENV]
     kept_out = _kept_out(program, target)
     if kept_out is not None:
-        _allow(ctx, found, target, program, kept_out, yes=yes)
+        _allow(ctx, branch, target, program, kept_out, yes=yes, again=again)
+
+
+def hand_over(program: str, command: list[str]) -> None:
+    """Become `program`, after what was said is out."""
     sys.stdout.flush()
     sys.stderr.flush()
     _exec(program, command)
@@ -137,7 +152,14 @@ def _kept_out(program: str, target: odouche.SshTarget) -> str | None:
 
 
 def _allow(
-    ctx: typer.Context, branch: odouche.Branch, target: odouche.SshTarget, program: str, kept_out: str, *, yes: bool
+    ctx: typer.Context,
+    branch: odouche.Branch,
+    target: odouche.SshTarget,
+    program: str,
+    kept_out: str,
+    *,
+    yes: bool,
+    again: str,
 ) -> None:
     """Ask Odoo.sh to let this machine's address in on the branch, once agreed, and wait until `ssh` gets in."""
     said = f"Your `ssh` does not get into build {target.user} from this machine's address: {kept_out}"
@@ -160,14 +182,14 @@ def _allow(
             address = client.allow_ip(branch)
         except odouche.OutcomeUnknownError as unknown:
             typer.echo(strip_control(str(unknown)), err=True)
-            typer.echo("Run `osh ssh` again: it asks only if `ssh` still does not get in.", err=True)
+            typer.echo(f"Run `{again}` again: it asks only if `ssh` still does not get in.", err=True)
             raise typer.Exit(EXIT_OUTCOME_UNKNOWN) from None
     typer.echo(f"Odoo.sh allowed {address} for one hour. It takes up to five minutes to apply.", err=True)
     still = _wait(program, target)
     if still is not None:
         line = (
             f"`ssh` still does not get into build {target.user}: {still}. "
-            "Odoo.sh may not have applied the rule yet: run `osh ssh` again in a few minutes."
+            f"Odoo.sh may not have applied the rule yet: run `{again}` again in a few minutes."
         )
         typer.echo(strip_control(line), err=True)
         raise typer.Exit(EXIT_TIMEOUT)
@@ -221,6 +243,7 @@ def _tries(program: str, target: odouche.SshTarget) -> Iterator[float]:
     raise _WaitOverError(last)
 
 
-def _refuse(reason: str, command: str) -> NoReturn:
+def refuse(reason: str, command: str) -> NoReturn:
+    """Say why `osh` does not hand over, with the command to run by hand, and exit."""
     typer.echo(strip_control(f"{reason} Run it yourself: {command}"), err=True)
     raise typer.Exit(EXIT_NO_SSH)
