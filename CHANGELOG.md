@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.6.0](https://github.com/avanserv/odouche/compare/v0.5.0...v0.6.0) (2026-10-17)
+
+
+### Features
+
+* **cli:** Copy a backup from the production build with osh backups pull ([#68](https://github.com/avanserv/odouche/issues/68)) ([a644dd8](https://github.com/avanserv/odouche/commit/a644dd8219d8a7a7a06c9eb483570f2415c9e810))
+* Download a backup's file with osh backups download ([#67](https://github.com/avanserv/odouche/issues/67)) ([bc751ae](https://github.com/avanserv/odouche/commit/bc751ae845170925f919cd135e66a1b83f07270d))
+* List a project's backups with osh backups list ([#63](https://github.com/avanserv/odouche/issues/63)) ([3d2c0ef](https://github.com/avanserv/odouche/commit/3d2c0ef22cfe86768e62d06f71edf44233bf2a73))
+* Take a branch's backup with osh backups create ([#64](https://github.com/avanserv/odouche/issues/64)) ([752b2bf](https://github.com/avanserv/odouche/commit/752b2bf822b02048e94893eb929a6a54e35fb1ff))
+
+
+### Documentation
+
+* Map the Backups tab of Odoo.sh from a browser capture ([#61](https://github.com/avanserv/odouche/issues/61)) ([c765a83](https://github.com/avanserv/odouche/commit/c765a8300520dce7a18d21041891f914f95ff315))
+
 ## [0.5.0](https://github.com/avanserv/odouche/compare/v0.4.0...v0.5.0) (2026-10-14)
 
 
