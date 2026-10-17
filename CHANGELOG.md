@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/avanserv/odouche/compare/v0.6.0...v0.7.0) (2026-10-17)
+
+
+### Features
+
+* List a branch's history with osh branches history ([#69](https://github.com/avanserv/odouche/issues/69)) ([c777fc4](https://github.com/avanserv/odouche/commit/c777fc4bff27df923e08672f838b40285f2f6a90))
+
 ## [0.6.0](https://github.com/avanserv/odouche/compare/v0.5.0...v0.6.0) (2026-10-17)
 
 
