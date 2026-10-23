@@ -15,6 +15,7 @@ from odouche._upstream import (
     logs,
     projects,
     rebuild,
+    revision,
     settings,
     ssh,
     user,
@@ -28,6 +29,7 @@ from odouche.models import (
     Branch,
     BranchSettings,
     Build,
+    BuildRevision,
     Identity,
     Log,
     LogKind,
@@ -247,6 +249,18 @@ class Client:
         the session's user can reach. Asks Odoo.sh once, and only reads.
         """
         return settings.settings(self._transport, _branch_id(branch))
+
+    def build_revision(self, project: Project | str, build: Build) -> BuildRevision:
+        """Return the revision a build of a project runs: its head commit, its Odoo version, and its branch's selected Odoo revision.
+
+        Odoo.sh ties no Odoo revision to a build, so the branch's is the one it has selected now,
+        which the build may not run. Odoo.sh gives no commit for a submodule. Asks Odoo.sh twice,
+        and a third time for the project's Odoo version when the branch has none of its own, and
+        only reads. Raises `NotFoundError` when the build is no longer among its branch's latest
+        or the project is not one the session's user can reach, and `UpstreamChangedError`
+        naming a field that is not as seen.
+        """
+        return revision.revision(self._transport, _project_name(project), build)
 
     def ssh_target(self, build: Build) -> SshTarget:
         """Return the user and the host `ssh` reaches a build with. Odoo.sh is not asked.

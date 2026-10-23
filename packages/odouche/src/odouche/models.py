@@ -149,6 +149,67 @@ class Build:
         return self.status in _FINISHED
 
 
+@dataclass(frozen=True, slots=True)
+class OdooRef:
+    """The commit of one of Odoo's own repositories in a weekly Odoo revision."""
+
+    repository: str
+    """What Odoo.sh calls the repository, such as `enterprise`."""
+
+    commit_hash: str
+    """The commit's full hash."""
+
+    url: str
+    """The repository's address."""
+
+
+@dataclass(frozen=True, slots=True)
+class OdooRevision:
+    """A weekly revision of Odoo's own repositories, as a branch has selected it."""
+
+    id: int
+    """The number Odoo.sh gives the revision, which `BranchSettings.odoo_revision_id` holds when it is pinned."""
+
+    version: str
+    """The Odoo version, such as `19.0`."""
+
+    pinned: bool
+    """Whether the branch pins this revision. Otherwise it is the latest of its version, and moves on."""
+
+    refs: tuple[OdooRef, ...]
+    """The commit of each repository, in the order Odoo.sh gives them."""
+
+
+@dataclass(frozen=True, slots=True)
+class BuildRevision:
+    """What a build runs, as far as Odoo.sh says.
+
+    Odoo.sh gives no commit for a submodule of the project's repository, so there is none here,
+    and nothing here says whether the repository has any.
+    """
+
+    build_id: int
+    """The number Odoo.sh gives the build."""
+
+    build_name: str
+    """The build's name on Odoo.sh."""
+
+    branch_name: str
+    """The git branch."""
+
+    commit: Commit
+    """The head commit of the project's repository, with its full hash."""
+
+    odoo_version: str
+    """The Odoo version the build was made with, such as `19.0`."""
+
+    branch_odoo_revision: OdooRevision | None
+    """The Odoo revision the branch has selected now, or `None` when Odoo.sh gives none.
+
+    Odoo.sh ties no revision to a build, so it is not proven to be the one the build runs.
+    """
+
+
 class TrackingKind(StrEnum):
     """What happened to a branch, as its history on Odoo.sh records it."""
 

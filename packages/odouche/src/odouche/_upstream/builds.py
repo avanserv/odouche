@@ -38,7 +38,7 @@ def build(transport: Transport, branch_id: int, build_id: int, *, within: float 
     for listed in builds(transport, branch_id, within=within):
         if listed.id == build_id:
             return listed
-    raise _not_listed(branch_id, build_id)
+    raise not_listed(branch_id, build_id)
 
 
 def worker(transport: Transport, branch_id: int, build_id: int) -> str | None:
@@ -47,10 +47,11 @@ def worker(transport: Transport, branch_id: int, build_id: int) -> str | None:
     for listed in _listed(transport, branch_id, DEFAULT_LIMIT):
         if listed.integer("id") == build_id:
             return listed.optional_text("worker_url")
-    raise _not_listed(branch_id, build_id)
+    raise not_listed(branch_id, build_id)
 
 
-def _not_listed(branch_id: int, build_id: int) -> NotFoundError:
+def not_listed(branch_id: int, build_id: int) -> NotFoundError:
+    """Return the error for a build that is not among the latest builds of its branch."""
     return NotFoundError(
         f"Build {build_id} is not among the latest builds of branch {branch_id}.", operation=_OPERATION
     )

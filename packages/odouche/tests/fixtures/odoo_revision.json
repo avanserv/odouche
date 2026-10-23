@@ -1,0 +1,15 @@
+{
+  "jsonrpc": "2.0",
+  "id": 35,
+  "result": {
+    "id": 2206,
+    "date_expiration": "2026-12-20 00:02:07",
+    "branch": "19.0",
+    "refs": [
+      {"repository": "odoo", "ref": "7b2e9c4a1d0f83e6b5a2c9d7e1f4a0b3c6d8e2f5", "url": "https://github.com/odoo/odoo"},
+      {"repository": "enterprise", "ref": "e5c1a9f3b7d2408e6c0a4f8b2d6e1c9a3f7b5d04", "url": "https://github.com/odoo/enterprise"},
+      {"repository": "themes", "ref": "3a8f6d2c0e4b19a7f5c3e1d9b7a5f3c1e9d7b5a8", "url": "https://github.com/odoo/design-themes"}
+    ],
+    "issues": []
+  }
+}

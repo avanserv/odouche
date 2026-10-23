@@ -165,6 +165,9 @@ class StubClient:
         self.calls.append(f"latest {branch.name}")
         return self.latest
 
+    def build_revision(self, project: str, build: Build) -> odouche.BuildRevision:
+        return odouche.BuildRevision(build.id, build.name, build.branch_name, build.commit, "19.0", None)
+
     # The library's own, which asks nothing.
     check_rebuild = odouche.Client.check_rebuild
     check_backup = odouche.Client.check_backup

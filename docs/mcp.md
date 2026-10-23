@@ -116,6 +116,13 @@ The settings come with the branch and its stage: the new build options, from `pr
 the library does not know is an error naming the field, not a value passed on. For a build, see
 `get_build`.
 
+### `get_build_revision`
+
+Without `build_id`, it reads the branch's latest build. Every hash is whole. The Odoo revision is
+the one the branch has selected now: Odoo.sh ties none to a build, so it is not proven to be the
+one the build runs. Odoo.sh gives no commit for a submodule, so there is none in the result, and
+its absence says nothing of whether the repository has submodules.
+
 ### `wait_for_build`
 
 It waits for the build of `build_id`, or the branch's latest one, and returns it as last seen and

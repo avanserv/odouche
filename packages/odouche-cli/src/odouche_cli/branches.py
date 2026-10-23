@@ -10,8 +10,10 @@ import odouche
 from odouche_cli._client import open_client
 from odouche_cli._context import (
     BranchOption,
+    BuildOption,
     ProjectOption,
     checkout_branch,
+    find_build,
     project_branch,
     resolve_branch,
     resolve_project,
@@ -21,13 +23,13 @@ from odouche_cli._context import (
     status_of,
     subject,
 )
-from odouche_cli._output import Column, Format, Output
+from odouche_cli._output import Column, Format, Output, strip_control
 from odouche_cli._time import ago
 
 
 app = typer.Typer(
     name="branches",
-    help="List the branches of an Odoo.sh project, a branch's history and its settings.",
+    help="List the branches of an Odoo.sh project, a branch's history and settings, and the revision a build runs.",
     epilog="Example: osh branches list --stage staging",
     no_args_is_help=True,
 )
@@ -158,6 +160,55 @@ def settings(ctx: typer.Context, project: ProjectOption = None, branch: BranchOp
         _, found = project_branch(ctx, client, project, name)
         read = client.branch_settings(found)
     output.one(read, _SETTINGS)
+
+
+_REVISION = [
+    Column[odouche.BuildRevision]("Build", lambda read: read.build_id),
+    Column[odouche.BuildRevision]("Name", lambda read: read.build_name),
+    Column[odouche.BuildRevision]("Branch", lambda read: read.branch_name),
+    Column[odouche.BuildRevision]("Commit", lambda read: read.commit.hash),
+    Column[odouche.BuildRevision]("Subject", lambda read: subject(read.commit.message)),
+    Column[odouche.BuildRevision]("Author", lambda read: read.commit.author),
+    Column[odouche.BuildRevision]("Committed", lambda read: ago(read.commit.timestamp)),
+    Column[odouche.BuildRevision]("Commit URL", lambda read: read.commit.url),
+    Column[odouche.BuildRevision]("Odoo version", lambda read: read.odoo_version),
+    Column[odouche.BuildRevision]("Branch's Odoo revision", lambda read: _selection(read.branch_odoo_revision)),
+]
+
+
+@app.command(epilog="Example: osh branches revision --branch staging")
+def revision(
+    ctx: typer.Context, project: ProjectOption = None, branch: BranchOption = None, *, build_id: BuildOption = None
+) -> None:
+    """Show what a build of a branch runs: its head commit, its Odoo version, and the Odoo revision the branch has selected. The latest build, or `--build`.
+
+    Odoo.sh ties no Odoo revision to a build: the branch's is the one it has selected now, which the build may not run. Odoo.sh gives no commit for a submodule, and a line on stderr says so.
+    """
+    output: Output = ctx.obj
+    name = resolve_branch(ctx, branch)
+    with open_client() as client:
+        project_name, found = project_branch(ctx, client, project, name)
+        read = client.build_revision(project_name, find_build(client, project_name, found, build_id))
+    output.one(read, _revision_columns(read))
+    typer.echo("Submodule commits are not available: Odoo.sh does not give them.", err=True)
+
+
+def _revision_columns(read: odouche.BuildRevision) -> list[Column[odouche.BuildRevision]]:
+    refs = () if read.branch_odoo_revision is None else read.branch_odoo_revision.refs
+    return [*_REVISION, *map(_ref_column, refs)]
+
+
+def _ref_column(ref: odouche.OdooRef) -> Column[odouche.BuildRevision]:
+    # The repository's name is Odoo.sh's, and `Output.one` prints a header as it is.
+    return Column[odouche.BuildRevision](strip_control(f"Branch's {ref.repository}"), lambda _: ref.commit_hash)
+
+
+def _selection(selected: odouche.OdooRevision | None) -> str:
+    if selected is None:
+        return "none"
+    if selected.pinned:
+        return f"{selected.id}, pinned, {selected.version}"
+    return f"{selected.id}, latest of {selected.version}"
 
 
 def _rows(events: list[odouche.Tracking]) -> Iterator[_Row]:
