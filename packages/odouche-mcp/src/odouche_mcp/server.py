@@ -18,6 +18,7 @@ from odouche_mcp._read import (
     MAX_LISTED,
     get_branch_settings,
     get_build,
+    get_build_revision,
     list_branches,
     list_builds,
     list_history,
@@ -85,6 +86,15 @@ def create_server(*, allow_changes: bool = False) -> MCPServer:
         get_branch_settings,
         returns="the branch with its stage, and its settings; the new build options apply to a development branch only.",
         bounds="three requests to Odoo.sh.",
+    )
+    add_tool(
+        server,
+        get_build_revision,
+        returns=(
+            "the build's number, name and branch, its head commit, its Odoo version, and its branch's selected Odoo "
+            "revision, which may not be the build's. There is no submodule commit, since Odoo.sh does not give one."
+        ),
+        bounds="six requests to Odoo.sh; a build older than the branch's latest ones is not found.",
     )
     add_tool(
         server,

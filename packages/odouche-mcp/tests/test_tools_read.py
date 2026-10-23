@@ -13,7 +13,15 @@ from odouche_mcp._read import DEFAULT_BUILDS, DEFAULT_HISTORY, DEFAULT_LISTED, M
 from odouche_mcp.server import create_server
 
 
-READS = ["list_projects", "list_branches", "list_builds", "list_history", "get_build", "get_branch_settings"]
+READS = [
+    "list_projects",
+    "list_branches",
+    "list_builds",
+    "list_history",
+    "get_build",
+    "get_branch_settings",
+    "get_build_revision",
+]
 
 ACME = odouche.Project(id=1, name="acme", repository="acme/odoo", url="https://www.odoo.sh/project/acme")
 MAIN = odouche.Branch(id=3, name="main", stage=odouche.Stage.PRODUCTION, stage_name="production")
@@ -87,6 +95,16 @@ SETTINGS = odouche.BranchSettings(
     dns_target="acme.example.com",
 )
 
+SELECTED = odouche.OdooRevision(
+    id=2206,
+    version="19.0",
+    pinned=True,
+    refs=(
+        odouche.OdooRef("odoo", "1" * 40, "https://github.com/odoo/odoo"),
+        odouche.OdooRef("enterprise", "2" * 40, "https://github.com/odoo/enterprise"),
+    ),
+)
+
 
 class Upstream:
     """A client over one project, `acme`, with its branches and the builds of `feature-x`."""
@@ -139,6 +157,10 @@ class Upstream:
 
     def branch_settings(self, branch: odouche.Branch) -> odouche.BranchSettings:
         return SETTINGS
+
+    def build_revision(self, project: str, build: odouche.Build) -> odouche.BuildRevision:
+        assert project == ACME.name
+        return odouche.BuildRevision(build.id, build.name, build.branch_name, build.commit, "19.0", SELECTED)
 
 
 @pytest.fixture(autouse=True)
@@ -283,6 +305,39 @@ def test_the_settings_come_with_their_branch_and_its_stage():
     }
 
 
+def test_the_revision_has_the_head_commit_and_the_branch_s_odoo_refs_whole():
+    answer = _answer("get_build_revision", project="acme", branch="feature-x")
+
+    assert answer == {
+        "revision": {
+            "build_id": 2,
+            "build_name": "acme-feature-x-2",
+            "branch_name": "feature-x",
+            "commit": {
+                "hash": "a" * 40,
+                "message": COMMIT.message,
+                "author": "Ada",
+                "timestamp": "2026-01-01T12:00:00Z",
+                "url": COMMIT.url,
+            },
+            "odoo_version": "19.0",
+            "branch_odoo_revision": {
+                "id": 2206,
+                "version": "19.0",
+                "pinned": True,
+                "refs": [
+                    {"repository": "odoo", "commit_hash": "1" * 40, "url": "https://github.com/odoo/odoo"},
+                    {"repository": "enterprise", "commit_hash": "2" * 40, "url": "https://github.com/odoo/enterprise"},
+                ],
+            },
+        }
+    }
+
+
+def test_the_revision_is_of_the_build_named():
+    assert _answer("get_build_revision", project="acme", branch="feature-x", build_id=1)["revision"]["build_id"] == 1
+
+
 @pytest.mark.parametrize(
     ("tool", "arguments", "attribute", "items", "key"),
     [
@@ -358,6 +413,8 @@ def test_a_limit_below_one_is_refused_before_odoo_sh_is_asked(tool: str, argumen
         ("get_build", {"project": "acme"}),
         ("get_branch_settings", {"branch": "feature-x"}),
         ("get_branch_settings", {"project": "acme"}),
+        ("get_build_revision", {"branch": "feature-x"}),
+        ("get_build_revision", {"project": "acme"}),
     ],
 )
 def test_a_call_without_its_project_or_branch_is_rejected_and_nothing_is_guessed(tool: str, arguments: dict[str, Any]):
@@ -381,6 +438,13 @@ def test_a_call_without_its_project_or_branch_is_rejected_and_nothing_is_guessed
             {"project": "acme", "branch": "feature-x", "build_id": 9},
             "Build 9 is not among the latest builds of branch 4.",
         ),
+        ("get_build_revision", {"project": "acme", "branch": "gone"}, "Project acme has no branch gone."),
+        ("get_build_revision", {"project": "acme", "branch": "main"}, "Branch main of acme has no build."),
+        (
+            "get_build_revision",
+            {"project": "acme", "branch": "feature-x", "build_id": 9},
+            "Build 9 is not among the latest builds of branch 4.",
+        ),
     ],
 )
 def test_what_is_not_found_is_an_error_with_its_message(tool: str, arguments: dict[str, Any], message: str):
@@ -396,6 +460,7 @@ def test_what_is_not_found_is_an_error_with_its_message(tool: str, arguments: di
         ("list_history", {"project": "acme", "branch": "feature-x"}),
         ("get_build", {"project": "acme", "branch": "feature-x"}),
         ("get_branch_settings", {"project": "acme", "branch": "feature-x"}),
+        ("get_build_revision", {"project": "acme", "branch": "feature-x"}),
     ],
 )
 def test_every_client_is_read_only(tool: str, arguments: dict[str, Any]):

@@ -106,6 +106,12 @@ Fixture: `branch_revision.json`.
 - The project's own submodules are in the project's [`get_settings`](upstream-project.md#project-settings)
   (`submodules`, empty here), with their deploy keys and no commit. No request seen gives the
   commit of a submodule.
+- The library sends `/app/revision/<odoo_revision_id>` when the branch pins one, and otherwise
+  `/app/branch/<id>/revision` with the branch's `odoo_branch` or, when that is `false`, the
+  project's, from the `projects` answer, as the page does.
+- Fixture `odoo_revision.json` stands for the answer to `/app/revision/<id>`. That answer was not
+  seen, and is read in the shape of the latest's.
+- What a version past its end of life answers is not known: the page asks neither request for it.
 
 ## Mails
 
@@ -176,4 +182,6 @@ in place of the one it holds.
 
 - Any write on this page, and the answer to each.
 - Shell and editor requests, a mail, and a pinned revision.
+- The revision requests for a version past its end of life.
+- The answer for a pinned revision past its `date_expiration`.
 - What a user below a stage's access level gets from these requests.

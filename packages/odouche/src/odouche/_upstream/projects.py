@@ -43,6 +43,14 @@ def project_id(transport: Transport, name: str, *, within: float | None = None) 
     return None
 
 
+def odoo_version(transport: Transport, name: str) -> str | None:
+    """Return the Odoo version of the project named `name`, such as `19.0`, or `None` when it is not listed."""
+    for repo in _repos(transport):
+        if repo.text("project_name") == name:
+            return repo.text("odoo_branch")
+    return None
+
+
 def segment(name: str) -> str:
     """Quote a name for the address of a request. A dot is quoted too: the client resolves `..`."""
     return quote(name, safe="").replace(".", "%2E")

@@ -357,6 +357,54 @@ with odouche.Client() as client:
   not read.
 - Odoo.sh has no settings request for a build, as `Client.build` says.
 
+### Build revision
+
+`client.build_revision(project, build)` returns what a build of a project runs, as
+`BuildRevision`: its head commit, its Odoo version, and the Odoo revision its branch has selected,
+with the commit of each of Odoo's own repositories. `project` is a `Project` or a project's name.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    build = client.build(51044, 88212)
+    revision = client.build_revision("acme-shop", build)
+    print(revision.commit.hash)
+    if revision.branch_odoo_revision is not None:
+        for ref in revision.branch_odoo_revision.refs:
+            print(ref.repository, ref.commit_hash)
+```
+
+| `BuildRevision` field | Meaning |
+| --- | --- |
+| `build_id`, `build_name`, `branch_name` | The build's number and name, and its git branch. |
+| `commit` | The head commit of the project's repository, as a `Commit`, with its full hash. |
+| `odoo_version` | The Odoo version the build was made with, such as `19.0`. |
+| `branch_odoo_revision` | The `OdooRevision` the branch has selected now, or `None`. |
+
+| `OdooRevision` field | Meaning |
+| --- | --- |
+| `id` | The number Odoo.sh gives the revision, as `BranchSettings.odoo_revision_id` holds it when pinned. |
+| `version` | The Odoo version, such as `19.0`. |
+| `pinned` | Whether the branch pins this revision. Otherwise it is the latest of its version, and moves on. |
+| `refs` | An `OdooRef` for each repository, in the order Odoo.sh gives them. |
+
+| `OdooRef` field | Meaning |
+| --- | --- |
+| `repository` | What Odoo.sh calls the repository, such as `enterprise`. |
+| `commit_hash` | The commit's full hash. |
+| `url` | The repository's address. |
+
+- It is two requests, and only reads. A branch with no Odoo version of its own follows the
+  project's, which is a third request.
+- Odoo.sh ties no Odoo revision to a build: `branch_odoo_revision` is the one the branch has
+  selected now, which the build may not run.
+- `branch_odoo_revision` is `None` when Odoo.sh gives none.
+- Odoo.sh gives no commit for a submodule of the project's repository, so nothing in the model
+  says whether the repository has submodules.
+- An answer not in the shape seen raises `UpstreamChangedError` naming the field.
+
 ### Logs
 
 `client.logs(project, build)` returns the logs a build has, as a list of `Log`. `project` is a

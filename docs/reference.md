@@ -51,6 +51,12 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.Commit
 
+::: odouche.BuildRevision
+
+::: odouche.OdooRevision
+
+::: odouche.OdooRef
+
 ::: odouche.Tracking
 
 ::: odouche.TrackingKind

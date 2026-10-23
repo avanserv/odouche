@@ -1,4 +1,4 @@
-"""The tools that read projects, branches, a branch's history and settings, and builds.
+"""The tools that read projects, branches, a branch's history and settings, builds, and the revision a build runs.
 
 Branch names, commit messages, and author and pusher names are written by third parties. They are returned in
 the fields of the library's models only, never in a sentence the server writes.
@@ -62,6 +62,11 @@ class SettingsRead:
     settings: odouche.BranchSettings
 
 
+@dataclass(frozen=True)
+class RevisionRead:
+    revision: odouche.BuildRevision
+
+
 def list_projects(limit: int = DEFAULT_LISTED) -> Projects:
     """List the Odoo.sh projects the user can reach. Call it first: every other tool takes a project by its name."""
     limit = capped(limit, MAX_LISTED)
@@ -107,6 +112,12 @@ def get_branch_settings(project: str, branch: str) -> SettingsRead:
     with open_client() as client:
         found = find_branch(client, project, branch)
         return SettingsRead(found, client.branch_settings(found))
+
+
+def get_build_revision(project: str, branch: str, build_id: int | None = None) -> RevisionRead:
+    """Read what a build of a branch of a project runs: its head commit, its Odoo version, and the Odoo revision its branch has selected, with the commit of each Odoo repository. The build of that number, or the latest one. Odoo.sh ties no Odoo revision to a build, so the branch's may not be the build's. Odoo.sh gives no commit for a submodule, so none is returned, and the result says nothing of whether the repository has any."""
+    with open_client() as client:
+        return RevisionRead(client.build_revision(project, find_build(client, project, branch, build_id)))
 
 
 def capped(limit: int, cap: int, name: str = "A limit") -> int:
