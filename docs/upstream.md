@@ -481,8 +481,9 @@ another, and an IPv6 address.
 
 ### Enumerations
 
-"Declared" values come from `mappings` in `get_info`, which lists values with their labels. A
-declared value that was not seen has never been observed in a payload.
+"Declared" values come from `mappings` in `get_info`, which lists values with their labels, or
+from the radios of a branch's Settings tab, as marked. A declared value that was not seen has never
+been observed in a payload.
 
 | Enumeration | Seen | Declared, not seen |
 | --- | --- | --- |
@@ -491,6 +492,9 @@ declared value that was not seen has never been observed in a payload.
 | Build `status` | `progress`, `done`, `dropped` | `updating`, `skipped`, `killed` |
 | Build `result` | `success`, `failed`, `warning` | |
 | `push_behavior` | `new`, `update` | `nothing` |
+| `modules_auto` | `repo` | `all`, `none`, by the form |
+| `test_mode` | `custom` | `off`, `all`, by the form |
+| `ai_agent` | `claude` | `opencode`, by the form |
 | `tracking_type` | `push`, `rebuild`, `stage` | Not declared anywhere |
 | Log names | `install`, `pip`, `odoo`, `update`, `neutralize` | `upgrade`, named in the page's script |
 

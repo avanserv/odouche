@@ -28,7 +28,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | --- | --- |
 | [`osh auth`](#osh-auth) | Log in to Odoo.sh, log out, and show the session in use. |
 | [`osh backups`](#osh-backups) | List the backups of an Odoo.sh project, take one, download one, and copy one over SSH. |
-| [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project, and a branch's history. |
+| [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project, a branch's history and its settings. |
 | [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, and start a new one. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
 | [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach. |
@@ -219,7 +219,7 @@ osh backups pull --output daily.sql.gz
 
 ## `osh branches`
 
-List the branches of an Odoo.sh project, and a branch's history.
+List the branches of an Odoo.sh project, a branch's history and its settings.
 
 ```text
 osh branches [OPTIONS] COMMAND [ARGS]...
@@ -229,6 +229,7 @@ osh branches [OPTIONS] COMMAND [ARGS]...
 | --- | --- |
 | [`osh branches list`](#osh-branches-list) | List a project's branches with their stage: production, staging, then development, each sorted by name. |
 | [`osh branches history`](#osh-branches-history) | List a branch's history, newest first: each push with its commits, each rebuild and each move between stages. |
+| [`osh branches settings`](#osh-branches-settings) | Show a branch's settings, one per line, as its Settings tab has them. |
 
 ### `osh branches list`
 
@@ -272,6 +273,27 @@ Example:
 
 ```bash
 osh branches history --branch staging --limit 30
+```
+
+### `osh branches settings`
+
+Show a branch's settings, one per line, as its Settings tab has them.
+
+The new build options, from `Project defaults` to `AI agent`, apply to a development branch only, and not while it uses the project's defaults.
+
+```text
+osh branches settings [OPTIONS]
+```
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--branch BRANCH` | The branch's name. Default: the git checkout's. | `OSH_BRANCH` |
+
+Example:
+
+```bash
+osh branches settings --branch staging
 ```
 
 ## `osh builds`

@@ -142,6 +142,25 @@ class StubClient:
     def history(self, branch: Branch, *, limit: int = 20, timeout: float) -> list[odouche.Tracking]:
         return []
 
+    def branch_settings(self, branch: Branch) -> odouche.BranchSettings:
+        return odouche.BranchSettings(
+            push_behavior=odouche.PushBehavior.NEW_BUILD,
+            project_defaults=True,
+            module_install=odouche.ModuleInstall.REPOSITORY,
+            modules=(),
+            tests=odouche.BuildTests.MODULES,
+            test_tags=None,
+            demo_data=True,
+            ai_agent=odouche.AiAgent.CLAUDE,
+            odoo_version=None,
+            odoo_revision_id=None,
+            machine="ubuntu-24.04",
+            recommended_machine="ubuntu-24.04",
+            next_machine=None,
+            domains=(),
+            dns_target=None,
+        )
+
     def latest_build(self, branch: Branch) -> Build | None:
         self.calls.append(f"latest {branch.name}")
         return self.latest

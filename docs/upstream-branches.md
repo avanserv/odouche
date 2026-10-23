@@ -43,13 +43,15 @@ That gate is the page's. What upstream answers a user below it was not seen.
 | `odoo_revision_id` | int or `false` | `false`: the latest weekly [revision](#revision) |
 | `is_eol` | bool | |
 | `machine`, `recommended_machine` | str | `ubuntu-24.04` |
-| `machine_next_commit` | bool | |
+| `machine_next_commit` | str or `false` | Only `false` seen; by the page's script, a machine's name when set |
 | `domains` | list of str | Custom domains; one on the staging branch |
 | `domain_build_production` | str | `odoo.com` |
 | `domain_to_point_to` | str | The build's host on `dev`, the production host otherwise |
 | `production_environment` | bool | `true` on all three stages |
 | `upgrade_branch`, `upgrade_info`, `upgrade_step` | list, object, `false` | The Upgrade tab's state |
 
+- The library reads `push_behavior`, `modules_auto`, `test_mode` and `ai_agent` as strict
+  [enumerations](upstream.md#enumerations): a value outside them raises the changed shape error.
 - `machine` values and their end of support are in `mappings.machine` of `get_info`: Ubuntu 18.04
   to 26.04, each with a `label`, `python_version` and `end_date`.
 - The `branch_info` of a `builds` answer also carries `ai_agent`, `demo_data`, `is_ai`,
