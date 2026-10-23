@@ -97,6 +97,12 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.LogLine
 
+::: odouche.Mail
+
+::: odouche.MailContent
+
+::: odouche.MailAttachment
+
 ## Errors
 
 ::: odouche.OdoucheError

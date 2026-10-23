@@ -17,7 +17,7 @@ from odouche import (
     UpstreamUnavailableError,
     __version__,
 )
-from odouche._upstream.transport import HOST, Transport, is_sendable, is_unauthenticated
+from odouche._upstream.transport import HOST, TooLargeError, Transport, is_sendable, is_unauthenticated
 
 
 SESSION = "s3ss10n-v4lu3"
@@ -237,6 +237,83 @@ def test_a_worker_is_asked_without_the_session(connect):
     assert str(request.url) == f"{WORKER}/paas/build/1/logs/list"
     assert json.loads(request.content)["params"] == {"token": "t0k3n"}
     assert "Cookie" not in request.headers
+
+
+def test_a_worker_gets_the_params_beside_the_token(connect):
+    transport, upstream = connect(fixture("build_logs_list.json"))
+
+    transport.worker_call("mails", WORKER, "/paas/1/mail/json/message", Secret("t0k3n"), {"message_id": 7})
+
+    assert json.loads(upstream.requests[0].content)["params"] == {"message_id": 7, "token": "t0k3n"}
+
+
+def test_a_worker_s_token_is_never_a_param(connect):
+    transport, upstream = connect(fixture("build_logs_list.json"))
+
+    with pytest.raises(ValueError, match="token"):
+        transport.worker_call("mails", WORKER, "/paas/1/mail/json/fetch", Secret("t0k3n"), {"token": "other"})
+
+    assert upstream.requests == []
+
+
+class Streamed(httpx2.SyncByteStream):
+    """A body sent in chunks, which says how far it was read and whether it was closed."""
+
+    def __init__(self, chunks):
+        self.chunks = chunks
+        self.read = 0
+        self.closed = False
+
+    def __iter__(self):
+        for chunk in self.chunks:
+            self.read += 1
+            yield chunk
+
+    def close(self):
+        self.closed = True
+
+
+def test_an_answer_past_the_limit_is_not_read_further(connect):
+    body = Streamed([b'{"result": "' + b"x" * 600, b"x" * 600, b"x" * 600 + b'"}'])
+    transport, upstream = connect(httpx2.Response(200, stream=body))
+
+    with pytest.raises(TooLargeError):
+        transport.worker_call("mails", WORKER, "/paas/1/mail/json/message", Secret("t0k3n"), limit=1000)
+
+    assert (body.read, body.closed) == (2, True)
+    # An answer that would not change is not asked again.
+    assert len(upstream.requests) == 1
+
+
+def test_an_answer_within_the_limit_is_read_whole(connect):
+    body = Streamed([b'{"result": ', b'"short"}'])
+    transport, _ = connect(httpx2.Response(200, stream=body))
+
+    answer = transport.worker_call("mails", WORKER, "/paas/1/mail/json/message", Secret("t0k3n"), limit=1000)
+
+    assert answer == {"result": "short"}
+    assert body.closed
+
+
+def test_a_failure_past_the_limit_is_still_the_failure(connect):
+    transport, _ = connect(httpx2.Response(404, content=b"x" * 2000))
+
+    with pytest.raises(NotFoundError):
+        transport.worker_call("mails", WORKER, "/paas/1/mail/json/message", Secret("t0k3n"), limit=1000)
+
+
+def test_a_connection_that_drops_while_capped_is_a_failed_request(connect):
+    class Dropping(httpx2.SyncByteStream):
+        def __iter__(self):
+            yield b"{"
+            raise httpx2.ReadError("dropped, token=t0k3n")
+
+    transport, upstream = connect(*(httpx2.Response(200, stream=Dropping()) for _ in range(3)))
+
+    with pytest.raises(UpstreamUnavailableError, match="ReadError"):
+        transport.worker_call("mails", WORKER, "/paas/1/mail/json/message", Secret("t0k3n"), limit=1000)
+
+    assert len(upstream.requests) == 3
 
 
 @pytest.mark.parametrize("status", [301, 302, 303, 307, 308])

@@ -24,9 +24,10 @@ from rich.text import Text
 # Wide enough that a piped table is never wrapped or truncated.
 _PLAIN_WIDTH = 100_000
 
-_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f]")
+# C0, DEL and C1, then the bidirectional controls, which can reorder what a terminal shows.
+_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]")
 _CONTROL_SPACE = re.compile(r"[\t\n\v\f\r\u2028\u2029]+")
-_LINE_CONTROL = re.compile(r"[\x00-\x08\x0a-\x1f\x7f-\x9f]")
+_LINE_CONTROL = re.compile(r"[\x00-\x08\x0a-\x1f\x7f-\x9f\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]")
 _CSI = r"(?:\x1b\[|\x9b)[0-?]*[ -/]*[@-~]"
 _STRING = r"[^\x07\x1b\x9c]*"
 _END = r"(?:\x07|\x1b\\|\x9c)"
@@ -66,7 +67,7 @@ class Column[T]:
 
 
 def strip_control(text: str) -> str:
-    """Remove the control characters, which are C0 with ESC, DEL and C1: they can drive a terminal.
+    """Remove the control characters, which are C0 with ESC, DEL, C1 and the bidirectional ones: they can drive a terminal.
 
     A run of those that are whitespace, and of the Unicode line and paragraph separators, becomes one space.
     """
@@ -74,7 +75,10 @@ def strip_control(text: str) -> str:
 
 
 def strip_line_control(text: str) -> str:
-    """Remove the escape sequences from a line of text that is not ours, then the control characters but the tab."""
+    """Remove the escape sequences from a line of text that is not ours, then the control characters but the tab.
+
+    The bidirectional controls are among them.
+    """
     return _LINE_CONTROL.sub("", _SEQUENCE.sub(_unsequenced, text))
 
 

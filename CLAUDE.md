@@ -9,15 +9,15 @@ official public API; this project is an **unofficial** client for what the Odoo.
 
 Status: the workspace, tooling and CI exist. The CLI has the commands of its first milestone:
 `osh auth`, `osh projects list`, `osh branches list`, `history`, `settings` and `revision`, `osh backups list`, `create`, `download`
-and `pull`, `osh builds list`, `show`, `watch`, `rebuild` and `open`, `osh logs` and `osh ssh`, with a
+and `pull`, `osh builds list`, `show`, `watch`, `rebuild`, `open` and `mails`, `osh logs` and `osh ssh`, with a
 reference page generated from them.
-The MCP server has ten read-only
-tools: `get_session`, `list_projects`, `list_branches`, `list_builds`, `list_history`, `get_build`, `get_branch_settings`, `get_build_revision`, `wait_for_build`
-and `read_log`. An eleventh, `rebuild_branch`, changes state and is registered only with `--allow-changes`. A reference page is generated from the tools. The library has its transport, session
+The MCP server has twelve read-only
+tools: `get_session`, `list_projects`, `list_branches`, `list_builds`, `list_history`, `get_build`, `get_branch_settings`, `get_build_revision`, `wait_for_build`,
+`read_log`, `list_mails` and `read_mail`. A thirteenth, `rebuild_branch`, changes state and is registered only with `--allow-changes`. A reference page is generated from the tools. The library has its transport, session
 store, login, logout and a client that
 reports the session's user, lists projects, branches, builds and backups, reads a branch's history and its settings, reports the revision a build runs, takes a backup and waits
 for it, prepares a backup's file and downloads it, watches a build, reads and
-follows a build's logs, triggers a rebuild, gives the SSH target of a build and the URL of its panels, and allows the
+follows a build's logs, lists the mails a build caught and reads one, triggers a rebuild, gives the SSH target of a build and the URL of its panels, and allows the
 caller's IP for SSH. The architecture
 and security sections below are
 the design the implementation is held to.

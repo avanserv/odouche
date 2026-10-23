@@ -37,6 +37,13 @@ class Reader:
             return float(value)
         return self._read(key, float)
 
+    def identifier(self, key: str) -> int | str:
+        """Return a field that names something, given as an integer or as a string that is not empty."""
+        value = self._fields.get(key)
+        if type(value) is int or (type(value) is str and value):
+            return cast("int | str", value)
+        raise UpstreamChangedError(self._operation, self._path(key))
+
     def optional_text(self, key: str) -> str | None:
         """Return a string field, or `None` when Odoo.sh answers `false` or `null` for an absent value."""
         return None if self._absent(key) else self._read(key, str)

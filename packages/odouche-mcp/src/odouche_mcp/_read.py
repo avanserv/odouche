@@ -137,11 +137,15 @@ def find_branch(client: odouche.Client, project: str, name: str) -> odouche.Bran
 
 def find_build(client: odouche.Client, project: str, branch: str, build_id: int | None) -> odouche.Build:
     """Return the build of that number of a branch, or its latest one when none is given."""
-    found = find_branch(client, project, branch)
+    return build_of(client, project, find_branch(client, project, branch), build_id)
+
+
+def build_of(client: odouche.Client, project: str, branch: odouche.Branch, build_id: int | None) -> odouche.Build:
+    """Return the build of that number of a branch found already, or its latest one when none is given."""
     if build_id is not None:
-        return client.build(found, build_id)
-    latest = client.latest_build(found)
+        return client.build(branch, build_id)
+    latest = client.latest_build(branch)
     if latest is None:
-        msg = f"Branch {branch} of {project} has no build."
+        msg = f"Branch {branch.name} of {project} has no build."
         raise odouche.NotFoundError(msg)
     return latest

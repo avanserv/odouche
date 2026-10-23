@@ -37,6 +37,8 @@ SHOWN = [
     ".watch_build(",
     ".read_log(",
     ".follow_log(",
+    ".mails(",
+    ".mail(",
     ".rebuild(",
     ".create_backup(",
     ".download(",
@@ -76,6 +78,9 @@ def odoo_sh(upstream, backend, session, monkeypatch, tmp_path):
     upstream.bodies[f"/paas/build/{listed[0]['id']}/logs/list"] = upstream.load("build_logs_list.json")
     for name in ("install", "odoo"):
         upstream.bodies[f"/paas/build/{listed[0]['id']}/logs/{name}"] = log
+    # And caught mails.
+    upstream.bodies[f"/paas/{listed[0]['id']}/mail/json/fetch"] = upstream.load("mails.json")
+    upstream.bodies[f"/paas/{listed[0]['id']}/mail/json/message"] = upstream.load("mail_message.json")
 
     def rebuild(_):
         listed.insert(0, copy.deepcopy(listed[0]) | {"id": listed[0]["id"] + 1})

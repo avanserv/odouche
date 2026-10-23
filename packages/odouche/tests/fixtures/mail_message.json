@@ -1,0 +1,21 @@
+{
+  "jsonrpc": "2.0",
+  "id": 51,
+  "result": {
+    "headers": {
+      "date": "Thu, 23 Oct 2026 10:00:00 +0000",
+      "from": "Acme <noreply@example.com>",
+      "to": "Jane Doe <jane@example.com>, billing@example.com",
+      "subject": "Your invoice INV/2026/0042"
+    },
+    "attachments": [
+      [
+        "2",
+        "invoice.pdf"
+      ]
+    ],
+    "plain": "Dear Jane,\n\nHere is your invoice INV/2026/0042 for 1 250,00 €.\n\nAcme\n",
+    "source": "From: Acme <noreply@example.com>\nTo: Jane Doe <jane@example.com>, billing@example.com\nCc: accounting@example.com\nSubject: Your invoice INV/2026/0042\nDate: Thu, 23 Oct 2026 10:00:00 +0000\nMessage-Id: <invoice-42@example.com>\nMIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=\"mixed\"\n\n--mixed\nContent-Type: multipart/alternative; boundary=\"alternative\"\n\n--alternative\nContent-Type: text/plain; charset=utf-8\nContent-Transfer-Encoding: 8bit\n\nDear Jane,\n\nHere is your invoice INV/2026/0042 for 1 250,00 €.\n\nAcme\n--alternative\nContent-Type: text/html; charset=utf-8\n\n<p>Dear Jane,</p><p>Here is your invoice <b>INV/2026/0042</b>.</p>\n--alternative--\n--mixed\nContent-Type: application/pdf; name=\"invoice.pdf\"\nContent-Disposition: attachment; filename=\"invoice.pdf\"\nContent-Transfer-Encoding: base64\n\nJVBERi0xLjQKJSBpbnZlbnRlZAolJUVPRgo=\n--mixed--\n",
+    "body_url": "/paas/88212/mail/body?message_id=1761213600.M1P1Q1.build&token=REDACTED"
+  }
+}

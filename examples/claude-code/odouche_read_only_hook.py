@@ -23,8 +23,10 @@ READ_ONLY = frozenset(
         "list_branches",
         "list_builds",
         "list_history",
+        "list_mails",
         "list_projects",
         "read_log",
+        "read_mail",
         "wait_for_build",
     }
 )
