@@ -1,0 +1,18 @@
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "error": {
+    "code": 0,
+    "message": "Odoo Server Error",
+    "data": {
+      "name": "odoo.addons.paas_master.controllers.controllers.InsufficientScopeError",
+      "debug": "",
+      "message": "The token does not provide the required scope, please provide additional authorization and try again\nhttps://github.com/login/oauth/authorize?client_id=REDACTED&scope=read%3Auser+user%3Aemail+repo&state=%7B%22redirect%22%3A+%22%2Fproject%2Facme-shop%2Fsettings%22%7D",
+      "arguments": [
+        "The token does not provide the required scope, please provide additional authorization and try again",
+        "https://github.com/login/oauth/authorize?client_id=REDACTED&scope=read%3Auser+user%3Aemail+repo&state=%7B%22redirect%22%3A+%22%2Fproject%2Facme-shop%2Fsettings%22%7D"
+      ],
+      "context": {}
+    }
+  }
+}

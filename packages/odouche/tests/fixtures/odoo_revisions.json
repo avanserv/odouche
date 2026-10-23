@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 33,
+  "result": [
+    {"id": 2210, "name": "19.0.20261019", "date": "2026-10-19 00:02:10", "has_security_issue": false},
+    {"id": 2206, "name": "19.0.20261012", "date": "2026-10-12 00:03:05", "has_security_issue": false},
+    {"id": 2202, "name": "19.0.20261005", "date": "2026-10-05 00:02:48", "has_security_issue": false}
+  ]
+}
