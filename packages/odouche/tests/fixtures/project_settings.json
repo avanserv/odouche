@@ -1,0 +1,106 @@
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "result": {
+    "repository": {
+      "id": 4217,
+      "project_name": "acme-shop",
+      "private": true,
+      "odoo_branch": "19.0",
+      "geolocation": "eu",
+      "hosting_location": "Europe",
+      "hosting_location_dev": "Europe",
+      "production_build_id": [88001, "acme-corp-odoo-addons-19-0-88001"],
+      "subscription_code": "M000000000000000",
+      "subscription_code_display": "M000000000000000",
+      "subscription_validity": "valid",
+      "subscription_recurrence": 1,
+      "subscription_next_invoice": "2026-11-02",
+      "subscription_workers": 1,
+      "subscription_stagings": 1,
+      "subscription_storage": 1048576.0,
+      "subscription_dedicated": false,
+      "max_production_workers": 1,
+      "max_staging_branches": 1,
+      "max_storage": 1048576.0,
+      "max_GB": 1,
+      "pays_dedicated": false,
+      "used_storage": 428000.0,
+      "production_build_size": 80600.0,
+      "size_staging": 106000.0,
+      "size_others": 0.0,
+      "block_odoo_domain": false,
+      "modules_auto": "repo",
+      "modules": false,
+      "disable_tests": false,
+      "test_mode": "custom",
+      "test_tags": false,
+      "demo_data": true,
+      "ai_agent": "claude",
+      "deploy_key_writable": false,
+      "ip_whitelist": "",
+      "ci_token": false,
+      "ci_suspended": false
+    },
+    "users": [
+      {
+        "id": 61001,
+        "avatar_url": "https://avatars.githubusercontent.com/u/1000001?v=4",
+        "username": "octo-dev",
+        "name": "octo-dev",
+        "hosting_identifier": "1000001",
+        "access_level": "admin",
+        "user_id": [9101, "octo-dev"],
+        "hosting_user_id": [7301, "octo-dev"]
+      },
+      {
+        "id": 61002,
+        "avatar_url": "https://avatars.githubusercontent.com/u/1000002?v=4",
+        "username": "jane-doe",
+        "name": "jane-doe",
+        "hosting_identifier": "1000002",
+        "access_level": "tester",
+        "user_id": [9102, "jane-doe"],
+        "hosting_user_id": [7302, "jane-doe"]
+      },
+      {
+        "id": 61003,
+        "avatar_url": "https://avatars.githubusercontent.com/u/1000003?v=4",
+        "username": "build-bot1",
+        "name": "build-bot1",
+        "hosting_identifier": "1000003",
+        "access_level": "developer",
+        "user_id": false,
+        "hosting_user_id": [7303, "build-bot1"]
+      }
+    ],
+    "production_build": {
+      "id": 88001,
+      "worker_url": "https://eupd00.odoo.com",
+      "size_container": 40800.0,
+      "size_database": 39800.0,
+      "size_custom_branch": 12.0,
+      "size_total": 80600.0,
+      "branch_id": [51001, "19.0"]
+    },
+    "submodules": [],
+    "domain_build_production": "odoo.com",
+    "title": "Odoo.sh",
+    "dedicated": false,
+    "dedicated_limits": {
+      "limit_real_time": {"label": "HTTP timeout", "min": 60, "max": 9000, "default": 900, "unit_label": "Minute(s)", "unit_conversion": 60, "value": 15.0},
+      "limit_real_time_cron": {"label": "Scheduled actions timeout", "min": 60, "max": 9000, "default": 900, "unit_label": "Minute(s)", "unit_conversion": 60, "value": 15.0}
+    },
+    "session_lifetime": "auto",
+    "session_lifetime_map": {
+      "auto": {"seconds": 691200, "label": "Automatic (recommended)"},
+      "4-hours": {"seconds": 14400, "label": "4 Hours"},
+      "8-hours": {"seconds": 28800, "label": "8 Hours"},
+      "1-day": {"seconds": 86400, "label": "1 Day"},
+      "2-days": {"seconds": 172800, "label": "2 Days"},
+      "4-days": {"seconds": 345600, "label": "4 Days"},
+      "8-days": {"seconds": 691200, "label": "8 Days"}
+    },
+    "upsells": {"can_have_worker_upsell_trial": true}
+  }
+}

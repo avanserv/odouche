@@ -1,0 +1,45 @@
+{
+  "jsonrpc": "2.0",
+  "id": 32,
+  "result": {
+    "domains": [],
+    "domain_build_production": "odoo.com",
+    "domain_to_point_to": "acme-shop-feature-invoicing-88240.dev.odoo.com",
+    "push_behavior": "new",
+    "test_mode": "custom",
+    "demo_data": true,
+    "test_tags": false,
+    "ai_agent": "claude",
+    "odoo_branch": false,
+    "is_eol": false,
+    "odoo_revision_id": false,
+    "machine": "ubuntu-24.04",
+    "machine_next_commit": false,
+    "recommended_machine": "ubuntu-24.04",
+    "modules_auto": "repo",
+    "modules": false,
+    "upgrade_branch": [],
+    "upgrade_info": {
+      "running_upgrade": false,
+      "already_upgrade": false,
+      "staging_upgrade_successfull": false,
+      "latest_build_id": false,
+      "steps": [
+        {"step": "upload", "state": "visited", "pinned": false},
+        {"step": "process", "state": "visited", "pinned": false},
+        {"step": "download", "state": "visited", "pinned": false},
+        {"step": "update_commit", "state": "visited", "pinned": true}
+      ],
+      "upgrade_step": false,
+      "upgrade_branch": false,
+      "cancelling_job": false,
+      "current_repository_odoo_branch": "19.0",
+      "icon": "fa-cog fa-spin",
+      "extra_warnings": [],
+      "success_upgrade": false
+    },
+    "upgrade_step": false,
+    "production_environment": true,
+    "apply_default_settings": true
+  }
+}

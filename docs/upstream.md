@@ -135,7 +135,8 @@ The pages also load fonts, analytics and an embedded video from third parties. A
 none of them.
 
 Each build has a host of its own, `<build name>.dev.odoo.com`, which serves
-its database, its shell (`/odoo-sh/webshell/ws`) and its editor (`/odoo-sh/editor/lab`). The
+its database, its shell (`/odoo-sh/webshell/ws`) and its editor (`/odoo-sh/editor/lab`), which
+the page reaches as [panels](upstream-branches.md#panels). The
 `www.odoo.sh` session is not sent there, since the cookie is bound to `www.odoo.sh`. Without
 authentication of its own, the build host answers 302 to
 `www.odoo.sh/paas/build/<build id>/token?redirect=...&otp=0`, so access is handed over from the
@@ -467,8 +468,8 @@ Read from the page's script on 2026-10-14 (`paas_master.paas_app_assets`), not c
 - The page offers the action only when the user's access level reaches the one the branch's
   stage needs (`access_level_map` and `access_by_stage` of the page's config).
 - No request lists these rules or says one applies. The project setting `ip_whitelist` (IPv4s,
-  one per line, at most 10, in `get_settings`) is a permanent rule for production and staging,
-  which the library does not read.
+  one per line, at most 10, in [`get_settings`](upstream-project.md#project-settings)) is a
+  permanent rule for production and staging, which the library does not read.
 
 Seen on 2026-10-14, on a production and a staging branch: the `result` is the IPv4 address the
 page shows. On the staging branch the rule took over five and a half minutes to apply. Within the
