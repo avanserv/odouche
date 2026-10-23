@@ -3,6 +3,7 @@
 import re
 import sys
 import time
+import webbrowser
 from collections.abc import Callable, Iterator
 from contextlib import closing
 from datetime import datetime
@@ -15,7 +16,7 @@ from rich.text import Text
 
 import odouche
 from odouche_cli import _terminal
-from odouche_cli._client import open_client
+from odouche_cli._client import forget_session_env, open_client
 from odouche_cli._context import (
     BranchOption,
     ContextError,
@@ -39,6 +40,7 @@ from odouche_cli._errors import (
     EXIT_BUILD_TIMEOUT,
     EXIT_BUILD_WARNING,
     EXIT_DECLINED,
+    EXIT_NO_BROWSER,
 )
 from odouche_cli._output import Column, Format, Output, strip_control
 from odouche_cli._time import ago, elapsed
@@ -46,7 +48,7 @@ from odouche_cli._time import ago, elapsed
 
 app = typer.Typer(
     name="builds",
-    help="List, show and watch the builds of a branch, and start a new one.",
+    help="List, show and watch the builds of a branch, start a new one, and open its panels.",
     epilog="Example: osh builds show",
     no_args_is_help=True,
 )
@@ -62,9 +64,10 @@ _POLL = 3.0
 _COMMIT_WAIT = 120.0
 _COMMIT = re.compile(r"[0-9a-f]{7,64}", re.IGNORECASE)
 
-# What the tests replace: the clock of the deadline and the wait between two requests.
+# What the tests replace: the clock of the deadline, the wait between two requests and the browser.
 _monotonic: Callable[[], float] = time.monotonic
 _sleep: Callable[[float], None] = time.sleep
+_browse: Callable[[str], bool] = webbrowser.open_new_tab
 
 _RESULT_EXITS = {
     odouche.BuildResult.SUCCESS: (0, "succeeded"),
@@ -142,6 +145,21 @@ WatchTimeoutOption = Annotated[
         min=1,
         metavar="SECONDS",
         help="The longest to wait for the new build to finish. Goes with `--watch` only.",
+    ),
+]
+PanelArgument = Annotated[
+    odouche.Panel,
+    typer.Argument(
+        metavar="PANEL",
+        help="The panel: the branch's monitor, or the shell or the editor on the build's own host.",
+    ),
+]
+OpenOption = Annotated[
+    bool,
+    typer.Option(
+        "--open",
+        help="Open the panel in your default browser rather than print its URL. "
+        "The browser signs in to Odoo.sh on its own.",
     ),
 ]
 
@@ -282,6 +300,41 @@ def rebuild(
             )
             raise
     raise typer.Exit(code)
+
+
+@app.command("open", epilog="Example: osh builds open shell --open")
+def open_(
+    ctx: typer.Context,
+    panel: PanelArgument,
+    build_id: BuildArgument = None,
+    project: ProjectOption = None,
+    branch: BranchOption = None,
+    *,
+    then_open: OpenOption = False,
+) -> None:
+    """Print the URL of a build's monitor, shell or editor: of its latest build, or BUILD_ID.
+
+    The monitor is the branch's, for a staging or a production branch, and takes no BUILD_ID.
+    """
+    output: Output = ctx.obj
+    if panel is odouche.Panel.MONITOR and build_id is not None:
+        msg = "The monitor is the branch's: it takes no BUILD_ID."
+        raise typer.BadParameter(msg, ctx=ctx)
+    name = resolve_branch(ctx, branch)
+    with open_client() as client:
+        project_name, found = project_branch(ctx, client, project, name)
+        build = find_build(client, project_name, found, build_id)
+        url = client.panel_url(project_name, found, build, panel)
+    if not then_open:
+        output.stream([url], str)
+        return
+    forget_session_env()
+    if _browse(url):
+        typer.echo(f"Sent the {panel.value} of build {build.id} to your browser.", err=True)
+        return
+    typer.echo("No browser could be started. Open this URL yourself:", err=True)
+    output.stream([url], str)
+    raise typer.Exit(EXIT_NO_BROWSER)
 
 
 def _rebuilt(project: str, branch: odouche.Branch, latest: odouche.Build | None) -> list[str]:

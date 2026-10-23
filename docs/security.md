@@ -112,6 +112,18 @@ session.
   proxy set in the environment, the proxy's address is the one allowed.
 - The MCP server has no such tool, with or without `--allow-changes`.
 
+## A build's panels
+
+`osh builds open` prints the URL of a build's monitor, shell or editor, and with `--open` hands it
+to your default browser through Python's `webbrowser`.
+
+- The URL holds no token and no session. It keeps only the host of the build's `url`, checked to
+  be a bare host under `odoo.com`, or is `www.odoo.sh` with the quoted names of the project and
+  the branch: no path, query or user part of an answer reaches it.
+- The browser signs in to Odoo.sh on its own, with its own login: odouche passes it nothing else.
+- `ODOUCHE_SESSION` is removed from the environment the browser gets.
+- The MCP server has no such tool: an agent has no browser to open a panel in.
+
 ## What odouche can change
 
 Three calls change something on Odoo.sh. Every other call only reads.

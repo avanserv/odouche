@@ -29,7 +29,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | [`osh auth`](#osh-auth) | Log in to Odoo.sh, log out, and show the session in use. |
 | [`osh backups`](#osh-backups) | List the backups of an Odoo.sh project, take one, download one, and copy one over SSH. |
 | [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project, a branch's history and settings, and the revision a build runs. |
-| [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, and start a new one. |
+| [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, start a new one, and open its panels. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
 | [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach. |
 | [`osh ssh`](#osh-ssh) | Open a shell on the branch's latest build, with your own `ssh`, its configuration and its keys. |
@@ -321,7 +321,7 @@ osh branches revision --branch staging
 
 ## `osh builds`
 
-List, show and watch the builds of a branch, and start a new one.
+List, show and watch the builds of a branch, start a new one, and open its panels.
 
 ```text
 osh builds [OPTIONS] COMMAND [ARGS]...
@@ -333,6 +333,7 @@ osh builds [OPTIONS] COMMAND [ARGS]...
 | [`osh builds show`](#osh-builds-show) | Show one build of a branch, with its commit and the address of its database: its latest, or BUILD_ID. |
 | [`osh builds watch`](#osh-builds-watch) | Watch a build until it finishes, and exit with its result: the build of HEAD, or BUILD_ID. |
 | [`osh builds rebuild`](#osh-builds-rebuild) | Change state on Odoo.sh: start a new build of a branch, which replaces its latest one. |
+| [`osh builds open`](#osh-builds-open) | Print the URL of a build's monitor, shell or editor: of its latest build, or BUILD_ID. |
 
 ### `osh builds list`
 
@@ -425,6 +426,33 @@ Example:
 
 ```bash
 osh builds rebuild --watch
+```
+
+### `osh builds open`
+
+Print the URL of a build's monitor, shell or editor: of its latest build, or BUILD_ID.
+
+The monitor is the branch's, for a staging or a production branch, and takes no BUILD_ID.
+
+```text
+osh builds open [OPTIONS] {PANEL} [BUILD_ID]
+```
+
+| Argument | Description |
+| --- | --- |
+| `PANEL` | The panel: the branch's monitor, or the shell or the editor on the build's own host. Required. One of `monitor`, `shell`, `editor`. |
+| `BUILD_ID` | The build's number, among the branch's latest builds. Default: the latest one. At least 1. |
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--branch BRANCH` | The branch's name. Default: the git checkout's. | `OSH_BRANCH` |
+| `--open` | Open the panel in your default browser rather than print its URL. The browser signs in to Odoo.sh on its own. | |
+
+Example:
+
+```bash
+osh builds open shell --open
 ```
 
 ## `osh logs`

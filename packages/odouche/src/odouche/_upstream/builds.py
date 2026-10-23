@@ -8,7 +8,7 @@ from typing import TypedDict
 
 from odouche._upstream.reader import Reader
 from odouche._upstream.transport import Transport
-from odouche.errors import NotFoundError
+from odouche.errors import NotFoundError, UpstreamChangedError
 from odouche.models import Build, BuildResult, BuildStatus, Commit
 
 
@@ -20,6 +20,8 @@ _STATUSES = {status.value: status for status in BuildStatus if status is not Bui
 _RESULTS = {result.value: result for result in BuildResult if result is not BuildResult.UNKNOWN}
 _TIMESTAMP = "%Y-%m-%d %H:%M:%S"
 _COMMIT_HASH = re.compile(r"/([0-9a-f]{40}|[0-9a-f]{64})$")
+# No label starts with a dash, which `ssh` would read as an option.
+_HOST_URL = re.compile(r"https://((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+odoo\.com)")
 
 _logger = logging.getLogger("odouche")
 
@@ -48,6 +50,20 @@ def worker(transport: Transport, branch_id: int, build_id: int) -> str | None:
         if listed.integer("id") == build_id:
             return listed.optional_text("worker_url")
     raise not_listed(branch_id, build_id)
+
+
+def host(build: Build, operation: str) -> str | None:
+    """Return the host of a build's address, or `None` when it has none.
+
+    Anything but a bare `https://<host>` under `odoo.com` raises `UpstreamChangedError` naming
+    `operation`: a path, a query or a user part is never carried into what is built from the host.
+    """
+    if build.url is None:
+        return None
+    found = _HOST_URL.fullmatch(build.url) if type(build.url) is str else None
+    if found is None:
+        raise UpstreamChangedError(operation, "url")
+    return found.group(1)
 
 
 def not_listed(branch_id: int, build_id: int) -> NotFoundError:

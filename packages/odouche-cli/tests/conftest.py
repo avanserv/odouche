@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 
 import odouche
-from odouche_cli import _output
+from odouche_cli import _output, builds
 from odouche_cli._context import BRANCH_ENV, PROJECT_ENV
 
 
@@ -44,6 +44,17 @@ def unreached(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[..., object]
     yield refusals["Client"]
     # The command reports the error as its own, with an exit code a test may expect.
     assert reached == [], "A command reached the library with no stand-in."
+
+
+@pytest.fixture(autouse=True)
+def no_browser(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fail a test that would start the user's browser. A file's own stand-in replaces it."""
+
+    def refused(url: str) -> bool:
+        msg = f"A browser was started for {url}."
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(builds, "_browse", refused)
 
 
 @pytest.fixture(autouse=True)
