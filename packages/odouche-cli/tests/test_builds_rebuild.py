@@ -35,6 +35,7 @@ REBUILD = ("builds", "rebuild")
 BACKUP = ("backups", "create")
 DOWNLOAD = ("backups", "download")
 PULL = ("backups", "pull")
+OPEN = ("builds", "open")
 # The commands that open a client that writes.
 WRITERS = {REBUILD, BACKUP, DOWNLOAD}
 
@@ -172,6 +173,7 @@ class StubClient:
     check_rebuild = odouche.Client.check_rebuild
     check_backup = odouche.Client.check_backup
     ssh_target = odouche.Client.ssh_target
+    panel_url = odouche.Client.panel_url
 
     def allow_ip(self, branch: Branch) -> ipaddress.IPv4Address:
         self.calls.append(f"allow_ip {branch.name}")
@@ -596,6 +598,7 @@ ARGUMENTS: dict[tuple[str, ...], tuple[str, ...]] = {
     BACKUP: ("--yes",),
     DOWNLOAD: ("--yes", "--new", "--link"),
     PULL: ("--output", "daily.sql.gz"),
+    OPEN: ("monitor",),
 }
 # The commands that build no client.
 CLIENTLESS = {("auth", "logout")}

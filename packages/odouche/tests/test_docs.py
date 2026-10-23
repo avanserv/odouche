@@ -33,6 +33,7 @@ SHOWN = [
     ".history(",
     ".branch_settings(",
     ".build_revision(",
+    ".panel_url(",
     ".watch_build(",
     ".read_log(",
     ".follow_log(",

@@ -9,7 +9,7 @@ official public API; this project is an **unofficial** client for what the Odoo.
 
 Status: the workspace, tooling and CI exist. The CLI has the commands of its first milestone:
 `osh auth`, `osh projects list`, `osh branches list`, `history`, `settings` and `revision`, `osh backups list`, `create`, `download`
-and `pull`, `osh builds list`, `show`, `watch` and `rebuild`, `osh logs` and `osh ssh`, with a
+and `pull`, `osh builds list`, `show`, `watch`, `rebuild` and `open`, `osh logs` and `osh ssh`, with a
 reference page generated from them.
 The MCP server has ten read-only
 tools: `get_session`, `list_projects`, `list_branches`, `list_builds`, `list_history`, `get_build`, `get_branch_settings`, `get_build_revision`, `wait_for_build`
@@ -17,7 +17,7 @@ and `read_log`. An eleventh, `rebuild_branch`, changes state and is registered o
 store, login, logout and a client that
 reports the session's user, lists projects, branches, builds and backups, reads a branch's history and its settings, reports the revision a build runs, takes a backup and waits
 for it, prepares a backup's file and downloads it, watches a build, reads and
-follows a build's logs, triggers a rebuild, gives the SSH target of a build and allows the
+follows a build's logs, triggers a rebuild, gives the SSH target of a build and the URL of its panels, and allows the
 caller's IP for SSH. The architecture
 and security sections below are
 the design the implementation is held to.
@@ -114,6 +114,11 @@ These are design constraints, not guidelines:
   generates or uploads an SSH key, a backup's build name is checked before it is a remote path,
   and the target from upstream is checked as a user and a host before it is an argument. Before that it may try that `ssh` in batch mode with `true`, and allow the address
   Odoo.sh sees, never one it names. There is no MCP tool for it, opt-in or not.
+- `osh builds open --open` hands the panel's URL, and nothing else, to the user's default browser
+  through `webbrowser`, with `ODOUCHE_SESSION` removed from the environment it inherits; the
+  browser signs in to Odoo.sh on its own. A panel's URL keeps only the host of the build's `url`,
+  checked to be a bare host under `odoo.com`, or is `www.odoo.sh` with quoted names: no path, query
+  or user part of an answer reaches it, so it carries no token.
 - The MCP server is read-only by default; tools that change state on Odoo.sh are opt-in and
   documented as such. Every tool documents what it does and what it can touch.
 

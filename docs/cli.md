@@ -245,6 +245,28 @@ no key, and its process becomes `ssh`, so the exit code is then `ssh`'s.
 - Where there is no `ssh` to become, as on native Windows, the command to run by hand is shown
   and `osh` exits 14.
 
+## A build's panels
+
+`osh builds open PANEL` prints the URL of the monitor, the shell or the editor of the latest build
+of the [branch](#project-and-branch), or of BUILD_ID, as the branch's page links to them. It asks
+Odoo.sh only for the branch and its builds, and changes nothing.
+
+```bash
+osh builds open shell --branch staging
+osh builds open editor 1234 --open
+osh builds open monitor --branch main --open
+```
+
+- `--open` sends the URL to your default browser instead, and says on stderr which panel of which
+  build it sent. The browser signs in to Odoo.sh on its own: `osh` hands it the URL and nothing
+  else. Where no browser can be started, the URL is printed for you to open and `osh` exits 14.
+- A build has panels once its status is `done`. One still in progress, waiting for a worker
+  included, exits 4.
+- The monitor is the branch's, and shows its latest build: it takes no BUILD_ID (exit 2), and only
+  a staging or a production branch has one (exit 4).
+- The shell and the editor are on the build's own host, which takes the Odoo.sh login of the
+  browser too.
+
 ## Scripts
 
 ### Output
@@ -272,6 +294,7 @@ osh --format json builds show --project acme --branch feature-x | jq -r .result
     | `osh backups create --wait` | One `Backup`. Without `--wait`, nothing. |
     | `osh builds list` | An array of `Build`. |
     | `osh builds show`, `osh builds rebuild` | One `Build`. |
+    | `osh builds open` | The URL, as a JSON string. With `--open`, nothing. |
     | `osh builds watch`, `osh builds rebuild --watch` | One `Build` per line, for each change, the first being the new build after a rebuild. The result line goes to stderr. |
     | `osh logs` | One `LogLine` per line. |
     | `osh logs --kinds` | An array of `Log`. |
@@ -298,13 +321,14 @@ osh --format json builds show --project acme --branch feature-x | jq -r .result
 ### Exit codes
 
 A command that fails prints one or two lines on stderr, what happened and what to do, and nothing
-on stdout. Three commands do otherwise:
+on stdout. These commands do otherwise:
 
 - `osh builds watch`, and `osh builds rebuild --watch` like it, exits non-zero for a build that
   did not succeed, with the result line on stdout, or on stderr as JSON. `osh builds list` and
   `osh builds show` exit 0 whatever the build's result.
 - `osh logs` can fail after lines went to stdout, at a follow's timeout (8) or when a request
   fails (7).
+- `osh builds open --open` prints the URL on stdout when no browser can be started, and exits 14.
 - `osh ssh`, once it has become `ssh`, exits with what `ssh` exits with: the code of the remote
   command, or 255 for an error of `ssh` itself. The table below is not how to read it.
 
@@ -314,7 +338,7 @@ on stdout. Three commands do otherwise:
 | 1 | Unexpected error, which is a bug to report, or a prompt or a question that was declined. | Every command |
 | 2 | Usage error: an unknown option, a value an option does not take, options that do not go together, no [project or branch](#project-and-branch), a download with neither `--output` nor `--link`, or to a file that exists or a directory you cannot write to, or a rebuild, a backup, a download or an IP allow that cannot be confirmed. | Every command |
 | 3 | No session, or an expired one. Run `osh auth login`. | Every command that needs the session |
-| 4 | The project, branch, build, backup or log is not one the logged-in user can reach. A build that is not among the branch's latest ones is not, and neither is the build of a branch that has none, or a backup that cannot be downloaded. | Every command that takes a project |
+| 4 | The project, branch, build, backup or log is not one the logged-in user can reach. A build that is not among the branch's latest ones is not, and neither is the build of a branch that has none, a backup that cannot be downloaded, a build with no panels yet, or the monitor of a development branch. | Every command that takes a project |
 | 5 | The session is not allowed to do this. | Every command that asks Odoo.sh |
 | 6 | Odoo.sh answered in a shape `osh` does not read. Please report it. | Every command that asks Odoo.sh |
 | 7 | Odoo.sh could not be reached, or answered with a server error. | Every command that asks Odoo.sh |
@@ -324,7 +348,7 @@ on stdout. Three commands do otherwise:
 | 11 | No usable keyring: none to store the session in, or one that stayed locked. | `osh auth login`, `osh auth logout`, every command that reads the stored session |
 | 12 | The login ended without a session. | `osh auth login` |
 | 13 | Any other error from the library. | Every command |
-| 14 | No `ssh` to hand over to, or native Windows. The command to run is shown. | `osh ssh` |
+| 14 | No `ssh` to hand over to, or native Windows, or no browser could be started. The command to run, or the URL to open, is shown. | `osh ssh`, `osh builds open --open` |
 | 15 | The disk refused the file: full, or no longer writable. Nothing of it is left. | `osh backups download` |
 | 20 | The build failed. `osh logs` is the next step. | `osh builds watch`, `osh builds rebuild --watch` |
 | 21 | The build finished with warnings. | `osh builds watch`, `osh builds rebuild --watch` |
@@ -346,6 +370,7 @@ session supplied through `ODOUCHE_SESSION` is masked in it.
 | `OSH_BRANCH` | The [branch](#project-and-branch), when `--branch` is not given. | Every command that takes `--branch` |
 | `OSH_DEBUG` | `OSH_DEBUG=1` is `--debug`. | Every command |
 | `NO_COLOR` | Set to a value that is not empty, it leaves tables without colour and box drawing. | Every command that prints a table |
+| `BROWSER` | The browsers to try for `--open`, in Python's `webbrowser` form, before the default one. | `osh builds open --open` |
 | `DISPLAY`, `WAYLAND_DISPLAY` | On Linux, with neither set, no browser is launched and the cookie is asked for. | `osh auth login` |
 | `HTTPS_PROXY`, `ALL_PROXY`, `NO_PROXY` | The proxy that requests to Odoo.sh are sent through, and the hosts that are reached without it. The lowercase names are read too. `HTTP_PROXY` has no effect: every request is HTTPS. | Every command that asks Odoo.sh |
 | `SSL_CERT_FILE`, `SSL_CERT_DIR` | The certificate authorities trusted for those requests, as a file or a directory, in place of the system's. The file wins over the directory. | Every command that asks Odoo.sh |

@@ -390,6 +390,17 @@ class SshTarget:
     """The build's own host."""
 
 
+class Panel(StrEnum):
+    """A page of a build that Odoo.sh opens in a browser."""
+
+    MONITOR = "monitor"
+    """The branch's Grafana dashboard on `www.odoo.sh`, for a staging or a production branch."""
+    SHELL = "shell"
+    """A terminal in the build's container, on its own host."""
+    EDITOR = "editor"
+    """The code editor of the build's container, on its own host."""
+
+
 class LogKind(StrEnum):
     """The logs Odoo.sh keeps of a build. A build has only some of them."""
 

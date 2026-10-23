@@ -493,6 +493,36 @@ A build host accepts SSH only from an address Odoo.sh allows, and no request of 
 whether this machine's is. `client.allow_ip(branch)` allows it: see
 [State-changing operations](#state-changing-operations).
 
+### A build's panels
+
+`client.panel_url(project, branch, build, panel)` returns the address of a build's monitor, shell
+or editor, for a browser to open. `panel` is a `Panel` (`MONITOR`, `SHELL` or `EDITOR`) or its
+name, and `build` a build of `branch`.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    branches = {branch.name: branch for branch in client.branches("acme-shop")}
+    branch = branches["feature-invoicing"]
+    build = client.latest_build(branch)
+    if build is None:
+        raise SystemExit("The branch has no build yet.")
+    try:
+        print(client.panel_url("acme-shop", branch, build, odouche.Panel.SHELL))
+    except odouche.NotFoundError as error:
+        print(error)
+```
+
+- Odoo.sh is not asked: the URL is built from the build and its branch, and only reads.
+- A build has panels once it is `DONE`, as on the page. Any other raises `NotFoundError`, which
+  says when the build is still waiting for a worker.
+- The shell and the editor are on the build's own host. The monitor is the branch's, on
+  `www.odoo.sh`, and shows its latest build: only a staging or a production branch has one.
+- No URL carries a token or the session. The browser that opens it signs in to Odoo.sh on its own.
+- A build address that is not a bare host under `odoo.com` raises `UpstreamChangedError`.
+
 ## State-changing operations
 
 Every other call of the client only reads. These are the calls that change something on Odoo.sh:
