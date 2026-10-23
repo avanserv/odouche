@@ -13,7 +13,7 @@ from odouche_mcp._read import DEFAULT_BUILDS, DEFAULT_HISTORY, DEFAULT_LISTED, M
 from odouche_mcp.server import create_server
 
 
-READS = ["list_projects", "list_branches", "list_builds", "list_history", "get_build"]
+READS = ["list_projects", "list_branches", "list_builds", "list_history", "get_build", "get_branch_settings"]
 
 ACME = odouche.Project(id=1, name="acme", repository="acme/odoo", url="https://www.odoo.sh/project/acme")
 MAIN = odouche.Branch(id=3, name="main", stage=odouche.Stage.PRODUCTION, stage_name="production")
@@ -69,6 +69,25 @@ def _history(count: int) -> list[odouche.Tracking]:
     return [_event(number) for number in range(count, 0, -1)]
 
 
+SETTINGS = odouche.BranchSettings(
+    push_behavior=odouche.PushBehavior.NEW_BUILD,
+    project_defaults=False,
+    module_install=odouche.ModuleInstall.LISTED,
+    modules=("sale", "purchase"),
+    tests=odouche.BuildTests.TAGS,
+    test_tags="/sale",
+    demo_data=True,
+    ai_agent=odouche.AiAgent.CLAUDE,
+    odoo_version="19.0",
+    odoo_revision_id=None,
+    machine="ubuntu-24.04",
+    recommended_machine="ubuntu-24.04",
+    next_machine=None,
+    domains=("www.example.com",),
+    dns_target="acme.example.com",
+)
+
+
 class Upstream:
     """A client over one project, `acme`, with its branches and the builds of `feature-x`."""
 
@@ -117,6 +136,9 @@ class Upstream:
 
     def latest_build(self, branch: odouche.Branch) -> odouche.Build | None:
         return next(iter(self.builds(branch, limit=1)), None)
+
+    def branch_settings(self, branch: odouche.Branch) -> odouche.BranchSettings:
+        return SETTINGS
 
 
 @pytest.fixture(autouse=True)
@@ -238,6 +260,29 @@ def test_the_latest_build_is_read_when_none_is_named():
     assert _answer("get_build", project="acme", branch="feature-x")["build"]["id"] == 2
 
 
+def test_the_settings_come_with_their_branch_and_its_stage():
+    assert _answer("get_branch_settings", project="acme", branch="feature-x") == {
+        "branch": {"id": 4, "name": "feature-x", "stage": "development", "stage_name": "dev"},
+        "settings": {
+            "push_behavior": "new_build",
+            "project_defaults": False,
+            "module_install": "listed",
+            "modules": ["sale", "purchase"],
+            "tests": "tags",
+            "test_tags": "/sale",
+            "demo_data": True,
+            "ai_agent": "claude",
+            "odoo_version": "19.0",
+            "odoo_revision_id": None,
+            "machine": "ubuntu-24.04",
+            "recommended_machine": "ubuntu-24.04",
+            "next_machine": None,
+            "domains": ["www.example.com"],
+            "dns_target": "acme.example.com",
+        },
+    }
+
+
 @pytest.mark.parametrize(
     ("tool", "arguments", "attribute", "items", "key"),
     [
@@ -311,6 +356,8 @@ def test_a_limit_below_one_is_refused_before_odoo_sh_is_asked(tool: str, argumen
         ("list_history", {"project": "acme"}),
         ("get_build", {"branch": "feature-x"}),
         ("get_build", {"project": "acme"}),
+        ("get_branch_settings", {"branch": "feature-x"}),
+        ("get_branch_settings", {"project": "acme"}),
     ],
 )
 def test_a_call_without_its_project_or_branch_is_rejected_and_nothing_is_guessed(tool: str, arguments: dict[str, Any]):
@@ -327,6 +374,7 @@ def test_a_call_without_its_project_or_branch_is_rejected_and_nothing_is_guessed
         ("list_builds", {"project": "acme", "branch": "gone"}, "Project acme has no branch gone."),
         ("list_history", {"project": "acme", "branch": "gone"}, "Project acme has no branch gone."),
         ("get_build", {"project": "acme", "branch": "gone"}, "Project acme has no branch gone."),
+        ("get_branch_settings", {"project": "acme", "branch": "gone"}, "Project acme has no branch gone."),
         ("get_build", {"project": "acme", "branch": "main"}, "Branch main of acme has no build."),
         (
             "get_build",
@@ -347,6 +395,7 @@ def test_what_is_not_found_is_an_error_with_its_message(tool: str, arguments: di
         ("list_builds", {"project": "acme", "branch": "feature-x"}),
         ("list_history", {"project": "acme", "branch": "feature-x"}),
         ("get_build", {"project": "acme", "branch": "feature-x"}),
+        ("get_branch_settings", {"project": "acme", "branch": "feature-x"}),
     ],
 )
 def test_every_client_is_read_only(tool: str, arguments: dict[str, Any]):

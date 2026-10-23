@@ -6,13 +6,27 @@ from contextlib import AbstractContextManager
 from typing import Self
 
 from odouche._session import SessionStore
-from odouche._upstream import allow_ip, backups, branches, builds, history, logs, projects, rebuild, ssh, user, watch
+from odouche._upstream import (
+    allow_ip,
+    backups,
+    branches,
+    builds,
+    history,
+    logs,
+    projects,
+    rebuild,
+    settings,
+    ssh,
+    user,
+    watch,
+)
 from odouche._upstream.transport import Transport
 from odouche.models import (
     Backup,
     BackupFile,
     BackupRequest,
     Branch,
+    BranchSettings,
     Build,
     Identity,
     Log,
@@ -201,6 +215,10 @@ class Client:
 
         Odoo.sh has no request for a build by its number, so the build is looked for among the
         branch's latest. Raises `NotFoundError` when it is not there, which an older build is not.
+
+        Odoo.sh has no settings request for a build either: the builds answer gives only each
+        build's operating system and Odoo version, and a new build takes its branch's settings,
+        which `branch_settings` reads.
         """
         return builds.build(self._transport, _branch_id(branch), build_id)
 
@@ -220,6 +238,15 @@ class Client:
         session's user can reach.
         """
         return history.history(self._transport, _branch_id(branch), limit=limit, timeout=timeout)
+
+    def branch_settings(self, branch: Branch | int) -> BranchSettings:
+        """Return a branch's settings, given as a `Branch` or by its number.
+
+        A setting whose value the library does not know raises `UpstreamChangedError` naming it,
+        rather than passing through unchecked. Raises `NotFoundError` when the branch is not one
+        the session's user can reach. Asks Odoo.sh once, and only reads.
+        """
+        return settings.settings(self._transport, _branch_id(branch))
 
     def ssh_target(self, build: Build) -> SshTarget:
         """Return the user and the host `ssh` reaches a build with. Odoo.sh is not asked.

@@ -27,7 +27,7 @@ from odouche_cli._time import ago
 
 app = typer.Typer(
     name="branches",
-    help="List the branches of an Odoo.sh project, and a branch's history.",
+    help="List the branches of an Odoo.sh project, a branch's history and its settings.",
     epilog="Example: osh branches list --stage staging",
     no_args_is_help=True,
 )
@@ -123,6 +123,41 @@ def history(
             Column[_Row]("Change", _change),
         ]
         output.rows(_rows(events), columns, empty="No history.")
+
+
+_SETTINGS = [
+    Column[odouche.BranchSettings]("On new commit", lambda read: read.push_behavior.value),
+    Column[odouche.BranchSettings]("Project defaults", lambda read: "yes" if read.project_defaults else "no"),
+    Column[odouche.BranchSettings]("Install", lambda read: read.module_install.value),
+    Column[odouche.BranchSettings]("Modules", lambda read: ", ".join(read.modules)),
+    Column[odouche.BranchSettings]("Tests", lambda read: read.tests.value),
+    Column[odouche.BranchSettings]("Test tags", lambda read: read.test_tags),
+    Column[odouche.BranchSettings]("Demo data", lambda read: "yes" if read.demo_data else "no"),
+    Column[odouche.BranchSettings]("AI agent", lambda read: read.ai_agent.value),
+    Column[odouche.BranchSettings]("Odoo version", lambda read: read.odoo_version or "the project's"),
+    Column[odouche.BranchSettings](
+        "Revision id", lambda read: "latest" if read.odoo_revision_id is None else read.odoo_revision_id
+    ),
+    Column[odouche.BranchSettings]("OS", lambda read: read.machine),
+    Column[odouche.BranchSettings]("Recommended OS", lambda read: read.recommended_machine),
+    Column[odouche.BranchSettings]("OS on next commit", lambda read: read.next_machine),
+    Column[odouche.BranchSettings]("Domains", lambda read: ", ".join(read.domains)),
+    Column[odouche.BranchSettings]("DNS target", lambda read: read.dns_target),
+]
+
+
+@app.command(epilog="Example: osh branches settings --branch staging")
+def settings(ctx: typer.Context, project: ProjectOption = None, branch: BranchOption = None) -> None:
+    """Show a branch's settings, one per line, as its Settings tab has them.
+
+    The new build options, from `Project defaults` to `AI agent`, apply to a development branch only, and not while it uses the project's defaults.
+    """
+    output: Output = ctx.obj
+    name = resolve_branch(ctx, branch)
+    with open_client() as client:
+        _, found = project_branch(ctx, client, project, name)
+        read = client.branch_settings(found)
+    output.one(read, _SETTINGS)
 
 
 def _rows(events: list[odouche.Tracking]) -> Iterator[_Row]:

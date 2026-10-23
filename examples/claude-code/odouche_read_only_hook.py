@@ -16,6 +16,7 @@ SERVER = "odouche"
 # A test holds this to the tools the server registers with the read-only hint.
 READ_ONLY = frozenset(
     {
+        "get_branch_settings",
         "get_build",
         "get_session",
         "list_branches",

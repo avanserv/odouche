@@ -8,14 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 official public API; this project is an **unofficial** client for what the Odoo.sh web UI uses.
 
 Status: the workspace, tooling and CI exist. The CLI has the commands of its first milestone:
-`osh auth`, `osh projects list`, `osh branches list` and `history`, `osh backups list`, `create`, `download`
+`osh auth`, `osh projects list`, `osh branches list`, `history` and `settings`, `osh backups list`, `create`, `download`
 and `pull`, `osh builds list`, `show`, `watch` and `rebuild`, `osh logs` and `osh ssh`, with a
 reference page generated from them.
-The MCP server has eight read-only
-tools: `get_session`, `list_projects`, `list_branches`, `list_builds`, `list_history`, `get_build`, `wait_for_build`
-and `read_log`. A ninth, `rebuild_branch`, changes state and is registered only with `--allow-changes`. A reference page is generated from the tools. The library has its transport, session
+The MCP server has nine read-only
+tools: `get_session`, `list_projects`, `list_branches`, `list_builds`, `list_history`, `get_build`, `get_branch_settings`, `wait_for_build`
+and `read_log`. A tenth, `rebuild_branch`, changes state and is registered only with `--allow-changes`. A reference page is generated from the tools. The library has its transport, session
 store, login, logout and a client that
-reports the session's user, lists projects, branches, builds and backups, reads a branch's history, takes a backup and waits
+reports the session's user, lists projects, branches, builds and backups, reads a branch's history and its settings, takes a backup and waits
 for it, prepares a backup's file and downloads it, watches a build, reads and
 follows a build's logs, triggers a rebuild, gives the SSH target of a build and allows the
 caller's IP for SSH. The architecture

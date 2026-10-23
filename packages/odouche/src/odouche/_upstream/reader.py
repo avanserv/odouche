@@ -41,6 +41,19 @@ class Reader:
         """Return a string field, or `None` when Odoo.sh answers `false` or `null` for an absent value."""
         return None if self._absent(key) else self._read(key, str)
 
+    def optional_integer(self, key: str) -> int | None:
+        """Return an integer field, or `None` when Odoo.sh answers `false` or `null` for an absent value."""
+        return None if self._absent(key) else self.integer(key)
+
+    def texts(self, key: str) -> list[str]:
+        """Return a field that is a list of strings."""
+        at = self._path(key)
+        values = self._read(key, list)
+        for index, value in enumerate(values):
+            if type(value) is not str:
+                raise UpstreamChangedError(self._operation, f"{at}[{index}]")
+        return cast("list[str]", values)
+
     def has(self, key: str) -> bool:
         """Tell whether a field is there, whatever it holds."""
         return key in self._fields

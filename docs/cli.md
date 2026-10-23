@@ -266,6 +266,7 @@ osh --format json builds show --project acme --branch feature-x | jq -r .result
     | `osh projects list` | An array of `Project`. |
     | `osh branches list` | An array of `Branch`, in the order of the table. |
     | `osh branches history` | An array of `Tracking`, newest first, whatever `--commits` says. |
+    | `osh branches settings` | One `BranchSettings`. |
     | `osh backups list` | An array of `Backup`, newest first. |
     | `osh backups create --wait` | One `Backup`. Without `--wait`, nothing. |
     | `osh builds list` | An array of `Build`. |

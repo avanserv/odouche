@@ -31,6 +31,7 @@ SHOWN = [
     ".backups(",
     ".builds(",
     ".history(",
+    ".branch_settings(",
     ".watch_build(",
     ".read_log(",
     ".follow_log(",
