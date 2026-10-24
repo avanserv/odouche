@@ -1,4 +1,6 @@
-"""`osh projects`: the Odoo.sh projects the session's user can reach, one's overview, settings, checks and audit log."""
+"""`osh projects`: the Odoo.sh projects the session's user can reach, one's overview, settings, checks, audit log and
+members.
+"""
 
 import ipaddress
 from collections.abc import Callable, Iterable
@@ -22,8 +24,8 @@ from odouche_cli._settings import quoted, shown
 
 app = typer.Typer(
     name="projects",
-    help="List the Odoo.sh projects you can reach, show one's overview, show and change its settings, check it, and "
-    "read its audit log.",
+    help="List the Odoo.sh projects you can reach, show one's overview, show and change its settings, check it, "
+    "read its audit log, and list its members.",
     epilog="Example: osh projects list",
     no_args_is_help=True,
 )
@@ -350,6 +352,30 @@ def audit(
             f"To see them, {more}.",
             err=True,
         )
+
+
+_MEMBER_COLUMNS = [
+    Column[odouche.ProjectMember]("Login", lambda member: _untrusted(member.login)),
+    Column[odouche.ProjectMember]("Name", lambda member: _untrusted(member.name)),
+    Column[odouche.ProjectMember]("Role", lambda member: member.role.value),
+    Column[odouche.ProjectMember]("Logged in", lambda member: "no" if member.pending_login else "yes"),
+]
+
+
+@app.command(epilog="Example: osh projects members --project acme-shop")
+def members(ctx: typer.Context, project: ProjectOption = None) -> None:
+    """List a project's members with their role, highest role first, then by login.
+
+    Odoo.sh lists them to an admin of the project only: anyone else gets exit code 5. `Logged in` is `no` for a member invited who has not logged in to Odoo.sh yet. It changes nothing.
+    """
+    output: Output = ctx.obj
+    with open_client() as client:
+        found = client.members(resolve_project(ctx, project, client.projects))
+    output.rows(sorted(found, key=_member_order), _MEMBER_COLUMNS, empty="No members.")
+
+
+def _member_order(member: odouche.ProjectMember) -> tuple[int, str, str]:
+    return -member.role.rank, member.login.casefold(), member.login
 
 
 class Verdict(StrEnum):

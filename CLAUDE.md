@@ -8,14 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 official public API; this project is an **unofficial** client for what the Odoo.sh web UI uses.
 
 Status: the workspace, tooling and CI exist. The CLI has the commands of its first milestone:
-`osh auth`, `osh projects list`, `show`, `settings show` and `set`, `check` and `audit`, `osh branches list`, `history`, `settings show` and `set` and `revision`, `osh backups list`, `create`, `download`
+`osh auth`, `osh projects list`, `show`, `settings show` and `set`, `check`, `audit` and `members`, `osh branches list`, `history`, `settings show` and `set` and `revision`, `osh backups list`, `create`, `download`
 and `pull`, `osh builds list`, `show`, `watch`, `rebuild`, `open` and `mails`, `osh logs` and `osh ssh`, with a
 reference page generated from them.
-The MCP server has fifteen read-only
-tools: `get_session`, `list_projects`, `get_project_overview`, `get_project_settings`, `list_audit_log`, `list_branches`, `list_builds`, `list_history`, `get_build`, `get_branch_settings`, `get_build_revision`, `wait_for_build`,
+The MCP server has sixteen read-only
+tools: `get_session`, `list_projects`, `get_project_overview`, `get_project_settings`, `list_audit_log`, `list_members`, `list_branches`, `list_builds`, `list_history`, `get_build`, `get_branch_settings`, `get_build_revision`, `wait_for_build`,
 `read_log`, `list_mails` and `read_mail`. Three more, `change_branch_settings`, `change_project_settings` and `rebuild_branch`, change state and are registered only with `--allow-changes`. A reference page is generated from the tools. The library has its transport, session
 store, login, logout and a client that
-reports the session's user, reports a project's overview, reads and changes a project's settings, reads its audit log, lists projects, branches, builds and backups, reads a branch's history, reads and changes its settings, reports the revision a build runs, takes a backup and waits
+reports the session's user, reports a project's overview, reads and changes a project's settings, reads its audit log and its members, lists projects, branches, builds and backups, reads a branch's history, reads and changes its settings, reports the revision a build runs, takes a backup and waits
 for it, prepares a backup's file and downloads it, watches a build, reads and
 follows a build's logs, lists the mails a build caught and reads one, triggers a rebuild, gives the SSH target of a build and the URL of its panels, and allows the
 caller's IP for SSH. The architecture

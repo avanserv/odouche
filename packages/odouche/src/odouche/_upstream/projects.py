@@ -6,6 +6,7 @@ from urllib.parse import quote
 
 from odouche._upstream.reader import Reader
 from odouche._upstream.transport import Transport
+from odouche.errors import PermissionDeniedError
 from odouche.models import ProductionBuild, Project, ProjectHosting, Subscription
 from odouche.secret import Secret
 
@@ -122,6 +123,18 @@ def is_admin(info: Reader) -> bool:
     """Tell whether the session's user is an admin of the project, by the test its page makes."""
     levels = info.child("config").child("access_level_map")
     return levels.integer(info.child("user").text("access")) >= levels.integer("admin")
+
+
+def admin(transport: Transport, name: str, operation: str, refusal: str) -> str:
+    """Return the name a project's requests address it by, once its info shows the session's user is an admin of it."""
+    read = info(transport, name)
+    active = read.child("active_repo")
+    if active.text("project_name") != name:
+        raise active.changed("project_name")
+    # The page's own test: what Odoo.sh answers anyone else was never seen.
+    if not is_admin(read):
+        raise PermissionDeniedError(refusal, operation=operation)
+    return active.text("technical_name")
 
 
 def settings_answer(transport: Transport, technical_name: str) -> Reader:

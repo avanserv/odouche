@@ -9,7 +9,7 @@ from dataclasses import dataclass, fields, replace
 from odouche._upstream import projects, settings
 from odouche._upstream.reader import Reader
 from odouche._upstream.transport import Transport, state_changing
-from odouche.errors import OdoucheError, PermissionDeniedError, SettingsConflictError
+from odouche.errors import OdoucheError, SettingsConflictError
 from odouche.models import ProjectSettings, ProjectSettingsChange, SessionLifetime, SettingsOutcome, Submodule
 
 
@@ -68,14 +68,16 @@ class _Page:
 
 def project_settings(transport: Transport, name: str) -> ProjectSettings:
     """Return the settings of the project named `name`. A value the library does not know is a changed shape."""
-    technical = _admin(transport, name, _OPERATION, "Odoo.sh shows a project's settings to its admins only.")
+    technical = projects.admin(transport, name, _OPERATION, "Odoo.sh shows a project's settings to its admins only.")
     return _read(name, projects.settings_answer(transport, technical))
 
 
 @state_changing
 def change_settings(transport: Transport, name: str, change: ProjectSettingsChange) -> SettingsOutcome[ProjectSettings]:
     """Send the settings of `change` that differ from the project's, once, and return them before and after."""
-    technical = _admin(transport, name, _OPERATION_CHANGE, "Odoo.sh lets only a project's admins change its settings.")
+    technical = projects.admin(
+        transport, name, _OPERATION_CHANGE, "Odoo.sh lets only a project's admins change its settings."
+    )
     answer = projects.settings_answer(transport, technical)
     current = _read(name, answer)
     narrowed = narrow(current, change)
@@ -121,18 +123,6 @@ def narrow(current: ProjectSettings, change: ProjectSettingsChange) -> ProjectSe
         allow_ips=allowed or None,
         disallow_ips=removed or None,
     )
-
-
-def _admin(transport: Transport, name: str, operation: str, refusal: str) -> str:
-    """Return the name a project's requests address it by, once its info shows the session's user is an admin of it."""
-    info = projects.info(transport, name)
-    active = info.child("active_repo")
-    if active.text("project_name") != name:
-        raise active.changed("project_name")
-    # The page's own test: what Odoo.sh answers anyone else was never seen.
-    if not projects.is_admin(info):
-        raise PermissionDeniedError(refusal, operation=operation)
-    return active.text("technical_name")
 
 
 def _read(name: str, answer: Reader) -> ProjectSettings:

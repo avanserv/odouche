@@ -31,6 +31,7 @@ READS = [
     "get_project_overview",
     "get_project_settings",
     "list_audit_log",
+    "list_members",
     "list_branches",
     "list_builds",
     "list_history",
@@ -109,6 +110,25 @@ def _entry(number: int, **fields: Any) -> odouche.AuditEntry:
 def _audit(count: int) -> list[odouche.AuditEntry]:
     """Return that many audit log entries, newest first."""
     return [_entry(number) for number in range(count, 0, -1)]
+
+
+def _member(
+    number: int, role: odouche.MemberRole = odouche.MemberRole.DEVELOPER, **fields: Any
+) -> odouche.ProjectMember:
+    member = odouche.ProjectMember(
+        id=61000 + number,
+        login=f"dev-{number:03}",
+        name=f"dev-{number:03}",
+        role=role,
+        github_id=1000000 + number,
+        pending_login=False,
+    )
+    return replace(member, **fields)
+
+
+def _members(count: int) -> list[odouche.ProjectMember]:
+    """Return that many developers, in the order they sort in."""
+    return [_member(number) for number in range(count)]
 
 
 SETTINGS = odouche.BranchSettings(
@@ -205,6 +225,7 @@ class Upstream:
     built: ClassVar[list[odouche.Build]] = _builds(2)
     tracked: ClassVar[list[odouche.Tracking]] = _history(2)
     audited: ClassVar[list[odouche.AuditEntry]] = _audit(2)
+    joined: ClassVar[list[odouche.ProjectMember]] = _members(2)
     read: ClassVar[list[int]] = []
     """How many events or entries each history or audit log call yielded."""
 
@@ -257,6 +278,12 @@ class Upstream:
         for entry in self.audited[:limit]:
             self.read[-1] += 1
             yield entry
+
+    def members(self, project: str) -> list[odouche.ProjectMember]:
+        if project != ACME.name:
+            msg = f"No project {project} among those you can reach."
+            raise odouche.NotFoundError(msg)
+        return list(self.joined)
 
     def build(self, branch: odouche.Branch, build_id: int) -> odouche.Build:
         for build in self.builds(branch):
@@ -659,6 +686,103 @@ def test_the_revision_has_the_head_commit_and_the_branch_s_odoo_refs_whole():
     }
 
 
+def test_the_members_are_listed_highest_role_first_then_by_login_in_their_untrusted_field(
+    upstream: pytest.MonkeyPatch,
+):
+    upstream.setattr(
+        Upstream,
+        "joined",
+        [
+            _member(1, login="jane-doe"),
+            _member(2, odouche.MemberRole.TESTER, login="zed"),
+            _member(3, login="Ada", pending_login=True),
+            _member(4, odouche.MemberRole.ADMIN, login="octo-dev"),
+        ],
+    )
+
+    answer = _answer("list_members", project="acme")
+
+    assert [member["login"] for member in answer["untrusted_members"]] == ["octo-dev", "zed", "Ada", "jane-doe"]
+    assert answer["untrusted_members"][2] == {
+        "id": 61003,
+        "login": "Ada",
+        "name": "dev-003",
+        "role": "developer",
+        "github_id": 1000003,
+        "pending_login": True,
+    }
+    assert answer["truncated"] is False
+
+
+def test_a_cut_list_of_members_keeps_the_highest_roles(upstream: pytest.MonkeyPatch):
+    upstream.setattr(Upstream, "joined", [*_members(3), _member(9, odouche.MemberRole.ADMIN)])
+
+    answer = _answer("list_members", project="acme", limit=1)
+
+    assert [member["role"] for member in answer["untrusted_members"]] == ["admin"]
+    assert answer["truncated"] is True
+
+
+@pytest.mark.parametrize(
+    ("fields", "shown"),
+    [
+        ({"login": "octo\x1b]8;;https://example.com\x07-dev\u202e"}, {"login": "octo-dev"}),
+        ({"name": "Octo\r\nDev\x1b[2J\u2066"}, {"name": "Octo Dev"}),
+    ],
+)
+def test_a_member_comes_on_one_line_without_controls(
+    upstream: pytest.MonkeyPatch, fields: dict[str, Any], shown: dict[str, str]
+):
+    upstream.setattr(Upstream, "joined", [_member(1, **fields)])
+
+    answer = _answer("list_members", project="acme")
+
+    assert {key: answer["untrusted_members"][0][key] for key in shown} == shown
+    assert answer["truncated"] is False
+
+
+@pytest.mark.parametrize("field", ["login", "name"])
+# A line break becomes a space, `é` takes two bytes and `"` two once escaped: a count of characters is short.
+@pytest.mark.parametrize("unit", ["x\n", "é", '"', "€ "])
+def test_a_member_over_its_size_is_cut_to_it_as_json_and_says_so(upstream: pytest.MonkeyPatch, field: str, unit: str):
+    upstream.setattr(Upstream, "joined", [replace(_member(1), **{field: unit * MAX_NAME})])
+
+    answer = _answer("list_members", project="acme")
+
+    cut = answer["untrusted_members"][0][field]
+    assert "\n" not in cut
+    assert MAX_NAME - 2 <= encoded_size(cut) <= MAX_NAME
+    assert answer["truncated"] is True
+
+
+@pytest.mark.parametrize("field", ["login", "name"])
+def test_a_member_at_its_size_exactly_is_not_cut(upstream: pytest.MonkeyPatch, field: str):
+    upstream.setattr(Upstream, "joined", [replace(_member(1), **{field: "x" * (MAX_NAME - 2)})])
+
+    answer = _answer("list_members", project="acme")
+
+    assert answer["untrusted_members"][0][field] == "x" * (MAX_NAME - 2)
+    assert answer["truncated"] is False
+
+
+def test_a_member_one_byte_over_its_size_is_cut(upstream: pytest.MonkeyPatch):
+    upstream.setattr(Upstream, "joined", [_member(1, login="x" * (MAX_NAME - 1))])
+
+    answer = _answer("list_members", project="acme")
+
+    assert answer["untrusted_members"][0]["login"] == "x" * (MAX_NAME - 2)
+    assert answer["truncated"] is True
+
+
+def test_denied_members_are_an_error_with_its_message(upstream: pytest.MonkeyPatch):
+    def denied(*_: object, **__: object) -> list[odouche.ProjectMember]:
+        raise odouche.PermissionDeniedError("Odoo.sh shows a project's members to its admins only.")
+
+    upstream.setattr(Upstream, "members", denied)
+
+    assert _error("list_members", project="acme").endswith(": Odoo.sh shows a project's members to its admins only.")
+
+
 def test_the_revision_is_of_the_build_named():
     assert _answer("get_build_revision", project="acme", branch="feature-x", build_id=1)["revision"]["build_id"] == 1
 
@@ -677,6 +801,7 @@ def test_the_revision_is_of_the_build_named():
         ("list_builds", {"project": "acme", "branch": "feature-x"}, "built", _builds(MAX_BUILDS + 1), "builds"),
         ("list_history", {"project": "acme", "branch": "feature-x"}, "tracked", _history(MAX_HISTORY + 1), "events"),
         ("list_audit_log", {"project": "acme"}, "audited", _audit(MAX_AUDIT + 1), "untrusted_entries"),
+        ("list_members", {"project": "acme"}, "joined", _members(MAX_LISTED + 1), "untrusted_members"),
     ],
 )
 def test_a_list_is_cut_at_the_limit_then_at_the_cap_and_says_so(
@@ -687,7 +812,7 @@ def test_a_list_is_cut_at_the_limit_then_at_the_cap_and_says_so(
         "events": (DEFAULT_HISTORY, MAX_HISTORY),
         "untrusted_entries": (DEFAULT_AUDIT, MAX_AUDIT),
     }.get(key, (DEFAULT_LISTED, MAX_LISTED))
-    first = "author" if key == "untrusted_entries" else "id"
+    first = {"untrusted_entries": "author", "untrusted_members": "login"}.get(key, "id")
     upstream.setattr(Upstream, attribute, items)
 
     by_default = _answer(tool, **arguments)
@@ -708,6 +833,7 @@ def test_a_list_is_cut_at_the_limit_then_at_the_cap_and_says_so(
         ("list_builds", {"project": "acme", "branch": "feature-x"}, 2),
         ("list_history", {"project": "acme", "branch": "feature-x"}, 2),
         ("list_audit_log", {"project": "acme"}, 2),
+        ("list_members", {"project": "acme"}, 2),
     ],
 )
 def test_a_list_that_fits_its_limit_is_not_cut(tool: str, arguments: dict[str, Any], count: int):
@@ -724,6 +850,7 @@ def test_a_list_that_fits_its_limit_is_not_cut(tool: str, arguments: dict[str, A
         ("list_builds", {"project": "acme", "branch": "feature-x"}),
         ("list_history", {"project": "acme", "branch": "feature-x"}),
         ("list_audit_log", {"project": "acme"}),
+        ("list_members", {"project": "acme"}),
     ],
 )
 def test_a_limit_below_one_is_refused_before_odoo_sh_is_asked(tool: str, arguments: dict[str, Any]):
@@ -737,6 +864,7 @@ def test_a_limit_below_one_is_refused_before_odoo_sh_is_asked(tool: str, argumen
         ("get_project_overview", {}),
         ("get_project_settings", {}),
         ("list_audit_log", {}),
+        ("list_members", {}),
         ("list_branches", {}),
         ("list_builds", {"branch": "feature-x"}),
         ("list_builds", {"project": "acme"}),
@@ -763,6 +891,7 @@ def test_a_call_without_its_project_or_branch_is_rejected_and_nothing_is_guessed
         ("get_project_settings", {"project": "other"}, "No project other among those you can reach."),
         ("list_branches", {"project": "other"}, "No project other among those you can reach."),
         ("list_audit_log", {"project": "other"}, "No project other among those you can reach."),
+        ("list_members", {"project": "other"}, "No project other among those you can reach."),
         ("list_builds", {"project": "other", "branch": "main"}, "No project other among those you can reach."),
         ("list_builds", {"project": "acme", "branch": "gone"}, "Project acme has no branch gone."),
         ("list_history", {"project": "acme", "branch": "gone"}, "Project acme has no branch gone."),
@@ -794,6 +923,7 @@ def test_what_is_not_found_is_an_error_with_its_message(tool: str, arguments: di
         ("get_project_overview", {"project": "acme"}),
         ("get_project_settings", {"project": "acme"}),
         ("list_audit_log", {"project": "acme"}),
+        ("list_members", {"project": "acme"}),
         ("list_branches", {"project": "acme"}),
         ("list_builds", {"project": "acme", "branch": "feature-x"}),
         ("list_history", {"project": "acme", "branch": "feature-x"}),

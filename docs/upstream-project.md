@@ -201,7 +201,9 @@ for the answer. It sends:
 
 ## Members
 
-The members are `users` of [`get_settings`](#project-settings). Fixture: `project_settings.json`.
+The members are `users` of [`get_settings`](#project-settings), which the Settings page lists in
+its Collaborators item (`paas_master.GithubUserManager`), so to an `admin` only. Fixture:
+`project_settings.json`.
 
 | Field | Type | Observed |
 | --- | --- | --- |
@@ -214,6 +216,15 @@ The members are `users` of [`get_settings`](#project-settings). Fixture: `projec
 | `hosting_user_id` | `[id, name]` | Named as the `hosting_user_id` of [Projects](upstream.md#projects); the two were not compared |
 
 Roles, lowest first, from `access_level_map`: `developer` (100), `tester` (200), `admin` (300).
+Each member's select lists the keys of `access_level_map` but its empty one. No member carries an
+email: the only one in these answers is the session user's own, in `get_info`.
+
+`Client.members` asks `get_info`, applies the page's admin test to it, then asks `get_settings`
+with the drops of [Project settings](#project-settings). It reads `id`, `username`, `name`,
+`hosting_identifier` (ASCII digits, or a changed shape), `access_level` (a role it does not know is
+a changed shape) and whether `user_id` is `false`. It leaves `avatar_url` unread, as a URL handed
+to an agent is one it may fetch, the pair of `user_id`, which is Odoo.sh's own user and repeats the
+login, and `hosting_user_id`, which only a removal takes.
 
 `POST /app/user_access/<id>/set_access_level`, params `{"access_level": "<role>"}`. Fixture:
 `set_access_level.json`. The answer has no `result` key, as a [rebuild](upstream.md#rebuild).

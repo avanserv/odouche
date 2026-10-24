@@ -30,6 +30,7 @@ SHOWN = [
     ".projects()",
     ".project_overview(",
     ".project_settings(",
+    ".members(",
     ".branches(",
     ".backups(",
     ".builds(",

@@ -61,6 +61,10 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.AuditKind
 
+::: odouche.ProjectMember
+
+::: odouche.MemberRole
+
 ::: odouche.Branch
 
 ::: odouche.Stage

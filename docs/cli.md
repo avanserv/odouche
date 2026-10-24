@@ -218,6 +218,26 @@ osh --format json projects audit --project acme-shop | jq '.[] | select(.kind ==
   `(failed)`. The author and the details are printed without control characters.
 - It changes nothing on Odoo.sh.
 
+## A project's members
+
+`osh projects members` lists the [project](#project-and-branch)'s members: each one's GitHub
+login, the name Odoo.sh gives them, their role, and whether they have logged in to Odoo.sh yet.
+Admins come first, then testers, then developers, each by login.
+
+```bash
+osh projects members
+osh --format json projects members | jq '.[] | select(.role == "admin") | .login'
+```
+
+- Odoo.sh shows the members to an admin of the project only. Anyone else exits 5, and the
+  settings they are part of are not asked for.
+- `Logged in` is `no` for a member who was invited and has not logged in to Odoo.sh yet.
+- The JSON adds the membership's `id` and the member's GitHub user number, `github_id`. Odoo.sh
+  gives no member's email.
+- A login and a name are printed on one line without control characters. A role `osh` does not
+  know exits 6.
+- It changes nothing on Odoo.sh.
+
 ## Watching a build
 
 `osh builds watch` follows one build until it finishes: the one whose number is given, or the

@@ -20,6 +20,7 @@ READS = [
     "get_project_overview",
     "get_project_settings",
     "list_audit_log",
+    "list_members",
     "list_branches",
     "list_builds",
     "list_history",
@@ -43,6 +44,7 @@ def test_server_says_what_its_untrusted_fields_hold():
     for named in (
         "`untrusted_`",
         "`list_audit_log`",
+        "`list_members`",
         "`read_log`",
         "`list_mails`",
         "`read_mail`",

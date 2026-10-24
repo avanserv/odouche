@@ -296,6 +296,43 @@ with odouche.Client() as client:
 - `client.change_project_settings` changes them, as
   [State-changing operations](#state-changing-operations) has it.
 
+### Members
+
+`client.members(project)` returns the members of a project, with the role of each, as a list of
+`ProjectMember`. `project` is a `Project` or a project's name.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    members = client.members("acme-shop")
+    for member in sorted(members, key=lambda member: -member.role.rank):
+        print(member.login, member.role, "pending" if member.pending_login else "")
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id` | The number of the membership, not of the person. |
+| `login` | Their GitHub login. |
+| `name` | What Odoo.sh calls them, the login in every member seen. |
+| `role` | A `MemberRole`: `DEVELOPER`, `TESTER` or `ADMIN`. |
+| `github_id` | Their GitHub user number, which stays when they rename their login. |
+| `pending_login` | Whether they were invited and have not logged in to Odoo.sh yet. |
+
+- `MemberRole` is declared lowest first, and `role.rank` is its place, 0 for `DEVELOPER`. Compare
+  roles by `rank`: as a `StrEnum`, `<` compares its values as strings.
+- The members come in the order Odoo.sh answers them, which is by none of the fields.
+- It asks Odoo.sh for the project's info, then its settings, and only reads: the members are part
+  of the Settings page, with the same drops as [Project settings](#project-settings).
+- Odoo.sh shows that page to an admin of the project only. Anyone else gets
+  `PermissionDeniedError` before the settings are asked for.
+- A role the library does not know raises `UpstreamChangedError` naming the field.
+- Odoo.sh gives no member's email, so there is no such field.
+- A login and a name are another person's personal data, carried as given: strip their control
+  characters before a terminal shows them.
+- A project the user cannot reach raises `NotFoundError`.
+
 ### Branches
 
 `client.branches(project)` returns the branches of a project, as a list of `Branch`. `project` is a
