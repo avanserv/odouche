@@ -30,6 +30,9 @@ INFO = "/app/project/acme-shop/get_info"
 FETCH = "/paas/88212/mail/json/fetch"
 MESSAGE = "/paas/88212/mail/json/message"
 FIRST = "1761213600.M1P1Q1.build"
+# The most a parse of a large mail takes, on a shared runner under coverage. Each below takes under
+# a fifth of a second here under coverage, and the encoded words, decoded whole, more than a minute.
+BUDGET = 15
 
 
 class Messages:
@@ -328,57 +331,78 @@ def test_a_body_is_cut_at_a_byte_count_and_never_inside_a_character(client, bran
     assert (content.body, content.truncated) == ("\u00e9\u00e9", True)
 
 
-def test_headers_written_to_be_slow_to_parse_are_read_quickly():
-    # The default policy of `email` takes seconds on the first and longer on the second.
-    cc = ", ".join(f"user{number} <user{number}@example.com>" for number in range(16000))
-    parameters = "; ".join(f"p{number}=v{number}" for number in range(80000))
-    text = (
+def growth(mail, size):
+    """Return how many times longer a parse of `mail(16 * size)` takes than one of `mail(size)`.
+
+    Linear code is near 16 and quadratic code near 256. A ratio holds on a slow runner under
+    coverage, where a time would not, and the faster of two parses of each leaves out a pause.
+    """
+    seconds = []
+    for text in (mail(size), mail(16 * size)):
+        runs = []
+        for _ in range(2):
+            started = time.perf_counter()
+            _mime.parse(text)
+            runs.append(time.perf_counter() - started)
+        seconds.append(min(runs))
+    return seconds[1] / seconds[0]
+
+
+def slow_headers(size):
+    cc = ", ".join(f"user{number} <user{number}@example.com>" for number in range(size))
+    parameters = "; ".join(f"p{number}=v{number}" for number in range(2 * size))
+    return (
         f"From: a@example.com\nCc: {cc}\nContent-Type: multipart/mixed; boundary=x\n\n--x\n"
         "Content-Type: text/plain\n\nHello\n--x\nContent-Type: application/pdf\n"
         f"Content-Disposition: attachment; {parameters}; filename=a.pdf\nContent-Transfer-Encoding: base64\n\n"
         "AAAA\n--x--\n"
     )
 
-    started = time.perf_counter()
-    parsed = _mime.parse(text)
 
-    assert time.perf_counter() - started < 1
+def headers_and_parts(size):
+    headers = "".join(f"X-Header-{number}: v\n" for number in range(size))
+    parts = "".join(f"--x\nContent-Type: text/plain\n\nx{number}\n" for number in range(size))
+    return f"From: a@example.com\n{headers}Content-Type: multipart/mixed; boundary=x\n\n{parts}--x--\n"
+
+
+def test_headers_written_to_be_slow_to_parse_are_read_in_a_time_in_line_with_their_size():
+    # The default policy of `email` parses a structured header in a time that grows faster than its size.
+    parsed = _mime.parse(slow_headers(2000))
+
     assert (parsed.body, parsed.attachments) == ("Hello", (MailAttachment("a.pdf", 3),))
     assert parsed.cc.startswith("user0 <user0@example.com>, user1")
+    assert growth(slow_headers, 2000) < 40
+
+
+def test_a_mail_of_many_headers_and_many_parts_is_read_in_a_time_in_line_with_its_size():
+    # The parser asks the mail's type for each of its parts, which walks every header of the mail.
+    parsed = _mime.parse(headers_and_parts(1250))
+
+    assert (parsed.body, parsed.truncated) == ("x0", True)
+    assert growth(headers_and_parts, 1250) < 40
 
 
 def test_a_header_of_encoded_words_is_decoded_from_its_start_only():
-    # Decoding encoded words takes minutes on a header of a few megabytes.
-    cc = "=?utf-8?b?SsOpcsO0bWU=?= " * 80000
+    # Decoding all of it takes this mail more than a minute: its first 65536 characters, a few milliseconds.
+    cc = "=?utf-8?b?SsOpcsO0bWU=?= " * 200000
     started = time.perf_counter()
     parsed = _mime.parse(f"From: a@example.com\nCc: {cc}\n\nHello\n")
 
-    assert time.perf_counter() - started < 1
+    assert time.perf_counter() - started < BUDGET
     assert parsed.cc.startswith("J\u00e9r\u00f4me")
     assert len(parsed.cc) < len(cc)
     assert (parsed.body, parsed.truncated) == ("Hello\n", True)
 
 
 def test_the_parts_are_read_up_to_a_cap():
-    parts = "".join(f"--x\nContent-Disposition: attachment; filename=f{number}\n\nx\n" for number in range(20000))
+    parts = "".join(f"--x\nContent-Disposition: attachment; filename=f{number}\n\nx\n" for number in range(5000))
     started = time.perf_counter()
     parsed = _mime.parse(f"From: a@example.com\nContent-Type: multipart/mixed; boundary=x\n\n{parts}--x--\n")
 
-    assert time.perf_counter() - started < 2
+    assert time.perf_counter() - started < BUDGET
     assert 0 < len(parsed.attachments) < 1000
     assert parsed.attachments[0] == MailAttachment("f0", 1)
     assert parsed.truncated
-
-
-def test_a_mail_of_many_headers_and_many_parts_is_read_quickly():
-    # The parser asks the mail's type for each of its parts, which walks every header of the mail.
-    headers = "".join(f"X-Header-{number}: v\n" for number in range(20000))
-    parts = "".join(f"--x\nContent-Type: text/plain\n\nx{number}\n" for number in range(20000))
-    started = time.perf_counter()
-    parsed = _mime.parse(f"From: a@example.com\n{headers}Content-Type: multipart/mixed; boundary=x\n\n{parts}--x--\n")
-
-    assert time.perf_counter() - started < 2
-    assert (parsed.body, parsed.truncated) == ("x0", True)
 
 
 def test_a_forwarded_mail_is_an_attachment_and_its_text_not_the_body(client, branch, build, messages):
