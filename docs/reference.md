@@ -37,6 +37,18 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.Project
 
+::: odouche.ProjectOverview
+
+::: odouche.Subscription
+
+::: odouche.ProductionBuild
+
+::: odouche.ProjectHosting
+
+::: odouche.StageCount
+
+::: odouche.BranchSummary
+
 ::: odouche.Branch
 
 ::: odouche.Stage

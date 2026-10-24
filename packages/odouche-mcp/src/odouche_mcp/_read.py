@@ -1,10 +1,11 @@
-"""The tools that read projects, branches, a branch's history and settings, builds, and the revision a build runs.
+"""The tools that read projects, a project's overview, branches, a branch's history and settings, builds, and the
+revision a build runs.
 
 Branch names, commit messages, and author and pusher names are written by third parties. They are returned in
 the fields of the library's models only, never in a sentence the server writes.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from mcp.server.mcpserver.exceptions import ToolError
 
@@ -30,6 +31,12 @@ HISTORY_TIMEOUT = 60
 @dataclass(frozen=True)
 class Projects:
     projects: list[odouche.Project]
+    truncated: bool
+
+
+@dataclass(frozen=True)
+class ProjectRead:
+    overview: odouche.ProjectOverview
     truncated: bool
 
 
@@ -73,6 +80,14 @@ def list_projects(limit: int = DEFAULT_LISTED) -> Projects:
     with open_client() as client:
         found = client.projects()
     return Projects(found[:limit], truncated=len(found) > limit)
+
+
+def get_project_overview(project: str) -> ProjectRead:
+    """Read the overview of a project, given by its name: its subscription, Odoo version, region, production build, its branches by stage with each one's last build, and, when the user is an admin of the project, its storage in bytes, workers and staging branches."""
+    with open_client() as client:
+        read = client.project_overview(project)
+    kept = read.branches[:MAX_LISTED]
+    return ProjectRead(replace(read, branches=kept), truncated=len(read.branches) > len(kept))
 
 
 def list_branches(project: str, limit: int = DEFAULT_LISTED) -> Branches:

@@ -5,11 +5,17 @@ design constraint rather than a guideline.
 
 ## What odouche holds
 
-- Your **password** and your **GitHub token** are never seen, stored or logged. You sign in through
-  a browser, with GitHub, as you do on Odoo.sh itself.
+- When you sign in, your **password** and your **GitHub token** are never seen, stored or logged.
+  You sign in through a browser, with GitHub, as you do on Odoo.sh itself.
 - Only the resulting **Odoo.sh session** is kept between runs, in your operating system's keyring.
   It is never written to a plain-text file, a configuration file or a cache.
 - In headless use, such as CI, the session is read from the environment and kept in memory only.
+- Some of Odoo.sh's answers carry a token or a code: a project's access token, the GitHub token a
+  project's admin set for commit statuses, the subscription and enterprise codes. odouche drops
+  each one as the answer arrives, before reading anything else, and never stores, logs, shows or
+  returns it. Two are read, and each is kept in memory for the one call only: the project's
+  access token, which opens a build's logs and mails, and the token of the redirect Odoo.sh
+  answers for a backup's file, which the download sends back to fetch the file.
 
 ## How you sign in
 

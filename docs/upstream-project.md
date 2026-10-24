@@ -37,6 +37,33 @@ Sizes are in KiB.
 `production_build` of the same answer splits the production size into `size_container`,
 `size_database`, `size_custom_branch` and `size_total`, with its `worker_url` and `branch_id`.
 
+`Client.project_overview` reads what the project page and its Settings page send, read from the
+script on 2026-10-24 from the capture of 2026-10-23: the project page asks `get_info` then
+`branches`, the Settings page `get_info` then `get_settings`. The region comes from `projects`,
+which answers it to every member.
+
+| Request | Read |
+| --- | --- |
+| `get_info` | `active_repo`: `id`, `owner`, `name`, `project_name`, `technical_name`, `subscription_validity`, `odoo_branch`, `pays_dedicated`, `production_expiration_days_left` (`null` seen), `production_build_id` (`id`, `branch_name`, `url`, or `false`); `user.access`; `config.access_level_map` |
+| `projects` | The listed project's `geolocation` (`Europe`) |
+| `branches` | Each branch's `stage`, `last_build_id`, `last_build_status` and `last_build_result` |
+| `get_settings` | `repository`: `used_storage`, `max_storage`, `max_production_workers`, `max_staging_branches` |
+
+- The page shows Settings when `access_level_map[user.access] >= access_level_map["admin"]`. The
+  library applies the same test before asking `get_settings`.
+- `subscription_validity`: `valid` was seen. The templates also name `trial` ("Trial"), `custom`
+  ("Non-standard") and `invalid` ("Expired"). The project page shows "Invalid Subscription" for
+  any other value.
+- The page's "Total accounted storage" is `production_build.size_total * 4 + size_staging`, which
+  equalled `used_storage` in the one capture. `used_storage` is also the least the storage input
+  accepts.
+- `production_expiration_days_left` is the days left of a trial given by a partnership code.
+- `get_info` holds `access_token`, `subscription_code` and the production build's
+  `enterprise_code` (only `false` seen). `projects` holds each project's `subscription_code`.
+  `get_settings` holds `ci_token`, the GitHub token for commit statuses (only `false` seen; the
+  page tests it for truth only), `subscription_code` and `subscription_code_display`. The library
+  drops them before reading.
+
 ## Audit log
 
 `POST /app/project/<technical_name>/audit_logs`, no params. Fixture: `audit_logs.json`.

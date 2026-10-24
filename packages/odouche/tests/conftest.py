@@ -128,6 +128,7 @@ class Upstream:
             "/app/revision/2206": self.load("odoo_revision.json"),
             "/app/user/profile": self.load("user_profile.json"),
             "/app/project/acme-shop/get_info": self.load("project_info.json"),
+            "/app/project/acme-corp-odoo-addons-4217/get_settings": self.load("project_settings.json"),
             "/paas/build/88212/logs/list": self.load("build_logs_list.json"),
             "/paas/88212/mail/json/fetch": self.load("mails.json"),
         }
