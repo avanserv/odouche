@@ -18,6 +18,7 @@ READS = [
     "get_session",
     "list_projects",
     "get_project_overview",
+    "get_project_settings",
     "list_audit_log",
     "list_branches",
     "list_builds",

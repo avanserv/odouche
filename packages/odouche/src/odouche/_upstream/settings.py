@@ -23,15 +23,15 @@ _OPERATION = "branch settings"
 _OPERATION_CHANGE = "branch settings change"
 _PUSH = {"nothing": PushBehavior.NOTHING, "new": PushBehavior.NEW_BUILD, "update": PushBehavior.UPDATE}
 # `none` is the form's "a specific list", which `modules` holds.
-_MODULES = {"repo": ModuleInstall.REPOSITORY, "all": ModuleInstall.ALL, "none": ModuleInstall.LISTED}
+MODULES = {"repo": ModuleInstall.REPOSITORY, "all": ModuleInstall.ALL, "none": ModuleInstall.LISTED}
 # `custom` is the form's "Run tests on module selection", and `all` its "Custom test filtering".
-_TESTS = {"off": BuildTests.OFF, "custom": BuildTests.MODULES, "all": BuildTests.TAGS}
-_AGENTS = {"claude": AiAgent.CLAUDE, "opencode": AiAgent.OPENCODE}
+TESTS = {"off": BuildTests.OFF, "custom": BuildTests.MODULES, "all": BuildTests.TAGS}
+AGENTS = {"claude": AiAgent.CLAUDE, "opencode": AiAgent.OPENCODE}
 # Written from the tables that read, so that the two cannot drift.
 _PUSH_SENT = {member: wire for wire, member in _PUSH.items()}
-_MODULES_SENT = {member: wire for wire, member in _MODULES.items()}
-_TESTS_SENT = {member: wire for wire, member in _TESTS.items()}
-_AGENTS_SENT = {member: wire for wire, member in _AGENTS.items()}
+_MODULES_SENT = {member: wire for wire, member in MODULES.items()}
+_TESTS_SENT = {member: wire for wire, member in TESTS.items()}
+_AGENTS_SENT = {member: wire for wire, member in AGENTS.items()}
 # A checkbox, as the form sends it: its hidden `off` input, or the box's own `on`.
 _FLAG = {True: "on", False: "off"}
 
@@ -56,16 +56,15 @@ def settings(transport: Transport, branch_id: int) -> BranchSettings:
         ),
     )
     result = answer.child("result")
-    modules = result.optional_text("modules")
     return BranchSettings(
-        push_behavior=_choice(result, "push_behavior", _PUSH),
+        push_behavior=choice(result, "push_behavior", _PUSH),
         project_defaults=result.boolean("apply_default_settings"),
-        module_install=_choice(result, "modules_auto", _MODULES),
-        modules=() if modules is None else tuple(name for name in map(str.strip, modules.split(",")) if name),
-        tests=_choice(result, "test_mode", _TESTS),
+        module_install=choice(result, "modules_auto", MODULES),
+        modules=modules(result),
+        tests=choice(result, "test_mode", TESTS),
         test_tags=result.optional_text("test_tags"),
         demo_data=result.boolean("demo_data"),
-        ai_agent=_choice(result, "ai_agent", _AGENTS),
+        ai_agent=choice(result, "ai_agent", AGENTS),
         odoo_version=result.optional_text("odoo_branch"),
         odoo_revision_id=result.optional_integer("odoo_revision_id"),
         machine=result.text("machine"),
@@ -175,9 +174,16 @@ def _form(change: SettingsChange) -> dict[str, str]:
     return {key: value for key, value in sent.items() if value is not None}
 
 
-def _choice[E](reader: Reader, key: str, known: dict[str, E]) -> E:
+def choice[E](reader: Reader, key: str, known: dict[str, E]) -> E:
+    """Return the member of `known` a field names. One it does not hold raises the changed shape error."""
     # Unlike a stage or a status, a setting is read to be written back: an unknown one is not passed through.
     member = known.get(reader.text(key))
     if member is None:
         raise reader.changed(key)
     return member
+
+
+def modules(reader: Reader) -> tuple[str, ...]:
+    """Return the modules of a `modules` field, which Odoo.sh gives comma-separated, or `false` for none."""
+    listed = reader.optional_text("modules")
+    return () if listed is None else tuple(name for name in map(str.strip, listed.split(",")) if name)

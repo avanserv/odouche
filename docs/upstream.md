@@ -469,7 +469,8 @@ Read from the page's script on 2026-10-14 (`paas_master.paas_app_assets`), not c
   stage needs (`access_level_map` and `access_by_stage` of the page's config).
 - No request lists these rules or says one applies. The project setting `ip_whitelist` (IPv4s,
   one per line, at most 10, in [`get_settings`](upstream-project.md#project-settings)) is a
-  permanent rule for production and staging, which the library does not read.
+  permanent rule for production and staging, which `Client.project_settings` reads as
+  `ip_allow_list`.
 
 Seen on 2026-10-14, on a production and a staging branch: the `result` is the IPv4 address the
 page shows. On the staging branch the rule took over five and a half minutes to apply. Within the

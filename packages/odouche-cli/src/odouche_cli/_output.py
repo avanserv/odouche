@@ -12,6 +12,7 @@ from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, fields, is_dataclass
 from datetime import datetime
 from enum import Enum, StrEnum
+from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network
 from typing import Annotated, TextIO
 
 import typer
@@ -95,8 +96,8 @@ def to_json(value: object) -> object:
         return value
     if isinstance(value, Enum):
         return to_json(value.value)
-    if isinstance(value, str):
-        return value
+    if isinstance(value, (str, IPv4Address, IPv6Address, IPv4Network, IPv6Network)):
+        return str(value)
     if isinstance(value, datetime):
         if value.utcoffset() is None:
             msg = "A datetime without an offset cannot be printed as JSON."

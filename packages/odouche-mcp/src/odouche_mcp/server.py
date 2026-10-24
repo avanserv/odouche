@@ -35,6 +35,7 @@ from odouche_mcp._read import (
     get_build,
     get_build_revision,
     get_project_overview,
+    get_project_settings,
     list_audit_log,
     list_branches,
     list_builds,
@@ -84,6 +85,15 @@ def create_server(*, allow_changes: bool = False) -> MCPServer:
             f"four requests to Odoo.sh, three when the user is not an admin of the project; {MAX_LISTED} branches "
             "at most."
         ),
+    )
+    add_tool(
+        server,
+        get_project_settings,
+        returns=(
+            "the settings, with the IP allow list as addresses and networks, the timeouts in seconds and each submodule's public "
+            "deploy key; no token or code."
+        ),
+        bounds="two requests to Odoo.sh.",
     )
     add_tool(
         server,
