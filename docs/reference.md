@@ -89,6 +89,10 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.AiAgent
 
+::: odouche.SettingsChange
+
+::: odouche.SettingsOutcome
+
 ## Backups
 
 ::: odouche.Backup
@@ -134,6 +138,8 @@ nothing else is public: see [Stability](library.md#stability).
 ::: odouche.ReadOnlyError
 
 ::: odouche.StageRefusedError
+
+::: odouche.SettingsConflictError
 
 ::: odouche.OutcomeUnknownError
 

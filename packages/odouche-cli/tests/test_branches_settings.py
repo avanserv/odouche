@@ -81,7 +81,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
 
 
 def run(*args: str) -> Result:
-    return runner.invoke(app, ["branches", "settings", *args])
+    return runner.invoke(app, ["branches", "settings", "show", *args])
 
 
 def pairs(result: Result) -> dict[str, str]:
@@ -143,7 +143,7 @@ def test_a_branch_of_its_own_shows_its_values(client: type[StubClient]):
 
 def test_as_json_is_the_whole_model_with_the_library_values():
     result = runner.invoke(
-        app, ["--format", "json", "branches", "settings", "--project", "acme", "--branch", "feature-x"]
+        app, ["--format", "json", "branches", "settings", "show", "--project", "acme", "--branch", "feature-x"]
     )
 
     shown = json.loads(result.stdout)
@@ -190,7 +190,7 @@ def test_a_setting_odoo_sh_changed_exits_6(client: type[StubClient]):
 
 
 def test_help_names_the_example():
-    result = runner.invoke(app, ["branches", "settings", "--help"])
+    result = runner.invoke(app, ["branches", "settings", "show", "--help"])
 
     assert result.exit_code == 0
-    assert "Example: osh branches settings" in click.unstyle(result.output)
+    assert "Example: osh branches settings show" in click.unstyle(result.output)

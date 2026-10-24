@@ -1,5 +1,6 @@
 import copy
 import getpass
+import json
 import re
 from pathlib import Path
 from urllib.parse import urlencode
@@ -41,6 +42,7 @@ SHOWN = [
     ".mails(",
     ".mail(",
     ".rebuild(",
+    ".change_branch_settings(",
     ".create_backup(",
     ".download(",
     "except odouche.OdoucheError",
@@ -88,6 +90,14 @@ def odoo_sh(upstream, backend, session, monkeypatch, tmp_path):
         return httpx2.Response(200, json=upstream.load("rebuild.json"))
 
     upstream.bodies["/app/branch/51044/rebuild"] = rebuild
+    settings = upstream.bodies["/app/branch/51044/get_settings"]["result"]
+
+    def save(request):
+        # As Odoo.sh is taken to: each choice sent is stored as it is read.
+        settings.update(json.loads(request.content)["params"])
+        return httpx2.Response(200, json=upstream.load("set_settings.json"))
+
+    upstream.bodies["/app/branch/51044/set_settings"] = save
     # Rebuilt and backed up both.
     upstream.bodies[BUILDS]["result"][0]["branch_info"]["stage"] = "staging"
     backups = upstream.bodies[BACKUPS]["result"]

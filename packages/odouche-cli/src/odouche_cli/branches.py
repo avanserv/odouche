@@ -2,15 +2,18 @@
 
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Annotated
 
 import typer
 
 import odouche
+from odouche_cli import _terminal
 from odouche_cli._client import open_client
 from odouche_cli._context import (
     BranchOption,
     BuildOption,
+    ContextError,
     ProjectOption,
     checkout_branch,
     find_build,
@@ -23,16 +26,25 @@ from odouche_cli._context import (
     status_of,
     subject,
 )
+from odouche_cli._errors import EXIT_DECLINED
 from odouche_cli._output import Column, Format, Output, strip_control
 from odouche_cli._time import ago
 
 
 app = typer.Typer(
     name="branches",
-    help="List the branches of an Odoo.sh project, a branch's history and settings, and the revision a build runs.",
+    help="List the branches of an Odoo.sh project, a branch's history, show and change its settings, and the "
+    "revision a build runs.",
     epilog="Example: osh branches list --stage staging",
     no_args_is_help=True,
 )
+settings_app = typer.Typer(
+    name="settings",
+    help="Show a branch's settings, or change them.",
+    epilog="Example: osh branches settings show --branch staging",
+    no_args_is_help=True,
+)
+app.add_typer(settings_app)
 
 _STAGE_ORDER = {odouche.Stage.PRODUCTION: 0, odouche.Stage.STAGING: 1, odouche.Stage.DEVELOPMENT: 2}
 
@@ -58,6 +70,18 @@ LimitOption = Annotated[
 CommitsOption = Annotated[
     bool,
     typer.Option("--commits", help="Print each commit in full: its whole hash, its address and its whole message."),
+]
+YesOption = Annotated[
+    bool,
+    typer.Option("--yes", "-y", help="Change without asking. Needed when stdin or stderr is not a terminal."),
+]
+SettingsArgument = Annotated[
+    list[str],
+    typer.Argument(
+        metavar="NAME=VALUE...",
+        show_default=False,
+        help="A setting and its new value, named as `osh branches settings show --format json` prints them.",
+    ),
 ]
 
 
@@ -148,8 +172,8 @@ _SETTINGS = [
 ]
 
 
-@app.command(epilog="Example: osh branches settings --branch staging")
-def settings(ctx: typer.Context, project: ProjectOption = None, branch: BranchOption = None) -> None:
+@settings_app.command(epilog="Example: osh branches settings show --branch staging")
+def show(ctx: typer.Context, project: ProjectOption = None, branch: BranchOption = None) -> None:
     """Show a branch's settings, one per line, as its Settings tab has them.
 
     The new build options, from `Project defaults` to `AI agent`, apply to a development branch only, and not while it uses the project's defaults.
@@ -160,6 +184,148 @@ def settings(ctx: typer.Context, project: ProjectOption = None, branch: BranchOp
         _, found = project_branch(ctx, client, project, name)
         read = client.branch_settings(found)
     output.one(read, _SETTINGS)
+
+
+@settings_app.command("set", epilog="Example: osh branches settings set --branch feature-x ai_agent=opencode")
+def set_(
+    ctx: typer.Context,
+    settings: SettingsArgument,
+    project: ProjectOption = None,
+    branch: BranchOption = None,
+    *,
+    yes: YesOption = False,
+) -> None:
+    """Change state on Odoo.sh: change a branch's settings, sending only those given.
+
+    The others keep their value. NAME is one of push_behavior, project_defaults, module_install, modules, tests, test_tags, demo_data and ai_agent. A choice takes a value `show --format json` prints, a yes or no takes `yes` or `no`, `modules` takes names separated by commas, and `test_tags=` clears the tags. Only a development branch has new build options, and while the project's defaults apply they are changed with `project_defaults=no` too. What a new commit does is not changed on a production branch. It asks first, unless `--yes` is given.
+    """
+    output: Output = ctx.obj
+    change = _settings_change(ctx, settings)
+    name = resolve_branch(ctx, branch)
+    if not yes and not _terminal.can_ask():
+        msg = (
+            "Stdin or stderr is not a terminal, so the change cannot be confirmed. "
+            "Give --yes to change without being asked."
+        )
+        raise ContextError(msg, ctx=ctx)
+    with open_client(writes=True) as client:
+        project_name, found = project_branch(ctx, client, project, name)
+        current = client.branch_settings(found)
+        narrowed = _checked(ctx, lambda: client.check_settings_change(found, current, change))
+        for line in _changing(project_name, found, current, change, narrowed):
+            typer.echo(strip_control(line), err=True)
+        if narrowed is None:
+            typer.echo("Nothing was sent: every setting already has that value.", err=True)
+            output.one(current, _SETTINGS)
+            return
+        if not yes and not _terminal.confirmed("Change these settings of this branch?"):
+            typer.echo("Nothing was sent.", err=True)
+            raise typer.Exit(EXIT_DECLINED)
+        # Sent once: an error is reported, never retried.
+        outcome = _checked(ctx, lambda: client.change_branch_settings(found, narrowed))
+        typer.echo("The settings were changed.", err=True)
+        for name in outcome.moved:
+            before, after = _shown(getattr(outcome.before, name)), _shown(getattr(outcome.after, name))
+            typer.echo(strip_control(f"{name}: {before} → {after}, also changed by Odoo.sh."), err=True)
+    output.one(outcome.after, _SETTINGS)
+
+
+# How a setting given on the command line is read, by its name in `BranchSettings`.
+_CHOICES: dict[str, type[StrEnum]] = {
+    "push_behavior": odouche.PushBehavior,
+    "module_install": odouche.ModuleInstall,
+    "tests": odouche.BuildTests,
+    "ai_agent": odouche.AiAgent,
+}
+_FLAGS = {"yes": True, "true": True, "no": False, "false": False}
+_SETTABLE = (
+    "push_behavior",
+    "project_defaults",
+    "module_install",
+    "modules",
+    "tests",
+    "test_tags",
+    "demo_data",
+    "ai_agent",
+)
+
+
+def _settings_change(ctx: typer.Context, given: list[str]) -> odouche.SettingsChange:
+    """Read each `NAME=VALUE` into the change it gives, refusing what the library would before asking Odoo.sh."""
+    values: dict[str, object] = {}
+    for pair in given:
+        name, sign, text = pair.partition("=")
+        if not sign:
+            msg = f"{pair!r} is not NAME=VALUE."
+            raise typer.BadParameter(msg, ctx=ctx, param_hint="NAME=VALUE")
+        if name not in _SETTABLE:
+            msg = f"{name!r} is not a setting that is changed. One of: {', '.join(_SETTABLE)}."
+            raise typer.BadParameter(msg, ctx=ctx, param_hint="NAME=VALUE")
+        if name in values:
+            msg = f"{name} is given twice."
+            raise typer.BadParameter(msg, ctx=ctx, param_hint="NAME=VALUE")
+        values[name] = _value(ctx, name, text)
+    try:
+        return odouche.SettingsChange(**values)  # pyright: ignore[reportArgumentType]
+    except ValueError as error:
+        raise typer.BadParameter(str(error), ctx=ctx, param_hint="NAME=VALUE") from None
+
+
+def _value(ctx: typer.Context, name: str, text: str) -> object:
+    choices = _CHOICES.get(name)
+    if choices is not None:
+        try:
+            return choices(text)
+        except ValueError:
+            msg = f"{text!r} is not a value of {name}. One of: {', '.join(choices)}."
+            raise typer.BadParameter(msg, ctx=ctx, param_hint="NAME=VALUE") from None
+    if name in {"project_defaults", "demo_data"}:
+        flag = _FLAGS.get(text.lower())
+        if flag is None:
+            msg = f"{text!r} is not a value of {name}. One of: yes, no."
+            raise typer.BadParameter(msg, ctx=ctx, param_hint="NAME=VALUE")
+        return flag
+    if name == "modules":
+        return tuple(module for module in (part.strip() for part in text.split(",")) if module)
+    return text
+
+
+def _checked[T](ctx: typer.Context, call: Callable[[], T]) -> T:
+    """Run a call of the library, with a setting it refuses for the others after the change as a usage error."""
+    try:
+        return call()
+    except odouche.SettingsConflictError as error:
+        raise ContextError(str(error), ctx=ctx) from None
+
+
+def _changing(
+    project: str,
+    branch: odouche.Branch,
+    current: odouche.BranchSettings,
+    change: odouche.SettingsChange,
+    narrowed: odouche.SettingsChange | None,
+) -> list[str]:
+    """Say what a change is about to work on: the project, the branch, and each setting from its value to the new one.
+
+    A setting is already at its value when the library leaves it out of what it sends.
+    """
+    sent = {} if narrowed is None else narrowed.given()
+    lines = [f"Project: {project}", f"Branch: {branch.name} ({stage_of(branch)})"]
+    for name, value in change.given().items():
+        before, after = _shown(getattr(current, name)), _shown(value)
+        lines.append(f"{name}: {before} → {after}" if name in sent else f"{name} is already {after}.")
+    return lines
+
+
+def _shown(value: object) -> str:
+    """Return a setting's value as `osh branches settings show` prints it, with tags quoted and no tags as `none`."""
+    if isinstance(value, bool):
+        return "yes" if value else "no"
+    if isinstance(value, StrEnum):
+        return value.value
+    if isinstance(value, tuple):
+        return ", ".join(str(module) for module in value) or "none"
+    return f'"{value}"' if value else "none"
 
 
 _REVISION = [
