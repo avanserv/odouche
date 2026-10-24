@@ -169,6 +169,24 @@ class StubClient:
     def build_revision(self, project: str, build: Build) -> odouche.BuildRevision:
         return odouche.BuildRevision(build.id, build.name, build.branch_name, build.commit, "19.0", None)
 
+    def project_overview(self, project: str) -> odouche.ProjectOverview:
+        return odouche.ProjectOverview(
+            id=1,
+            name=project,
+            repository="acme/odoo",
+            subscription=odouche.Subscription.VALID,
+            subscription_name="valid",
+            trial_days_left=None,
+            odoo_version="19.0",
+            region="Europe",
+            dedicated=False,
+            production_build=None,
+            access_level="developer",
+            hosting=None,
+            stages=(),
+            branches=(),
+        )
+
     # The library's own, which asks nothing.
     check_rebuild = odouche.Client.check_rebuild
     check_backup = odouche.Client.check_backup

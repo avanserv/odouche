@@ -72,6 +72,10 @@ class Reader:
             raise UpstreamChangedError(self._operation, self._path(key))
         return value[0], value[1]
 
+    def optional_pair(self, key: str) -> tuple[int, str] | None:
+        """Return a many-to-one field, or `None` when Odoo.sh answers `false` for an absent value."""
+        return None if self._absent(key) else self.pair(key)
+
     def label(self, key: str) -> str:
         """Return the value of a selection field given with its label, as `["dropped", "Dropped"]`."""
         value = self._read(key, list)

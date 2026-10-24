@@ -13,6 +13,7 @@ A tool that changes Odoo.sh is registered only when the server is started with
 | --- | --- | --- |
 | [`get_session`](#get_session) | No | reads only |
 | [`list_projects`](#list_projects) | No | reads only |
+| [`get_project_overview`](#get_project_overview) | No | reads only |
 | [`list_branches`](#list_branches) | No | reads only |
 | [`list_builds`](#list_builds) | No | reads only |
 | [`list_history`](#list_history) | No | reads only |
@@ -51,6 +52,25 @@ List the Odoo.sh projects the user can reach. Call it first: every other tool ta
 - **Returns**: the projects, each with its name, repository and address, and `truncated`, true when there are more.
 - **Touches**: reads only
 - **Bounds**: one request to Odoo.sh; `limit` items, 50 by default and 200 at most.
+
+| Hint | Value |
+| --- | --- |
+| `readOnlyHint` | true |
+| `destructiveHint` | false |
+| `idempotentHint` | true |
+| `openWorldHint` | true |
+
+## `get_project_overview`
+
+Read the overview of a project, given by its name: its subscription, Odoo version, region, production build, its branches by stage with each one's last build, and, when the user is an admin of the project, its storage in bytes, workers and staging branches.
+
+| Argument | Type | Default |
+| --- | --- | --- |
+| `project` | string | Required. |
+
+- **Returns**: the overview, whose `stages` count every branch; `hosting`, which holds the storage, the workers and the staging branches, is null when the user is not an admin of the project; and `truncated`, true when the project has more branches than `branches` holds.
+- **Touches**: reads only
+- **Bounds**: four requests to Odoo.sh, three when the user is not an admin of the project; 200 branches at most.
 
 | Hint | Value |
 | --- | --- |

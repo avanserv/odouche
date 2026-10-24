@@ -29,6 +29,7 @@ from odouche_mcp._read import (
     get_branch_settings,
     get_build,
     get_build_revision,
+    get_project_overview,
     list_branches,
     list_builds,
     list_history,
@@ -63,6 +64,19 @@ def create_server(*, allow_changes: bool = False) -> MCPServer:
         list_projects,
         returns="the projects, each with its name, repository and address, and `truncated`, true when there are more.",
         bounds=f"one request to Odoo.sh; {listed}.",
+    )
+    add_tool(
+        server,
+        get_project_overview,
+        returns=(
+            "the overview, whose `stages` count every branch; `hosting`, which holds the storage, the workers and "
+            "the staging branches, is null when the user is not an admin of the project; and `truncated`, true when "
+            "the project has more branches than `branches` holds."
+        ),
+        bounds=(
+            f"four requests to Odoo.sh, three when the user is not an admin of the project; {MAX_LISTED} branches "
+            "at most."
+        ),
     )
     add_tool(
         server,

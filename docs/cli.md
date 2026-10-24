@@ -84,6 +84,24 @@ value:
 - With no source giving a value, or an empty `--project` or `--branch`, the command exits 2.
 - `--debug` says on stderr which source was used.
 
+## A project's overview
+
+`osh projects show` prints the [project](#project-and-branch)'s overview, one fact per line: its
+subscription, Odoo version, region, storage of its quota, workers, staging branches, whether it is
+on a dedicated server, its production build, its branches by stage and your access to it.
+
+```bash
+osh projects show
+osh --format json projects show --project acme-shop | jq .hosting
+```
+
+- Storage, workers and staging branches are on the project's Settings page, which Odoo.sh shows
+  to an admin of the project only. Anyone else gets `admins only` in the table, and
+  `"hosting": null` in the JSON. The region is shown to every member.
+- It asks Odoo.sh what the project's page and its Settings page ask: the project's info, its
+  branches and, for an admin, its settings, and the projects for the region. It changes nothing.
+- A subscription state `osh` does not know is printed as Odoo.sh names it.
+
 ## Watching a build
 
 `osh builds watch` follows one build until it finishes: the one whose number is given, or the
@@ -309,6 +327,7 @@ osh --format json builds show --project acme --branch feature-x | jq -r .result
     | `osh auth status` | One `SessionInfo`. |
     | `osh auth status --check` | One `Identity`, with the `SessionInfo` as its `session`. |
     | `osh projects list` | An array of `Project`. |
+    | `osh projects show` | One `ProjectOverview`. |
     | `osh branches list` | An array of `Branch`, in the order of the table. |
     | `osh branches history` | An array of `Tracking`, newest first, whatever `--commits` says. |
     | `osh branches settings` | One `BranchSettings`. |
