@@ -124,6 +124,9 @@ Search the output of every check below for the session value: it appears in none
 | R43 | | `osh builds mails --branch <production branch>` | That the branch is production and Odoo.sh catches the mails of a development or a staging build only | 4 |
 | R44 | You are an admin of the project | `osh projects show`, then with `--format json` | One fact per line, as the project's page and its Settings page show them: subscription, Odoo version, region, storage of its quota with the same percentage, workers, staging branches, production build and branches by stage. Then one `ProjectOverview`, in which no access token, GitHub token, subscription code or enterprise code appears | 0 |
 | R45 | A project you are not an admin of; skip when none is at hand | `osh projects show --project <that project>` | Storage, workers and staging branches print `admins only`; the region and the rest as R44 | 0 |
+| R46 | As R44, a project with a valid subscription and no trial days left, storage under 90% of its quota, a production build that succeeded and no failed branch | `osh projects check; echo $?`, then with `--format json` | Four `pass` rows: `subscription`, `production`, `storage` and `branches`, the storage fact as `osh projects show` prints it. Then the same four as an array of `name`, `result` and `fact` | 0 |
+| R47 | As R46 | `osh projects check --storage-margin 100; echo $?` | `storage` is `warn`, the other rows as R46 | 31 |
+| R48 | As R45 | `osh projects check --project <that project>; echo $?` | `storage` is `skip` with `admins only`; the other rows as R46 | That of the other checks |
 
 ## Streams and rebuild
 

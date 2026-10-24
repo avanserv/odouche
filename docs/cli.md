@@ -102,6 +102,37 @@ osh --format json projects show --project acme-shop | jq .hosting
   branches and, for an admin, its settings, and the projects for the region. It changes nothing.
 - A subscription state `osh` does not know is printed as Odoo.sh names it.
 
+## Checking a project
+
+`osh projects check` reads the [project](#project-and-branch)'s overview, as `osh projects show`
+does, and judges four facts of it. It prints one row per check: its name, its result (`pass`,
+`warn`, `fail` or `skip`) and the fact it was judged on. It exits 30 when a check fails, 31 when
+none fails and one warns, and 0 otherwise.
+
+```bash
+osh projects check || case $? in
+  30) echo "Something is broken." ;;
+  31) echo "Something needs a look." ;;
+  *) exit $? ;;
+esac
+```
+
+| Check | Fails | Warns |
+| --- | --- | --- |
+| `subscription` | Expired, or in a state `osh` does not know, which the project's page calls invalid. | A trial, a non-standard subscription, or a valid one with trial days left. |
+| `production` | The last build of a production branch failed. | No production branch, one with no build, or a last build that is running or ended without a result, finished with warnings, or has a result `osh` does not know. |
+| `storage` | The storage used is at or over the quota. | The storage used is within `--storage-margin` percent of the quota: 10 by default. 0 never warns and 100 warns on any use. |
+| `branches` | The last build of any branch, production included, failed. | The last build of a branch has a result `osh` does not know. |
+
+- A build dropped for a newer one is judged by the result it had.
+- Storage is on the project's Settings page, which Odoo.sh shows to an admin of the project only.
+  Anyone else gets `skip` with `admins only`. A quota of 0 is `skip` too, with the storage as
+  `osh projects show` prints it. A `skip` does not count in the exit code.
+- The check names are what a script matches on. `osh --format json projects check` gives the same
+  rows and exits as the table does. Piped into `jq`, the pipeline exits with `jq`'s code unless
+  the script runs `set -o pipefail` or reads `${PIPESTATUS[0]}`.
+- It changes nothing on Odoo.sh.
+
 ## Watching a build
 
 `osh builds watch` follows one build until it finishes: the one whose number is given, or the
@@ -371,10 +402,11 @@ osh --format json builds show --project acme --branch feature-x | jq -r .result
     | `osh logs` | One `LogLine` per line. |
     | `osh logs --kinds` | An array of `Log`. |
 
-- Three commands print an object of `osh`'s own, on one line:
+- These commands print JSON of `osh`'s own, which is on one line but for `osh projects check`:
 
     | Command | JSON on stdout |
     | --- | --- |
+    | `osh projects check` | An array of the checks: `name`, `result` (`pass`, `warn`, `fail` or `skip`) and `fact`. |
     | `osh auth login` | `identity`: the `Identity` of the stored session, or `null` when `ODOUCHE_SESSION` is set. |
     | `osh auth logout` | `source`: where the session came from, or `null` with none. `deleted`: whether it was removed from the keyring. `invalidated`: whether Odoo.sh ended it. `failure`: why Odoo.sh could not be asked, or `null`. |
     | `osh --version` | `osh` and `odouche`: the version of each. |
@@ -401,6 +433,7 @@ on stdout. These commands do otherwise:
 - `osh logs` can fail after lines went to stdout, at a follow's timeout (8) or when a request
   fails (7).
 - `osh builds open --open` prints the URL on stdout when no browser can be started, and exits 14.
+- `osh projects check` prints its checks on stdout when it exits 30 or 31.
 - `osh ssh`, once it has become `ssh`, exits with what `ssh` exits with: the code of the remote
   command, or 255 for an error of `ssh` itself. The table below is not how to read it.
 
@@ -427,6 +460,9 @@ on stdout. These commands do otherwise:
 | 22 | The build ended without a result. It was dropped for a newer build, killed or skipped, or its result is one `osh` does not know. | `osh builds watch`, `osh builds rebuild --watch` |
 | 23 | The build had not finished, or had not appeared, at the timeout. | `osh builds watch`, `osh builds rebuild --watch` |
 | 24 to 29 | Reserved for the result of a build. | None yet |
+| 30 | A check of the project failed. | `osh projects check` |
+| 31 | A check of the project warned, and none failed. | `osh projects check` |
+| 32 to 39 | Reserved for the result of a check. | None yet |
 | 130 | Interrupted with Ctrl+C. | Every command |
 | 141 | Stdout is a pipe and its reader, such as `head`, closed it. Nothing is written to stderr. | Every command |
 
