@@ -31,6 +31,10 @@ EXIT_BUILD_WARNING = 21
 EXIT_BUILD_NO_RESULT = 22
 EXIT_BUILD_TIMEOUT = 23
 
+# What `osh projects check` exits with, in the 30 to 39 kept for the result of a check.
+EXIT_CHECK_FAILED = 30
+EXIT_CHECK_WARNED = 31
+
 # What `osh ssh` exits with when there is no `ssh` to become.
 EXIT_NO_SSH = 14
 # What `osh builds open --open` exits with when no browser opens: as with `osh ssh`, what to use
