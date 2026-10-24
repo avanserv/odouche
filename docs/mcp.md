@@ -98,6 +98,15 @@ page, to an admin only, and they are not asked otherwise. The region is there fo
 every branch. Each branch's last build holds its number, status and result only: `get_build` reads
 the rest. No token or code is in the result.
 
+### `list_audit_log`
+
+Odoo.sh shows a project's audit log to an admin of the project only: anyone else gets an error,
+and the log is not asked for. Odoo.sh sends the whole of the last 30 days in one answer, with no
+paging, so `limit` bounds what is returned, not what Odoo.sh sends. The entries are in
+`untrusted_entries`: their author, action and details were written by other people, and the
+details hold addresses, logins and what an SSH client says of itself. An action the library does
+not know has the kind `unknown`, with what Odoo.sh calls it in `kind_name`.
+
 ### `list_branches`
 
 The branches come in the order Odoo.sh answers them.
@@ -214,8 +223,8 @@ again, since a second call can start a second build.
 
 ## Security
 
-- **By default** the server reads your projects, their branches, a branch's settings, their builds,
-  the builds' logs and the mails a development or staging build caught. It changes nothing on
+- **By default** the server reads your projects, a project's audit log, their branches, a branch's
+  settings, their builds, the builds' logs and the mails a development or staging build caught. It changes nothing on
   Odoo.sh.
 - **With `--allow-changes`** it can also start a rebuild of a development or a staging branch, and
   change a branch's settings: what a new commit does, and a development branch's new build
@@ -284,9 +293,9 @@ it to `.claude/settings.json`:
   in your configuration. Under another name than `odouche`, change `SERVER` in the script and the
   matcher above.
 - It does not read a call's arguments, and it never denies a call.
-- `read_log`, `list_mails` and `read_mail` are among the tools it approves, so the lines of a
-  [build log](#build-logs-and-mails) and the text of a caught mail reach the agent without a
-  prompt.
+- `list_audit_log`, `read_log`, `list_mails` and `read_mail` are among the tools it approves, so
+  an audit log's details, the lines of a [build log](#build-logs-and-mails) and the text of a
+  caught mail reach the agent without a prompt.
 - It does not replace `--allow-changes`: without the flag there is no tool to ask about.
 
 Another client decides from the [hints](#tool-contract) each tool carries.
@@ -330,7 +339,9 @@ and the `timeout` of `wait_for_build` follow the same rule.
 
 Branch names, commit messages and author names are written by other people. The server returns
 them in the fields of a result only, never in a sentence of its own, and a client should treat
-them as data, not as instructions.
+them as data, not as instructions. An audit log's entries are in `untrusted_entries`, as a build's
+logs and mails are in `untrusted_` fields: each on one line, without control characters and
+within a size.
 
 ## Tool contract
 

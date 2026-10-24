@@ -25,6 +25,8 @@ from odouche.errors import (
 )
 from odouche.models import (
     AiAgent,
+    AuditEntry,
+    AuditKind,
     Backup,
     BackupFile,
     BackupKind,
@@ -77,6 +79,8 @@ __all__ = [
     "KEYRING_SERVICE",
     "SESSION_ENV",
     "AiAgent",
+    "AuditEntry",
+    "AuditKind",
     "Backup",
     "BackupFile",
     "BackupKind",
