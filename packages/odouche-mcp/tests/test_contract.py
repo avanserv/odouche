@@ -7,7 +7,7 @@ asks the client.
 import asyncio
 import ipaddress
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from typing import Any, Self
 
@@ -57,6 +57,27 @@ BUILD = odouche.Build(
     status_info=None,
     started_at=None,
     url=None,
+)
+
+PROJECT_SETTINGS = odouche.ProjectSettings(
+    name=PROJECT.name,
+    odoo_domain_blocked=False,
+    session_lifetime=odouche.SessionLifetime.AUTO,
+    public=False,
+    commit_statuses_suspended=False,
+    deploy_key_writable=False,
+    submodules=(),
+    hosting=odouche.ProjectHosting(1024, 2048, 1, 1),
+    dedicated=False,
+    http_timeout_seconds=900,
+    cron_timeout_seconds=900,
+    module_install=odouche.ModuleInstall.REPOSITORY,
+    modules=(),
+    tests=odouche.BuildTests.MODULES,
+    test_tags=None,
+    demo_data=True,
+    ai_agent=odouche.AiAgent.CLAUDE,
+    ip_allow_list=(ipaddress.ip_address("198.51.100.42"), ipaddress.ip_network("203.0.113.0/24")),
 )
 
 MAIL = odouche.Mail(id="1", date=None, date_text="", sender="a@example.com", recipients="b@example.com", subject="Hi")
@@ -127,26 +148,7 @@ RESULTS: dict[str, object] = {
         stages=(odouche.StageCount(odouche.Stage.DEVELOPMENT, "dev", 1),),
         branches=(odouche.BranchSummary(BRANCH, None),),
     ),
-    "project_settings": odouche.ProjectSettings(
-        name=PROJECT.name,
-        odoo_domain_blocked=False,
-        session_lifetime=odouche.SessionLifetime.AUTO,
-        public=False,
-        commit_statuses_suspended=False,
-        deploy_key_writable=False,
-        submodules=(),
-        hosting=odouche.ProjectHosting(1024, 2048, 1, 1),
-        dedicated=False,
-        http_timeout_seconds=900,
-        cron_timeout_seconds=900,
-        module_install=odouche.ModuleInstall.REPOSITORY,
-        modules=(),
-        tests=odouche.BuildTests.MODULES,
-        test_tags=None,
-        demo_data=True,
-        ai_agent=odouche.AiAgent.CLAUDE,
-        ip_allow_list=(ipaddress.ip_address("198.51.100.42"), ipaddress.ip_network("203.0.113.0/24")),
-    ),
+    "project_settings": PROJECT_SETTINGS,
     "rebuild": BUILD,
     "check_settings_change": odouche.SettingsChange(ai_agent=odouche.AiAgent.OPENCODE),
     "change_branch_settings": odouche.SettingsOutcome(
@@ -186,6 +188,10 @@ RESULTS: dict[str, object] = {
         ),
         ("tests",),
     ),
+    "check_project_settings_change": odouche.ProjectSettingsChange(ai_agent=odouche.AiAgent.OPENCODE),
+    "change_project_settings": odouche.SettingsOutcome(
+        PROJECT_SETTINGS, replace(PROJECT_SETTINGS, ai_agent=odouche.AiAgent.OPENCODE), ()
+    ),
     "audit_log": [
         odouche.AuditEntry(
             logged_at=datetime(2026, 1, 1, tzinfo=UTC),
@@ -211,7 +217,10 @@ FAILURES: list[odouche.OdoucheError] = [
 
 SAMPLES: dict[str, object] = {"string": "acme", "integer": 1, "number": 1.0, "boolean": False}
 # What a tool needs beyond its required arguments to do anything, by its name.
-OPTIONAL: dict[str, dict[str, object]] = {"change_branch_settings": {"ai_agent": "opencode"}}
+OPTIONAL: dict[str, dict[str, object]] = {
+    "change_branch_settings": {"ai_agent": "opencode"},
+    "change_project_settings": {"ai_agent": "opencode"},
+}
 
 
 class StandIn:
@@ -561,3 +570,51 @@ def test_a_tool_that_changes_something_says_what():
 
     assert violations(server) == []
     assert asyncio.run(_tools(server))[0].annotations == changing
+
+
+def test_every_tool_that_changes_state_refuses_an_argument_it_does_not_declare():
+    tools = asyncio.run(_tools(create_server(allow_changes=True)))
+    changing = [tool for tool in tools if not (tool.annotations and tool.annotations.read_only_hint)]
+
+    assert changing
+    assert [tool.name for tool in changing if tool.input_schema.get("additionalProperties") is not False] == []
+
+
+def test_no_tool_takes_a_setting_that_changes_who_reaches_a_project():
+    tools = asyncio.run(_tools(create_server(allow_changes=True)))
+    refused = odouche.ProjectSettingsChange.ACCESS | {"ip_allow_list", "ip_whitelist"}
+
+    assert [
+        (tool.name, name) for tool in tools for name in tool.input_schema.get("properties", {}) if name in refused
+    ] == []
+
+
+def test_an_undeclared_argument_fails_a_changing_tool_before_it_runs_and_not_a_read_only_one():
+    ran: list[str] = []
+
+    def list_builds(project: str) -> Projects:
+        """List the builds."""
+        ran.append(project)
+        return Projects([])
+
+    server = scratch()
+    add(server, list_projects)
+    add(
+        server,
+        list_builds,
+        touches="starts a build of the branch.",
+        annotations=READ_ONLY.model_copy(update={"read_only_hint": False}),
+    )
+
+    async def call() -> tuple[bool, bool]:
+        async with Client(server) as client:
+            changing = await client.call_tool("list_builds", {"project": "acme", "public": True})
+            reading = await client.call_tool("list_projects", {"public": True})
+            return changing.is_error, reading.is_error
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(odouche, "Client", StandIn)
+        patch.setattr(StandIn, "failure", None)
+        assert asyncio.run(call()) == (True, False)
+
+    assert ran == []

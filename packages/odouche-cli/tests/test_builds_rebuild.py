@@ -37,8 +37,9 @@ DOWNLOAD = ("backups", "download")
 PULL = ("backups", "pull")
 OPEN = ("builds", "open")
 SETTINGS = ("branches", "settings", "set")
+PROJECT_SETTINGS = ("projects", "settings", "set")
 # The commands that open a client that writes.
-WRITERS = {REBUILD, BACKUP, DOWNLOAD, SETTINGS}
+WRITERS = {REBUILD, BACKUP, DOWNLOAD, SETTINGS, PROJECT_SETTINGS}
 
 
 def build(number: int, **changes: object) -> Build:
@@ -221,6 +222,7 @@ class StubClient:
     # The library's own, which asks nothing.
     check_rebuild = odouche.Client.check_rebuild
     check_settings_change = odouche.Client.check_settings_change
+    check_project_settings_change = odouche.Client.check_project_settings_change
     check_backup = odouche.Client.check_backup
     ssh_target = odouche.Client.ssh_target
     panel_url = odouche.Client.panel_url
@@ -235,9 +237,18 @@ class StubClient:
             raise self.lost
         return STARTED
 
-    def change_branch_settings(self, branch: Branch, change: odouche.SettingsChange) -> odouche.SettingsOutcome:
+    def change_branch_settings(
+        self, branch: Branch, change: odouche.SettingsChange
+    ) -> odouche.SettingsOutcome[odouche.BranchSettings]:
         self.calls.append(f"settings {branch.name}")
         before = self.branch_settings(branch)
+        return odouche.SettingsOutcome(before, replace(before, **change.given()), ())  # pyright: ignore[reportArgumentType]
+
+    def change_project_settings(
+        self, project: str, change: odouche.ProjectSettingsChange
+    ) -> odouche.SettingsOutcome[odouche.ProjectSettings]:
+        self.calls.append(f"project settings {project}")
+        before = self.project_settings(project)
         return odouche.SettingsOutcome(before, replace(before, **change.given()), ())  # pyright: ignore[reportArgumentType]
 
     def create_backup(self, project: str, branch: Branch, *, comment: str = "") -> odouche.BackupRequest:
@@ -659,6 +670,7 @@ ARGUMENTS: dict[tuple[str, ...], tuple[str, ...]] = {
     OPEN: ("monitor",),
     # What a new commit does: a staging branch has no new build options.
     SETTINGS: ("--yes", "push_behavior=update"),
+    PROJECT_SETTINGS: ("--yes", "public=yes"),
 }
 # The commands that build no client.
 CLIENTLESS = {("auth", "logout")}

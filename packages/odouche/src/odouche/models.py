@@ -6,6 +6,7 @@ from dataclasses import dataclass, fields
 from datetime import datetime
 from enum import StrEnum
 from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network
+from typing import ClassVar
 
 from odouche.errors import OdoucheError
 
@@ -497,6 +498,19 @@ class AiAgent(StrEnum):
     OPENCODE = "opencode"
 
 
+class SessionLifetime(StrEnum):
+    """How long a member's session on Odoo.sh can last while working on a project."""
+
+    AUTO = "auto"
+    """As Odoo.sh sees fit, never over 8 days."""
+    FOUR_HOURS = "4h"
+    EIGHT_HOURS = "8h"
+    ONE_DAY = "1d"
+    TWO_DAYS = "2d"
+    FOUR_DAYS = "4d"
+    EIGHT_DAYS = "8d"
+
+
 @dataclass(frozen=True, slots=True)
 class BranchSettings:
     """A branch's settings, as its Settings tab shows them.
@@ -554,16 +568,22 @@ class BranchSettings:
 _MODULE = re.compile(r"[A-Za-z0-9_]+")
 # The characters of Odoo's `--test-tags`: `[-][tag][/module][:class][.method][[params]]`, separated by commas.
 _TEST_TAGS = re.compile(r"[A-Za-z0-9_/:.,*+\-\[\]]*")
-# What each field of a change is given as.
+# What each field of a change is given as, a branch's or a project's: a name in both means the same in both.
 _KINDS: dict[str, type] = {
     "push_behavior": PushBehavior,
     "project_defaults": bool,
+    "session_lifetime": SessionLifetime,
+    "public": bool,
+    "http_timeout_seconds": int,
+    "cron_timeout_seconds": int,
     "module_install": ModuleInstall,
     "modules": tuple,
     "tests": BuildTests,
     "test_tags": str,
     "demo_data": bool,
     "ai_agent": AiAgent,
+    "allow_ips": tuple,
+    "disallow_ips": tuple,
 }
 
 
@@ -611,17 +631,17 @@ class SettingsChange:
 
     def given(self) -> dict[str, object]:
         """Return the settings given, by name, in the order of the fields."""
-        return {field.name: value for field in fields(self) if (value := getattr(self, field.name)) is not None}
+        return _given(self)
 
 
 @dataclass(frozen=True, slots=True)
-class SettingsOutcome:
-    """What a change of a branch's settings did: the settings before and after it."""
+class SettingsOutcome[S]:
+    """What a change of settings did, a branch's or a project's: the settings before and after it."""
 
-    before: BranchSettings
+    before: S
     """The settings read before the change."""
 
-    after: BranchSettings
+    after: S
     """The settings read back after it, which show every setting sent as sent."""
 
     moved: tuple[str, ...]
@@ -629,13 +649,24 @@ class SettingsOutcome:
     build runs once it installs every module. `before` and `after` hold their values."""
 
 
+def _given(change: object) -> dict[str, object]:
+    return {field.name: value for field in fields(change) if (value := getattr(change, field.name)) is not None}  # pyright: ignore[reportArgumentType]
+
+
 def _check_setting(name: str, value: object) -> None:
     kind = _KINDS[name]
-    # `bool` is checked exactly: an `int` is not a yes or a no.
-    if not (type(value) is kind if kind is bool else isinstance(value, kind)):
+    # `bool` and `int` are checked exactly: an `int` is not a yes or a no, and a `bool` is no timeout.
+    if not (type(value) is kind if kind in {bool, int} else isinstance(value, kind)):
         msg = f"`{name}` is given as a {kind.__name__}."
         raise TypeError(msg)
-    if isinstance(value, tuple):
+    if type(value) is int and value <= 0:
+        msg = f"`{name}` is a number of seconds over 0."
+        raise ValueError(msg)
+    if name == "allow_ips" and isinstance(value, tuple):
+        _check_allowed(value)
+    elif name == "disallow_ips" and isinstance(value, tuple):
+        _check_disallowed(value)
+    elif isinstance(value, tuple):
         for module in value:
             # A comma would split the name in two once sent, and a space or a control character is no module's.
             if not isinstance(module, str) or not _MODULE.fullmatch(module):
@@ -647,17 +678,35 @@ def _check_setting(name: str, value: object) -> None:
         raise ValueError(msg)
 
 
-class SessionLifetime(StrEnum):
-    """How long a member's session on Odoo.sh can last while working on a project."""
+def _check_allowed(addresses: tuple[object, ...]) -> None:
+    _check_entries("allow_ips", addresses)
+    for address in addresses:
+        if not isinstance(address, IPv4Address):
+            # The page asks for IPv4 addresses, one a line: what Odoo.sh does with anything else is unseen.
+            msg = f"`allow_ips` is given as IPv4 addresses, not as {type(address).__name__}."
+            raise TypeError(msg)
+        # `0.0.0.0` could read as any address, and none of these is one Odoo.sh sees a client come from.
+        kinds = (address.is_unspecified, address.is_loopback, address.is_multicast, address.is_link_local)
+        if any(kinds) or address.is_reserved:
+            msg = f"{address} is not an address Odoo.sh sees a client come from."
+            raise ValueError(msg)
 
-    AUTO = "auto"
-    """As Odoo.sh sees fit, never over 8 days."""
-    FOUR_HOURS = "4h"
-    EIGHT_HOURS = "8h"
-    ONE_DAY = "1d"
-    TWO_DAYS = "2d"
-    FOUR_DAYS = "4d"
-    EIGHT_DAYS = "8d"
+
+def _check_disallowed(entries: tuple[object, ...]) -> None:
+    _check_entries("disallow_ips", entries)
+    for entry in entries:
+        if not isinstance(entry, IPv4Address | IPv6Address | IPv4Network | IPv6Network):
+            msg = f"`disallow_ips` is given as addresses and networks, not {type(entry).__name__}."
+            raise TypeError(msg)
+
+
+def _check_entries(name: str, entries: tuple[object, ...]) -> None:
+    if not entries:
+        msg = f"`{name}` names at least one entry, or is left `None`."
+        raise ValueError(msg)
+    if len(set(entries)) != len(entries):
+        msg = f"`{name}` names an entry twice."
+        raise ValueError(msg)
 
 
 @dataclass(frozen=True, slots=True)
@@ -745,6 +794,81 @@ class ProjectSettings:
     builds, in the order the Settings page lists them: an entry with a `/` as a network, any other as
     an address.
     """
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ProjectSettingsChange:
+    """Settings to change on a project, named as in `ProjectSettings`: a field left `None` keeps its value on Odoo.sh.
+
+    The allow list is changed by entry, never replaced: `allow_ips` adds IPv4 addresses, and
+    `disallow_ips` removes entries as `ProjectSettings.ip_allow_list` reads them. Raises
+    `ValueError` when no field is given, for a timeout of 0 or less, an allow list field that is
+    empty or names an entry twice, an entry in both, an address to allow that is unspecified,
+    loopback, multicast, link-local or reserved, and as `SettingsChange` does for modules and
+    test tags. Raises `TypeError` for a value of another type, an address to allow that is not
+    an `IPv4Address` included.
+    """
+
+    ACCESS: ClassVar[frozenset[str]] = frozenset({"session_lifetime", "public", "allow_ips", "disallow_ips"})
+    """The fields that change who can reach the project or for how long."""
+
+    session_lifetime: SessionLifetime | None = None
+    """How long a member's session can last while working on the project."""
+
+    public: bool | None = None
+    """Whether the Builds page is open to visitors."""
+
+    http_timeout_seconds: int | None = None
+    """How long an HTTP request runs before a worker is stopped, in seconds, a whole number of the page's unit
+    (minutes). Dedicated server only."""
+
+    cron_timeout_seconds: int | None = None
+    """How long a scheduled action runs before it is stopped, in seconds, a whole number of the page's unit
+    (minutes). Dedicated server only."""
+
+    module_install: ModuleInstall | None = None
+    """Which modules a new development build installs."""
+
+    modules: tuple[str, ...] | None = None
+    """The modules a new development build installs with `LISTED`."""
+
+    tests: BuildTests | None = None
+    """Which tests a new development build runs."""
+
+    test_tags: str | None = None
+    """The Odoo test tags `TAGS` runs. An empty text clears them."""
+
+    demo_data: bool | None = None
+    """Whether a new development build loads demonstration data."""
+
+    ai_agent: AiAgent | None = None
+    """The agent the AI tab of a development branch runs."""
+
+    allow_ips: tuple[IPv4Address, ...] | None = None
+    """The addresses to add to the IP allow list."""
+
+    disallow_ips: tuple[IPv4Address | IPv6Address | IPv4Network | IPv6Network, ...] | None = None
+    """The entries to remove from the IP allow list."""
+
+    def __post_init__(self) -> None:
+        given = self.given()
+        if not given:
+            msg = "A change of settings names at least one setting."
+            raise ValueError(msg)
+        for name, value in given.items():
+            _check_setting(name, value)
+        both = set(self.allow_ips or ()) & set(self.disallow_ips or ())
+        if both:
+            msg = f"{min(both)} is both to allow and to remove."
+            raise ValueError(msg)
+
+    def given(self) -> dict[str, object]:
+        """Return the settings given, by name, in the order of the fields."""
+        return _given(self)
+
+    def access(self) -> tuple[str, ...]:
+        """Return the fields given that change who can reach the project, in the order of the fields."""
+        return tuple(name for name in self.given() if name in self.ACCESS)
 
 
 @dataclass(frozen=True, slots=True)

@@ -61,6 +61,10 @@ class Reader:
                 raise UpstreamChangedError(self._operation, f"{at}[{index}]")
         return cast("list[str]", values)
 
+    def keys(self) -> list[str]:
+        """Return the names of the fields, in the order of the answer."""
+        return list(self._fields)
+
     def has(self, key: str) -> bool:
         """Tell whether a field is there, whatever it holds."""
         return key in self._fields

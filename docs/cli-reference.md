@@ -31,7 +31,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project, a branch's history, show and change its settings, and the revision a build runs. |
 | [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, start a new one, open its panels and read the mails it caught. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
-| [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach, show one's overview and settings, check it, and read its audit log. |
+| [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach, show one's overview, show and change its settings, check it, and read its audit log. |
 | [`osh ssh`](#osh-ssh) | Open a shell on the branch's latest build, with your own `ssh`, its configuration and its keys. |
 
 ## `osh auth`
@@ -552,7 +552,7 @@ osh logs --follow
 
 ## `osh projects`
 
-List the Odoo.sh projects you can reach, show one's overview and settings, check it, and read its audit log.
+List the Odoo.sh projects you can reach, show one's overview, show and change its settings, check it, and read its audit log.
 
 ```text
 osh projects [OPTIONS] COMMAND [ARGS]...
@@ -564,7 +564,7 @@ osh projects [OPTIONS] COMMAND [ARGS]...
 | [`osh projects show`](#osh-projects-show) | Show a project's overview, one fact per line: its subscription, Odoo version, hosting, production build and branches by stage. |
 | [`osh projects audit`](#osh-projects-audit) | List a project's audit log, newest first: who did what, when, on which stage, and what Odoo.sh adds about it. |
 | [`osh projects check`](#osh-projects-check) | Check a project's subscription, production build, storage and branches, and exit 30 when one fails, 31 when one warns. |
-| [`osh projects settings`](#osh-projects-settings) | Show a project's settings. |
+| [`osh projects settings`](#osh-projects-settings) | Show a project's settings, or change them. |
 
 ### `osh projects list`
 
@@ -645,7 +645,7 @@ osh projects check --project acme-shop
 
 ### `osh projects settings`
 
-Show a project's settings.
+Show a project's settings, or change them.
 
 ```text
 osh projects settings [OPTIONS] COMMAND [ARGS]...
@@ -654,6 +654,7 @@ osh projects settings [OPTIONS] COMMAND [ARGS]...
 | Command | Description |
 | --- | --- |
 | [`osh projects settings show`](#osh-projects-settings-show) | Show a project's settings, one per line, as its Settings page has them. |
+| [`osh projects settings set`](#osh-projects-settings-set) | Change state on Odoo.sh: change a project's settings, sending only those given. |
 
 #### `osh projects settings show`
 
@@ -673,6 +674,33 @@ Example:
 
 ```bash
 osh projects settings show --project acme-shop
+```
+
+#### `osh projects settings set`
+
+Change state on Odoo.sh: change a project's settings, sending only those given.
+
+The others keep their value. NAME is one of session_lifetime, public, http_timeout_seconds, cron_timeout_seconds, module_install, modules, tests, test_tags, demo_data and ai_agent, the last six being the defaults of new development branches. A choice takes a value `show --format json` prints, a yes or no takes `yes` or `no`, a timeout takes seconds, a multiple of 60, and is changed on a dedicated server only, `modules` takes names separated by commas, and `test_tags=` clears the tags. The IP allow list, which SSH and PostgreSQL to production and staging go through, is changed by entry with `--add-ip` and `--remove-ip`, ten entries at most. Only an admin of the project can change them: anyone else gets exit code 5. It asks first, saying when the change is to who can reach the project, unless `--yes` is given.
+
+```text
+osh projects settings set [OPTIONS] [NAME=VALUE]...
+```
+
+| Argument | Description |
+| --- | --- |
+| `[NAME=VALUE]...` | A setting and its new value, named as `osh projects settings show --format json` prints them. |
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--add-ip IP` | An IPv4 address to add to the IP allow list. Can be given more than once. | |
+| `--remove-ip ENTRY` | An address or a network to remove from the IP allow list, as `osh projects settings show` lists it. Can be given more than once. | |
+| `--yes`, `-y` | Change without asking. Needed when stdin or stderr is not a terminal. | |
+
+Example:
+
+```bash
+osh projects settings set --project acme-shop --add-ip 203.0.113.7
 ```
 
 ## `osh ssh`
