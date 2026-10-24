@@ -300,7 +300,8 @@ def test_every_command_of_osh_has_a_section():
     page = cli_reference.render()
     found = list(paths(typer.main.get_command(app), "osh"))
 
-    assert {"osh", "osh logs", "osh builds rebuild"} <= set(found)
+    assert {"osh", "osh logs", "osh builds rebuild", "osh branches settings set"} <= set(found)
     for path in found:
-        level = "##" if len(path.split()) < 3 else "###"
+        # The root and its commands share the top level, and each group's commands sit one under it.
+        level = "#" * max(2, len(path.split()))
         assert f"\n{level} `{path}`\n" in page

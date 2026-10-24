@@ -40,6 +40,12 @@ NEXT_STEPS: tuple[tuple[type[odouche.OdoucheError], str | None], ...] = (
 )
 
 
+# Where to look after an unconfirmed change, by the operation the library names, when it is not a build.
+OUTCOME_STEPS = {
+    "branch settings change": "Read the branch's settings with get_branch_settings before trying again.",
+}
+
+
 def login_step() -> str:
     """Return what the user does to give the server a session, by where it reads one from."""
     return ENVIRONMENT if os.environ.get(odouche.SESSION_ENV) else LOGIN
@@ -48,6 +54,8 @@ def login_step() -> str:
 def tool_error(error: odouche.OdoucheError) -> ToolError:
     """Return the tool error that says what happened and, when there is one, the next step."""
     step = next(step for kind, step in NEXT_STEPS if isinstance(error, kind))
+    if isinstance(error, odouche.OutcomeUnknownError):
+        step = OUTCOME_STEPS.get(error.operation or "", step)
     if step is LOGIN:
         step = login_step()
     return ToolError(f"{error} {step}" if step else str(error))

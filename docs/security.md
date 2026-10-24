@@ -141,9 +141,12 @@ to your default browser through Python's `webbrowser`.
 
 ## What odouche can change
 
-Three calls change something on Odoo.sh. Every other call only reads.
+These calls change something on Odoo.sh. Every other call only reads.
 
 - A rebuild starts a new build of a development or a staging branch.
+- A change of a branch's settings sets only the settings named: what a new commit does, on a
+  development or a staging branch, and a development branch's new build options. A setting the
+  branch's Settings tab does not offer in its stage is refused before anything is sent.
 - A backup is taken of a staging or a production branch's latest build, and Odoo.sh keeps it for
   three days.
 - Allowing an IP lets the address of the machine that sends it connect to the builds with `ssh`
@@ -163,9 +166,10 @@ For each of them:
 ## The MCP server
 
 The server is read-only by default. Tools that change state on Odoo.sh are opt-in, and every tool
-documents what it does and what it can touch. The one such tool, a rebuild, is registered only when
-the server is started with [`--allow-changes`](mcp.md#changing-state), and each call of it writes a
-line to the server's stderr.
+documents what it does and what it can touch. Such tools, a rebuild and a change of a branch's
+settings, are registered only when the server is started with
+[`--allow-changes`](mcp.md#changing-state), and each call of one writes a line to the server's
+stderr, with the names of the settings changed but never their values.
 
 The tools that read a build's log and the mails it caught put text the build wrote into an agent's
 context: `read_log`, `list_mails` and `read_mail`. It is

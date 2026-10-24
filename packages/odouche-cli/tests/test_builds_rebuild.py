@@ -36,8 +36,9 @@ BACKUP = ("backups", "create")
 DOWNLOAD = ("backups", "download")
 PULL = ("backups", "pull")
 OPEN = ("builds", "open")
+SETTINGS = ("branches", "settings", "set")
 # The commands that open a client that writes.
-WRITERS = {REBUILD, BACKUP, DOWNLOAD}
+WRITERS = {REBUILD, BACKUP, DOWNLOAD, SETTINGS}
 
 
 def build(number: int, **changes: object) -> Build:
@@ -189,6 +190,7 @@ class StubClient:
 
     # The library's own, which asks nothing.
     check_rebuild = odouche.Client.check_rebuild
+    check_settings_change = odouche.Client.check_settings_change
     check_backup = odouche.Client.check_backup
     ssh_target = odouche.Client.ssh_target
     panel_url = odouche.Client.panel_url
@@ -202,6 +204,11 @@ class StubClient:
         if self.lost is not None:
             raise self.lost
         return STARTED
+
+    def change_branch_settings(self, branch: Branch, change: odouche.SettingsChange) -> odouche.SettingsOutcome:
+        self.calls.append(f"settings {branch.name}")
+        before = self.branch_settings(branch)
+        return odouche.SettingsOutcome(before, replace(before, **change.given()), ())  # pyright: ignore[reportArgumentType]
 
     def create_backup(self, project: str, branch: Branch, *, comment: str = "") -> odouche.BackupRequest:
         self.calls.append(f"backup {branch.name}")
@@ -620,6 +627,8 @@ ARGUMENTS: dict[tuple[str, ...], tuple[str, ...]] = {
     DOWNLOAD: ("--yes", "--new", "--link"),
     PULL: ("--output", "daily.sql.gz"),
     OPEN: ("monitor",),
+    # What a new commit does: a staging branch has no new build options.
+    SETTINGS: ("--yes", "push_behavior=update"),
 }
 # The commands that build no client.
 CLIENTLESS = {("auth", "logout")}

@@ -28,7 +28,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | --- | --- |
 | [`osh auth`](#osh-auth) | Log in to Odoo.sh, log out, and show the session in use. |
 | [`osh backups`](#osh-backups) | List the backups of an Odoo.sh project, take one, download one, and copy one over SSH. |
-| [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project, a branch's history and settings, and the revision a build runs. |
+| [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project, a branch's history, show and change its settings, and the revision a build runs. |
 | [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, start a new one, open its panels and read the mails it caught. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
 | [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach, and show one's overview. |
@@ -219,7 +219,7 @@ osh backups pull --output daily.sql.gz
 
 ## `osh branches`
 
-List the branches of an Odoo.sh project, a branch's history and settings, and the revision a build runs.
+List the branches of an Odoo.sh project, a branch's history, show and change its settings, and the revision a build runs.
 
 ```text
 osh branches [OPTIONS] COMMAND [ARGS]...
@@ -229,8 +229,8 @@ osh branches [OPTIONS] COMMAND [ARGS]...
 | --- | --- |
 | [`osh branches list`](#osh-branches-list) | List a project's branches with their stage: production, staging, then development, each sorted by name. |
 | [`osh branches history`](#osh-branches-history) | List a branch's history, newest first: each push with its commits, each rebuild and each move between stages. |
-| [`osh branches settings`](#osh-branches-settings) | Show a branch's settings, one per line, as its Settings tab has them. |
 | [`osh branches revision`](#osh-branches-revision) | Show what a build of a branch runs: its head commit, its Odoo version, and the Odoo revision the branch has selected. The latest build, or `--build`. |
+| [`osh branches settings`](#osh-branches-settings) | Show a branch's settings, or change them. |
 
 ### `osh branches list`
 
@@ -276,27 +276,6 @@ Example:
 osh branches history --branch staging --limit 30
 ```
 
-### `osh branches settings`
-
-Show a branch's settings, one per line, as its Settings tab has them.
-
-The new build options, from `Project defaults` to `AI agent`, apply to a development branch only, and not while it uses the project's defaults.
-
-```text
-osh branches settings [OPTIONS]
-```
-
-| Option | Description | Environment |
-| --- | --- | --- |
-| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
-| `--branch BRANCH` | The branch's name. Default: the git checkout's. | `OSH_BRANCH` |
-
-Example:
-
-```bash
-osh branches settings --branch staging
-```
-
 ### `osh branches revision`
 
 Show what a build of a branch runs: its head commit, its Odoo version, and the Odoo revision the branch has selected. The latest build, or `--build`.
@@ -317,6 +296,66 @@ Example:
 
 ```bash
 osh branches revision --branch staging
+```
+
+### `osh branches settings`
+
+Show a branch's settings, or change them.
+
+```text
+osh branches settings [OPTIONS] COMMAND [ARGS]...
+```
+
+| Command | Description |
+| --- | --- |
+| [`osh branches settings show`](#osh-branches-settings-show) | Show a branch's settings, one per line, as its Settings tab has them. |
+| [`osh branches settings set`](#osh-branches-settings-set) | Change state on Odoo.sh: change a branch's settings, sending only those given. |
+
+#### `osh branches settings show`
+
+Show a branch's settings, one per line, as its Settings tab has them.
+
+The new build options, from `Project defaults` to `AI agent`, apply to a development branch only, and not while it uses the project's defaults.
+
+```text
+osh branches settings show [OPTIONS]
+```
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--branch BRANCH` | The branch's name. Default: the git checkout's. | `OSH_BRANCH` |
+
+Example:
+
+```bash
+osh branches settings show --branch staging
+```
+
+#### `osh branches settings set`
+
+Change state on Odoo.sh: change a branch's settings, sending only those given.
+
+The others keep their value. NAME is one of push_behavior, project_defaults, module_install, modules, tests, test_tags, demo_data and ai_agent. A choice takes a value `show --format json` prints, a yes or no takes `yes` or `no`, `modules` takes names separated by commas, and `test_tags=` clears the tags. Only a development branch has new build options, and while the project's defaults apply they are changed with `project_defaults=no` too. What a new commit does is not changed on a production branch. It asks first, unless `--yes` is given.
+
+```text
+osh branches settings set [OPTIONS] {NAME=VALUE...}
+```
+
+| Argument | Description |
+| --- | --- |
+| `NAME=VALUE...` | A setting and its new value, named as `osh branches settings show --format json` prints them. Required. |
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--branch BRANCH` | The branch's name. Default: the git checkout's. | `OSH_BRANCH` |
+| `--yes`, `-y` | Change without asking. Needed when stdin or stderr is not a terminal. | |
+
+Example:
+
+```bash
+osh branches settings set --branch feature-x ai_agent=opencode
 ```
 
 ## `osh builds`
