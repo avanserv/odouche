@@ -48,12 +48,13 @@ from odouche_cli._time import ago, elapsed
 
 app = typer.Typer(
     name="builds",
-    help="List, show and watch the builds of a branch, start a new one, and open its panels.",
+    help="List, show and watch the builds of a branch, start a new one, open its panels and read the mails it caught.",
     epilog="Example: osh builds show",
     no_args_is_help=True,
 )
 
 _DEFAULT_LIMIT = 4
+_DEFAULT_MAILS = 20
 
 _HASH_LENGTH = 7
 
@@ -153,6 +154,14 @@ PanelArgument = Annotated[
         metavar="PANEL",
         help="The panel: the branch's monitor, or the shell or the editor on the build's own host.",
     ),
+]
+MailOption = Annotated[
+    str | None,
+    typer.Option("--mail", metavar="MAIL_ID", help="Show this mail with its body, rather than list."),
+]
+MailLimitOption = Annotated[
+    int,
+    typer.Option("--limit", min=1, help="The most mails to list, newest first. Goes without `--mail`."),
 ]
 OpenOption = Annotated[
     bool,
@@ -335,6 +344,82 @@ def open_(
     typer.echo("No browser could be started. Open this URL yourself:", err=True)
     output.stream([url], str)
     raise typer.Exit(EXIT_NO_BROWSER)
+
+
+@app.command(epilog="Example: osh builds mails --branch staging")
+def mails(
+    ctx: typer.Context,
+    build_id: BuildArgument = None,
+    project: ProjectOption = None,
+    branch: BranchOption = None,
+    *,
+    mail_id: MailOption = None,
+    limit: MailLimitOption = _DEFAULT_MAILS,
+) -> None:
+    """List the mails a build of a development or a staging branch caught: of its latest build, or BUILD_ID.
+
+    Odoo.sh catches them rather than sending them. `--mail` shows one with its body. Their text is
+    the build's: it is printed without escape sequences or control characters.
+    """
+    output: Output = ctx.obj
+    if mail_id is not None and is_given(ctx, "limit"):
+        msg = "--limit goes without --mail."
+        raise typer.BadParameter(msg, ctx=ctx)
+    name = resolve_branch(ctx, branch)
+    with open_client() as client:
+        project_name, found = project_branch(ctx, client, project, name)
+        build = find_build(client, project_name, found, build_id)
+        content = None if mail_id is None else client.mail(project_name, found, build, mail_id)
+        caught = [] if content is not None else client.mails(project_name, found, build, limit=limit)
+    if content is not None:
+        _show_mail(output, content)
+        return
+    output.rows(caught, _mail_columns(), empty=f"Build {build.id} caught no mail.")
+
+
+def _mail_columns() -> list[Column[odouche.Mail]]:
+    return [
+        Column[odouche.Mail]("ID", lambda mail: mail.id),
+        Column[odouche.Mail]("Date", _mail_date),
+        Column[odouche.Mail]("From", lambda mail: mail.sender),
+        Column[odouche.Mail]("To", lambda mail: mail.recipients),
+        Column[odouche.Mail]("Subject", lambda mail: mail.subject),
+    ]
+
+
+def _show_mail(output: Output, content: odouche.MailContent) -> None:
+    """Print a mail's headers, then its body, which is always stripped: it is never meant to drive a terminal."""
+    columns = [
+        Column[odouche.MailContent]("ID", lambda content: content.mail.id),
+        Column[odouche.MailContent]("Date", lambda content: _mail_date(content.mail)),
+        Column[odouche.MailContent]("From", lambda content: content.mail.sender),
+        Column[odouche.MailContent]("To", lambda content: content.mail.recipients),
+        Column[odouche.MailContent]("Cc", lambda content: content.cc),
+        Column[odouche.MailContent]("Subject", lambda content: content.mail.subject),
+        Column[odouche.MailContent]("Attachments", _attachments),
+    ]
+    output.one(content, columns)
+    if output.format is Format.TABLE:
+        typer.echo()
+        output.lines(content.body.splitlines(), str, strip=True)
+    if not content.truncated:
+        return
+    if content.body:
+        typer.echo(
+            "The mail was cut: to 1 MiB of body, 65536 characters a header or 1000 MIME parts, containers included.",
+            err=True,
+        )
+    else:
+        typer.echo("The mail is over 16 MiB or could not be read: its body and attachments are not shown.", err=True)
+
+
+def _mail_date(mail: odouche.Mail) -> str:
+    return mail.date_text if mail.date is None else ago(mail.date)
+
+
+def _attachments(content: odouche.MailContent) -> str | None:
+    named = [f"{attachment.name or '(no name)'} ({attachment.size} B)" for attachment in content.attachments]
+    return ", ".join(named) or None
 
 
 def _rebuilt(project: str, branch: odouche.Branch, latest: odouche.Build | None) -> list[str]:

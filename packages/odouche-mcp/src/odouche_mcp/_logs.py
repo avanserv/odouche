@@ -4,7 +4,6 @@ A log is whatever a build printed: untrusted text, with the secrets of the insta
 are returned in one field, never in a sentence the server writes, and none of it is logged.
 """
 
-import re
 from collections import deque
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -14,6 +13,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 import odouche
 from odouche_mcp._read import capped, find_build
 from odouche_mcp._session import open_client
+from odouche_mcp._untrusted import encoded_size, prefix, strip_line_control
 
 
 DEFAULT_LINES = 100
@@ -28,21 +28,6 @@ _DEFAULT_KINDS = (odouche.LogKind.INSTALL, odouche.LogKind.ODOO)
 
 # More lines than the end of a log the library reads can hold: a tail of it is all of them.
 _EVERY_LINE = 1048576
-
-# As `odouche_cli._output.strip_line_control`, which this package cannot import.
-_LINE_CONTROL = re.compile(r"[\x00-\x08\x0a-\x1f\x7f-\x9f]")
-_CSI = r"(?:\x1b\[|\x9b)[0-?]*[ -/]*[@-~]"
-_STRING = r"[^\x07\x1b\x9c]*"
-_END = r"(?:\x07|\x1b\\|\x9c)"
-# A 7-bit string that was cut goes to the end of the line. An 8-bit introducer that nothing ends
-# is a character of text decoded twice: only it goes, and `bare` is the text after it.
-_SEQUENCE = re.compile(
-    rf"{_CSI}"
-    rf"|\x1b[\]PX^_]{_STRING}{_END}?"  # OSC, DCS, SOS, PM, APC
-    rf"|[\x90\x98\x9d\x9e\x9f](?:{_STRING}{_END}|(?P<bare>{_STRING}))"  # the same, in 8 bits
-    r"|\x1b[ -/]*[0-~]"  # any other escape
-)
-_BARE_SEQUENCE = re.compile(_CSI)
 
 
 @dataclass(frozen=True)
@@ -88,18 +73,6 @@ def read_log(
     return LogRead(build.id, kind, fitting, truncated=cut or dropped)
 
 
-def strip_line_control(text: str) -> str:
-    """Remove the escape sequences from a line of a log, then the control characters but the tab."""
-    return _LINE_CONTROL.sub("", _SEQUENCE.sub(_unsequenced, text))
-
-
-def _unsequenced(found: re.Match[str]) -> str:
-    """Return what a sequence leaves: nothing, or the text after a bare 8-bit introducer."""
-    bare = found["bare"]
-    # No string starts in it: each would end where this one does not.
-    return _BARE_SEQUENCE.sub("", bare) if bare else ""
-
-
 def _tail(
     client: odouche.Client, project: str, build: odouche.Build, kind: odouche.LogKind | None, tail: int
 ) -> tuple[odouche.LogKind, Iterable[odouche.LogLine]]:
@@ -122,25 +95,8 @@ def _fitted(lines: list[str]) -> tuple[list[str], bool]:
         size = encoded_size(line)
         if size > left:
             if not fitting:
-                fitting.append(_prefix(line, left))
+                fitting.append(prefix(line, left))
             return fitting[::-1], True
         fitting.append(line)
         left -= size
     return fitting[::-1], False
-
-
-def encoded_size(line: str) -> int:
-    """Return the bytes a line takes as a JSON string. It has no control character but the tab."""
-    return len(line.encode()) + line.count('"') + line.count("\\") + line.count("\t") + 2
-
-
-def _prefix(line: str, size: int) -> str:
-    """Return the longest start of a line that takes no more than `size` bytes."""
-    kept, over = 0, len(line)
-    while kept < over:
-        middle = (kept + over + 1) // 2
-        if encoded_size(line[:middle]) <= size:
-            kept = middle
-        else:
-            over = middle - 1
-    return line[:kept]

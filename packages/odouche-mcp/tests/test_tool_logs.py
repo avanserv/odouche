@@ -10,7 +10,8 @@ from mcp import Client
 from mcp.types import CallToolResult
 
 import odouche
-from odouche_mcp._logs import DEFAULT_LINES, MAX_BYTES, MAX_LINES, encoded_size, strip_line_control
+from odouche_mcp._logs import DEFAULT_LINES, MAX_BYTES, MAX_LINES
+from odouche_mcp._untrusted import encoded_size, strip_line_control
 from odouche_mcp.server import create_server
 
 

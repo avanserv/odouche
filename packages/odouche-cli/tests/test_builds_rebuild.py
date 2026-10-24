@@ -233,6 +233,9 @@ class StubClient:
     ) -> Iterator[LogLine]:
         yield LogLine(text="Modules loaded.", offset=16, truncated=False)
 
+    def mails(self, project: str, branch: Branch, build: Build, *, limit: int = 20) -> list[odouche.Mail]:
+        return []
+
 
 @pytest.fixture(autouse=True)
 def read_only_clients() -> None:

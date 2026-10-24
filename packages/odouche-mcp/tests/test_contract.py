@@ -58,6 +58,8 @@ BUILD = odouche.Build(
     url=None,
 )
 
+MAIL = odouche.Mail(id="1", date=None, date_text="", sender="a@example.com", recipients="b@example.com", subject="Hi")
+
 # What the stand-in client answers, by method.
 RESULTS: dict[str, object] = {
     "projects": [PROJECT],
@@ -111,6 +113,8 @@ RESULTS: dict[str, object] = {
     "rebuild": BUILD,
     "logs": [odouche.Log(odouche.LogKind.INSTALL, "install", datetime(2026, 1, 1, tzinfo=UTC), "1 KB")],
     "read_log": [odouche.LogLine("Loading modules", offset=16, truncated=False)],
+    "mails": [MAIL],
+    "mail": odouche.MailContent(MAIL, cc="", body="Hello", attachments=(), truncated=False),
 }
 
 # One of each error the library raises.

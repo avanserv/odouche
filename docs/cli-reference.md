@@ -29,7 +29,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | [`osh auth`](#osh-auth) | Log in to Odoo.sh, log out, and show the session in use. |
 | [`osh backups`](#osh-backups) | List the backups of an Odoo.sh project, take one, download one, and copy one over SSH. |
 | [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project, a branch's history and settings, and the revision a build runs. |
-| [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, start a new one, and open its panels. |
+| [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, start a new one, open its panels and read the mails it caught. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
 | [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach. |
 | [`osh ssh`](#osh-ssh) | Open a shell on the branch's latest build, with your own `ssh`, its configuration and its keys. |
@@ -321,7 +321,7 @@ osh branches revision --branch staging
 
 ## `osh builds`
 
-List, show and watch the builds of a branch, start a new one, and open its panels.
+List, show and watch the builds of a branch, start a new one, open its panels and read the mails it caught.
 
 ```text
 osh builds [OPTIONS] COMMAND [ARGS]...
@@ -334,6 +334,7 @@ osh builds [OPTIONS] COMMAND [ARGS]...
 | [`osh builds watch`](#osh-builds-watch) | Watch a build until it finishes, and exit with its result: the build of HEAD, or BUILD_ID. |
 | [`osh builds rebuild`](#osh-builds-rebuild) | Change state on Odoo.sh: start a new build of a branch, which replaces its latest one. |
 | [`osh builds open`](#osh-builds-open) | Print the URL of a build's monitor, shell or editor: of its latest build, or BUILD_ID. |
+| [`osh builds mails`](#osh-builds-mails) | List the mails a build of a development or a staging branch caught: of its latest build, or BUILD_ID. |
 
 ### `osh builds list`
 
@@ -453,6 +454,34 @@ Example:
 
 ```bash
 osh builds open shell --open
+```
+
+### `osh builds mails`
+
+List the mails a build of a development or a staging branch caught: of its latest build, or BUILD_ID.
+
+Odoo.sh catches them rather than sending them. `--mail` shows one with its body. Their text is
+the build's: it is printed without escape sequences or control characters.
+
+```text
+osh builds mails [OPTIONS] [BUILD_ID]
+```
+
+| Argument | Description |
+| --- | --- |
+| `BUILD_ID` | The build's number, among the branch's latest builds. Default: the latest one. At least 1. |
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--branch BRANCH` | The branch's name. Default: the git checkout's. | `OSH_BRANCH` |
+| `--mail MAIL_ID` | Show this mail with its body, rather than list. | |
+| `--limit LIMIT` | The most mails to list, newest first. Goes without `--mail`. At least 1. Default: `20`. | |
+
+Example:
+
+```bash
+osh builds mails --branch staging
 ```
 
 ## `osh logs`

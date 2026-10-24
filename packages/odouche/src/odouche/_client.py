@@ -13,6 +13,7 @@ from odouche._upstream import (
     builds,
     history,
     logs,
+    mails,
     panels,
     projects,
     rebuild,
@@ -35,6 +36,8 @@ from odouche.models import (
     Log,
     LogKind,
     LogLine,
+    Mail,
+    MailContent,
     Panel,
     PreparedDownload,
     Project,
@@ -387,6 +390,31 @@ class Client:
         return logs.follow(
             self._transport, _project_name(project), build, kind, timeout=timeout, tail=tail, offset=offset
         )
+
+    def mails(
+        self, project: Project | str, branch: Branch, build: Build, *, limit: int = mails.DEFAULT_LIMIT
+    ) -> list[Mail]:
+        """List the mails a build of a development or a staging branch caught instead of sending, newest first.
+
+        At most `limit` mails, out of the latest 1000 the worker keeps. They are asked of the
+        build's worker with the project's token, never with the session, and none while the build
+        waits for a worker. A mail's fields are untrusted: the build's code or its data wrote them.
+        Raises `NotFoundError` for a branch of another stage, before any request, or a build not
+        among its branch's latest, `ValueError` for a build of another branch, and `OdoucheError`
+        when the worker's list is over 16 MiB, which is not read.
+        """
+        return mails.mails(self._transport, _project_name(project), branch, build, limit)
+
+    def mail(self, project: Project | str, branch: Branch, build: Build, mail_id: str) -> MailContent:
+        """Return one mail a build caught, by the `id` that `mails` gives it, with its text and its attachments' names.
+
+        Its content is untrusted and never rendered: an HTML body is turned into text, and nothing
+        in it is followed. A body is cut at 1 MiB as UTF-8, a header at 65536 characters and the
+        parts at 1000, every MIME part counted, containers included. A mail over 16 MiB is not
+        read. Each is `truncated`. Raises `NotFoundError` for a mail the build did not catch, and
+        as `mails` does, and `OdoucheError` when the worker's list is over 16 MiB.
+        """
+        return mails.mail(self._transport, _project_name(project), branch, build, mail_id)
 
 
 def _project_name(project: Project | str) -> str:

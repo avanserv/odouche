@@ -222,6 +222,29 @@ stderr, with `--debug` or without.
   its name. A build that waits for a worker has no log yet.
 - A log the build does not have exits 4, and the message names the ones it has.
 
+## Reading a build's mails
+
+A development or a staging build sends no mail: Odoo.sh catches each one. `osh builds mails`
+lists those of the branch's latest build, or of `BUILD_ID`, newest first, and `--mail` shows one
+with its body:
+
+```bash
+osh builds mails --branch staging
+osh builds mails 88212 --branch staging --limit 5
+osh builds mails --branch staging --mail 1761213600.M1P1Q1.build
+```
+
+- A mail is untrusted text: the build's code or its data wrote it. Its headers and its body are
+  printed without escape sequences, control characters and bidirectional controls, tabs kept, on
+  a terminal or not.
+- An HTML body is printed as text. Nothing in it is rendered, opened or fetched, and there is no
+  `--open`.
+- With `--format json`, a mail is printed as its model, which JSON escapes.
+- A body over 1 MiB, a header over 65536 characters and a mail of more than 1000 MIME parts,
+  containers included, are cut, and a mail over 16 MiB is shown without its body or attachments. Either says so on stderr.
+- A build that caught nothing says so on stderr and exits 0. A production branch exits 4, and so
+  does a mail the build did not catch.
+
 ## A shell on a build
 
 `osh ssh` opens a shell on the latest build of the [branch](#project-and-branch), with your own
@@ -338,7 +361,7 @@ on stdout. These commands do otherwise:
 | 1 | Unexpected error, which is a bug to report, or a prompt or a question that was declined. | Every command |
 | 2 | Usage error: an unknown option, a value an option does not take, options that do not go together, no [project or branch](#project-and-branch), a download with neither `--output` nor `--link`, or to a file that exists or a directory you cannot write to, or a rebuild, a backup, a download or an IP allow that cannot be confirmed. | Every command |
 | 3 | No session, or an expired one. Run `osh auth login`. | Every command that needs the session |
-| 4 | The project, branch, build, backup or log is not one the logged-in user can reach. A build that is not among the branch's latest ones is not, and neither is the build of a branch that has none, a backup that cannot be downloaded, a build with no panels yet, or the monitor of a development branch. | Every command that takes a project |
+| 4 | The project, branch, build, backup or log is not one the logged-in user can reach. A build that is not among the branch's latest ones is not, and neither is the build of a branch that has none, a backup that cannot be downloaded, a build with no panels yet, the monitor of a development branch, a mail the build did not catch, or the mails of a production branch. | Every command that takes a project |
 | 5 | The session is not allowed to do this. | Every command that asks Odoo.sh |
 | 6 | Odoo.sh answered in a shape `osh` does not read. Please report it. | Every command that asks Odoo.sh |
 | 7 | Odoo.sh could not be reached, or answered with a server error. | Every command that asks Odoo.sh |

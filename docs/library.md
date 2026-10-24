@@ -468,7 +468,75 @@ Each line is a `LogLine`:
 - A request that fails is sent again twice, from where the last one stopped, so no line is lost
   or repeated. Then `UpstreamUnavailableError` is raised.
 - Each call asks Odoo.sh for the build's worker and the project's access token before the log.
-  [Security](security.md#build-logs) says what happens to the token.
+  [Security](security.md#build-logs-and-mails) says what happens to the token.
+
+### Caught mails
+
+A development or a staging build sends no mail: Odoo.sh catches each one on the build's worker.
+`client.mails(project, branch, build)` lists them as `Mail`s, newest first, and
+`client.mail(project, branch, build, mail_id)` returns one as a `MailContent`, with its text.
+`build` is a build of `branch`.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    branches = {branch.name: branch for branch in client.branches("acme-shop")}
+    branch = branches["feature-invoicing"]
+    build = client.latest_build(branch)
+    if build is None:
+        raise SystemExit("The branch has no build yet.")
+    caught = client.mails("acme-shop", branch, build, limit=10)
+    for mail in caught:
+        print(mail.id, repr(mail.subject))
+    if caught:
+        content = client.mail("acme-shop", branch, build, caught[0].id)
+        print(repr(content.body))
+        for attachment in content.attachments:
+            print(repr(attachment.name), attachment.size)
+```
+
+| `Mail` field | Meaning |
+| --- | --- |
+| `id` | The worker's name for the mail, which `mail` takes. |
+| `date` | When the mail is dated, in UTC, or `None` when `date_text` is not a date. |
+| `date_text` | The date as the worker gives it. |
+| `sender` | The `From` header, as written. |
+| `recipients` | The `To` header, as written. |
+| `subject` | The `Subject` header, as written. |
+
+| `MailContent` field | Meaning |
+| --- | --- |
+| `mail` | The `Mail`. |
+| `cc` | The `Cc` header, as written. |
+| `body` | The plain text part, or the HTML part turned into text. |
+| `attachments` | Each attached file's `name` and `size` in bytes. Its content is not read. |
+| `truncated` | Whether the body was cut, or the mail was too large to read. |
+
+!!! warning "Mail content is untrusted"
+
+    Every field but `id` was written by the build's code or its data: a subject or a body can
+    hold terminal escape sequences, links and instructions. Neutralise it before showing it, and
+    never follow it.
+
+- Only a development or a staging branch's builds have mails. Any other stage raises
+  `NotFoundError` before a request, and a build of another branch raises `ValueError`.
+- The worker keeps the latest 1000 mails of a build. A build waiting for a worker has none.
+- An HTML body is turned into text: scripts, styles and images are dropped, a link keeps its
+  address after its text, and nothing is fetched or rendered. Only its first 2097152 characters
+  are read.
+- A body is cut at 1 MiB as UTF-8, a header at 65536 characters, and the parts read at 1000,
+  counting every MIME part, containers included. A forwarded mail is one attachment, whose parts
+  are not read. A mail over 16 MiB, attachments
+  included, is not read, nor is one whose source cannot be parsed: its `body` and `attachments`
+  are empty. Each sets `truncated`.
+- A worker's list of mails over 16 MiB is not read either, and raises `OdoucheError`.
+- Half of a surrogate pair in a header, which JSON can hold, is replaced with `?`. A mail whose
+  `id` holds one is listed, and `mail` raises `NotFoundError` for it: its id cannot be sent back.
+- Each call asks Odoo.sh for the build's worker and the project's access token, then the worker
+  for the list; `mail` asks it for that mail too. [Security](security.md#build-logs-and-mails)
+  says what happens to the token.
 
 ### A shell on a build
 
