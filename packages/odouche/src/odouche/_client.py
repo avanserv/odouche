@@ -47,6 +47,7 @@ from odouche.models import (
     Project,
     ProjectOverview,
     ProjectSettings,
+    ProjectSettingsChange,
     SessionInfo,
     SettingsChange,
     SettingsOutcome,
@@ -133,6 +134,34 @@ class Client:
         `NotFoundError` when the project is not one the session's user can reach.
         """
         return project_settings.project_settings(self._transport, _project_name(project))
+
+    def change_project_settings(
+        self, project: Project | str, change: ProjectSettingsChange
+    ) -> SettingsOutcome[ProjectSettings]:
+        """Change state on Odoo.sh: set the settings `change` gives on a project, and return its settings before and after.
+
+        Only those that differ are sent, in one request: the others keep their value. The allow
+        list is sent whole, as the page sends it: each entry kept as written, those removed left
+        out, the addresses added at the end. A setting the page disables, hides or refuses, given
+        the settings after the change, raises `SettingsConflictError` before the request.
+
+        Sent once. Raises `OutcomeUnknownError` when Odoo.sh did not confirm it, or the settings read
+        back do not show it, `ReadOnlyError` on a read-only client, and `PermissionDeniedError` for
+        a user who is not an admin of the project, before any change. Another setting Odoo.sh
+        moved along is in the outcome's `moved`. Asks Odoo.sh four times, twice when nothing differs.
+        """
+        return project_settings.change_settings(self._transport, _project_name(project), change)
+
+    def check_project_settings_change(
+        self, current: ProjectSettings, change: ProjectSettingsChange
+    ) -> ProjectSettingsChange | None:
+        """Return the part of `change` that differs from `current`, or `None`, and raise as `change_project_settings` would.
+
+        `current` is the project's settings, as `project_settings` reads them. A timeout's unit and
+        bounds are not part of them: `change_project_settings` checks those. Odoo.sh is not asked
+        and nothing changes, on a read-only client too: call it before asking the user.
+        """
+        return project_settings.narrow(current, change)
 
     def audit_log(
         self, project: Project | str, *, limit: int = audit.DEFAULT_LIMIT, timeout: float
@@ -302,7 +331,7 @@ class Client:
         """
         return settings.settings(self._transport, _branch_id(branch))
 
-    def change_branch_settings(self, branch: Branch | int, change: SettingsChange) -> SettingsOutcome:
+    def change_branch_settings(self, branch: Branch | int, change: SettingsChange) -> SettingsOutcome[BranchSettings]:
         """Change state on Odoo.sh: set the settings `change` gives on a branch, and return its settings before and after.
 
         Only those that differ are sent, in one request, as the page sends a section of its Settings

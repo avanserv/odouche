@@ -77,6 +77,8 @@ _OUTCOME_HINTS = {
     "backup": "`osh backups list` shows whether the backup was taken.",
     "branch settings change": "`osh branches settings show` shows whether the settings were changed. Sending the "
     "same change again does no harm.",
+    "project settings change": "`osh projects settings show` shows whether the settings were changed. Sending the "
+    "same change again does no harm.",
     "download preparation": "Preparing the file again does no harm: run the command again, naming the backup rather "
     "than giving --new.",
 }

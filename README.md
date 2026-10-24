@@ -11,11 +11,11 @@ environment: list branches, watch builds, stream logs, from a script, a terminal
 > without notice.
 >
 > **Pre-alpha.** The library and the `osh` command log in, list projects, branches, builds and
-> backups, watch a build, read and follow its logs, start a rebuild and change a branch's settings, and `osh ssh` opens a shell on a
+> backups, watch a build, read and follow its logs, start a rebuild and change a branch's or a project's settings, and `osh ssh` opens a shell on a
 > build with your own `ssh`: the
 > [CLI guide](https://avanserv.github.io/odouche/cli/) has the commands. The MCP server reports
 > its session, lists projects, branches and builds, reads one build and its logs and, when you
-> allow it, starts a rebuild and changes a branch's settings.
+> allow it, starts a rebuild and changes a branch's or a project's settings.
 
 ## Packages
 

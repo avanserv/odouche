@@ -137,7 +137,7 @@ safely, before reading.
 | --- | --- |
 | `name` | `repository.project_name`, which must be the name asked |
 | `odoo_domain_blocked` | `repository.block_odoo_domain` |
-| `session_lifetime` | `session_lifetime`, one of the seven keys of `session_lifetime_map` seen; the map is not read |
+| `session_lifetime` | `session_lifetime`, one of the seven keys of `session_lifetime_map` seen; the map is read only to change it |
 | `public` | Not `repository.private` |
 | `commit_statuses_suspended` | `repository.ci_suspended` |
 | `deploy_key_writable` | `repository.deploy_key_writable` |
@@ -148,8 +148,10 @@ safely, before reading.
 | `module_install` to `ai_agent` | `repository.modules_auto`, `modules`, `test_mode`, `test_tags`, `demo_data`, `ai_agent`, as on a branch |
 | `ip_allow_list` | `repository.ip_whitelist`, split into lines, blank ones skipped, each a network when it holds a `/` and an address otherwise: what `set_settings` accepts beyond the IPv4s the page asks for is unseen |
 
-`POST /app/project/<technical_name>/set_settings`, read from the script. As on a branch, its
-params are one section of the page as form values, and its `result` is the new `repository`.
+`POST /app/project/<technical_name>/set_settings`, read from the script
+(`SettingsPage.saveSettings`), not captured. As on a branch, its params are one section of the
+page as form values, a checkbox as `"on"` or `"off"`. The page merges its `result` into what it
+holds and looks for a saved field in it, so it holds what was saved, not the whole repository.
 
 | Section | Params | Touches access |
 | --- | --- | --- |
@@ -157,12 +159,12 @@ params are one section of the page as form values, and its `result` is the new `
 | Session lifetime | `session_lifetime`, a slider's position in `session_lifetime_map` (`"0"` is `auto`) | Yes: how long any member's session lasts on the project |
 | Public access | `public` | Yes: opens the Builds page and the development builds to anyone |
 | GitHub commit statuses | `ci_token` or `reset_ci_token` | A GitHub token |
-| GitHub key and webhook | `deploy_key_writable`, `redeploy_key`, `redeploy_webhook` | Yes: the deploy key's write access to the repository |
+| GitHub key and webhook | `deploy_key_writable` with a hidden `redeploy_key` of `1`, or `redeploy_webhook` | Yes: the deploy key's write access to the repository |
 | Production database size | `max_storage` | No; billed |
 | Database workers | `max_production_workers`, `pays_dedicated` | No; billed |
-| Workers settings | `limit_real_time`, `limit_real_time_cron` | No |
+| Workers settings | `limit_real_time`, `limit_real_time_cron`, in the limit's unit | No |
 | Staging branches | `max_staging_branches` | No; billed |
-| Development branches | The development defaults | No |
+| Development branches | The development defaults, the whole section on any change, rendered as on a branch | No |
 | Firewall | `ip_whitelist` | Yes: SSH, and PostgreSQL on a dedicated server, to production and staging |
 | Activation | `subscription_code` | No; billed |
 
@@ -172,6 +174,30 @@ params are one section of the page as form values, and its `result` is the new `
   of a billed field before sending.
 - Collaborators, submodules (`create_submodule_deploy_key`), and the limits'
   `reset_default_limits` have requests of their own.
+- A change of `block_odoo_domain` is answered `"job_queued"`. Every save of the GitHub key
+  section sends `redeploy_key`, which deploys the key again on GitHub.
+- The slider's position is an index into `Object.keys(session_lifetime_map)`, sent as a string.
+  A limit's input takes `value` in its unit, between `min` and `max` divided by `unit_conversion`
+  and rounded down, and only while `pays_dedicated`.
+
+The library sends, in one request, the fields it is given that differ from `get_settings`, and
+reads the settings again rather than `result`, as on a branch. `set_project_settings.json` stands
+for the answer. It sends:
+
+| Field | Sent as |
+| --- | --- |
+| `session_lifetime` | The index of its key in `session_lifetime_map` as answered, which must hold the seven keys seen |
+| `public` | `public`, `"on"` or `"off"` |
+| `http_timeout_seconds`, `cron_timeout_seconds` | `limit_real_time` and `limit_real_time_cron` both, as the page sends its section: the seconds given divided by `unit_conversion`, which must divide them, within the input's bounds, and the other at its `value` as read, on a project that `pays_dedicated` |
+| `module_install` to `ai_agent` | As on a branch, and refused as the page would not render them |
+| `allow_ips`, `disallow_ips` | `ip_whitelist`: each line of the text read in the same call kept as written, those whose entry is removed left out, then each address added. At most 10 entries. An edit made elsewhere between the read and the write is overwritten, as by the page |
+
+- That a field sent alone, or with fields of other sections, leaves the others as they were is
+  inferred, as on a branch: the firewall, public access and session lifetime sections hold one
+  field each, but the development section is sent whole. The settings read back are compared
+  with those before, the ones the library does not send included, so a reset is reported.
+- The project name, `block_odoo_domain`, the deploy key, the commit-status token, submodules and
+  the billed fields are not sent by the library.
 
 ## Members
 

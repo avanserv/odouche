@@ -6,6 +6,7 @@
 import functools
 import inspect
 import re
+import types
 from collections.abc import Callable
 from typing import Any
 
@@ -89,3 +90,25 @@ def add_tool[**P, R](
         # A return type with no schema fails here, not as a result without structure.
         structured_output=True,
     )
+    if not annotations.read_only_hint:
+        _refuse_undeclared(server, name)
+
+
+def _refuse_undeclared(server: MCPServer[Any], name: str) -> None:
+    """Make a tool refuse a call that gives an argument it does not declare, before it runs.
+
+    The server otherwise drops the argument and runs the tool on the rest, so a change asked for
+    in an argument the tool does not take would send the others and return as if done.
+    """
+    registered = server._tool_manager.get_tool(name)
+    if registered is None:
+        msg = f"{name}: the tool was not registered."
+        raise ValueError(msg)
+    declared = registered.fn_metadata.arg_model
+    config = {**declared.model_config, "extra": "forbid"}
+    strict = types.new_class(
+        declared.__name__, (declared,), {}, lambda namespace: namespace.update(model_config=config)
+    )
+    registered.fn_metadata.arg_model = strict
+    # What the client is shown: `additionalProperties` false.
+    registered.parameters = strict.model_json_schema(by_alias=True)

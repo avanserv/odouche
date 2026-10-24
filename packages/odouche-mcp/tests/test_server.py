@@ -34,7 +34,7 @@ READS = [
 
 
 # In the order they are registered.
-CHANGES = ["change_branch_settings", "rebuild_branch"]
+CHANGES = ["change_branch_settings", "change_project_settings", "rebuild_branch"]
 
 
 def test_server_says_what_its_untrusted_fields_hold():

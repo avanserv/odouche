@@ -293,6 +293,8 @@ with odouche.Client() as client:
 - A project the user cannot reach raises `NotFoundError`.
 - The submodule URLs, modules and test tags come from what the project's admins typed: strip their
   control characters before a terminal shows them.
+- `client.change_project_settings` changes them, as
+  [State-changing operations](#state-changing-operations) has it.
 
 ### Branches
 
@@ -750,6 +752,7 @@ Every other call of the client only reads. These are the calls that change somet
 | `client.create_backup(project, branch)` | Takes a manual backup of the branch's latest build, which Odoo.sh keeps for three days. |
 | `client.prepare_download(project, backup)` | Has Odoo.sh prepare the backup's file, which it keeps for 2 hours. |
 | `client.change_branch_settings(branch, change)` | Sets the settings a `SettingsChange` gives on the branch. |
+| `client.change_project_settings(project, change)` | Sets the settings a `ProjectSettingsChange` gives on the project, the IP allow list by entry. |
 
 ```python
 import odouche
@@ -835,6 +838,49 @@ with odouche.Client() as client:
     if client.check_settings_change(branch, client.branch_settings(branch), change) is not None:
         outcome = client.change_branch_settings(branch, change)
         print(outcome.after.push_behavior, outcome.moved)
+```
+
+- `change_project_settings` takes a `Project` or a project's name and a `ProjectSettingsChange`,
+  and returns a `SettingsOutcome` of `ProjectSettings`. It works as `change_branch_settings` does,
+  for an admin of the project: anyone else gets `PermissionDeniedError` before the settings are
+  asked for. `moved` covers every setting but the name, the hosting figures and the submodules,
+  those the change cannot send included, such as `deploy_key_writable`. It asks Odoo.sh four times, twice when nothing differs: for the project's info, its
+  settings, the change, then its settings again.
+- Its fields are the session lifetime, public access, the two timeouts, the development defaults,
+  named as in `ProjectSettings`, and the allow list by entry: `allow_ips` adds `IPv4Address`es and
+  `disallow_ips` removes entries as `ip_allow_list` reads them. The list is sent whole, as the page
+  sends it: each line kept as written, those removed left out, the addresses added at the end. The
+  lines come from a read made in the same call, so an edit made elsewhere in between is
+  overwritten, as it is by the page. An address already allowed, or an entry not listed, is left
+  out of what is sent. Both timeouts are sent when either is given, the other with its value as
+  read, as the page sends its workers section. `ACCESS` names the
+  fields that change who can reach the project, and `access()` those a change gives.
+- `ProjectSettingsChange` raises `ValueError` as `SettingsChange` does, and for a timeout of 0 or
+  less, an empty or repeated entry, an entry both to allow and to remove, or an address to allow
+  that is unspecified, loopback, multicast, link-local or reserved. An address to allow that is
+  not an `IPv4Address` raises `TypeError`.
+- `SettingsConflictError` is raised before the change for a timeout on a project with no dedicated
+  server, one that is not a whole number of the page's unit or out of its bounds, a development
+  default the page hides as a branch's tab does, or an allow list over ten entries. A change that
+  only removes entries is never refused. `client.check_project_settings_change(current, change)`
+  checks all of it but a timeout's unit and bounds, which the settings do not hold.
+
+```python
+import ipaddress
+
+import odouche
+
+
+with odouche.Client() as client:
+    change = odouche.ProjectSettingsChange(
+        ai_agent=odouche.AiAgent.OPENCODE, allow_ips=(ipaddress.IPv4Address("203.0.113.7"),)
+    )
+    current = client.project_settings("acme-shop")
+    narrowed = client.check_project_settings_change(current, change)
+    if narrowed is not None:
+        print("access:", narrowed.access())
+        outcome = client.change_project_settings("acme-shop", narrowed)
+        print(outcome.after.ip_allow_list, outcome.moved)
 ```
 
 - `prepare_download` takes the project and a `Backup` that is `downloadable`, and
