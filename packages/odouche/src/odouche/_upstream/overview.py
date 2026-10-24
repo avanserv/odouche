@@ -44,7 +44,7 @@ def overview(transport: Transport, name: str) -> ProjectOverview:
         raise NotFoundError(f"The session's user can reach no project named {name!r}.", operation="projects")
     summaries = tuple(branches.summary(row) for row in branches.listed(transport, technical_name))
     # The page shows the settings to an admin only: what they answer anyone else was never seen.
-    hosting = projects.hosting(transport, technical_name) if admin else None
+    hosting = projects.hosting(projects.settings_answer(transport, technical_name)) if admin else None
     return replace(read, region=region, hosting=hosting, stages=_stages(summaries), branches=summaries)
 
 

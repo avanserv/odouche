@@ -1,6 +1,7 @@
 """The projects request, and the info and settings of one project."""
 
 import logging
+import re
 from urllib.parse import quote
 
 from odouche._upstream.reader import Reader
@@ -14,6 +15,14 @@ PATH = "/app/projects"
 _OPERATION = "projects"
 _INFO = "project"
 _SETTINGS = "project settings"
+_SCHEME = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*")
+_SSH_SCHEMES = frozenset({"ssh", "git+ssh", "ssh+git"})
+# A Unix user name and nothing else: no password, no token after a colon.
+_SSH_USER = re.compile(r"[a-z_][a-z0-9_-]{0,31}")
+# What GitHub and GitLab tokens start with, which a user name of that shape can still be.
+_TOKEN_PREFIXES = ("ghp_", "gho_", "ghu_", "ghs_", "ghr_", "github_pat_", "glpat-", "x-access-token")
+# A host, or a bracketed IPv6 address, then an optional port.
+_AUTHORITY = re.compile(r"(?:[A-Za-z0-9.-]+|\[[0-9A-Fa-f:.]+\])(?::[0-9]*)?")
 # The page's templates name `trial`, `custom` and `invalid`: only `valid` was seen.
 _SUBSCRIPTIONS = {
     "valid": Subscription.VALID,
@@ -115,11 +124,26 @@ def is_admin(info: Reader) -> bool:
     return levels.integer(info.child("user").text("access")) >= levels.integer("admin")
 
 
-def hosting(transport: Transport, technical_name: str) -> ProjectHosting:
-    """Return what the Settings page of a project shows of its storage and workers. Its secrets are dropped unread."""
+def settings_answer(transport: Transport, technical_name: str) -> Reader:
+    """Return the reader of the `result` of a project's settings.
+
+    Its token, its codes, the subscription link that carries one, and the credentials, query and fragment of
+    each submodule URL are dropped unread.
+    """
     body = transport.call(_SETTINGS, f"/app/project/{segment(technical_name)}/get_settings", retry=True)
     _drop(body, ("result", "repository"), "ci_token", "subscription_code", "subscription_code_display")
-    repo = Reader(_SETTINGS, body).child("result").child("repository")
+    # Whole, as nothing reads it: its subscription link carries the code as a query value.
+    _drop(body, ("result",), "upsells")
+    result = body.get("result")
+    submodules = result.get("submodules") if isinstance(result, dict) else None
+    for submodule in submodules if isinstance(submodules, list) else []:
+        _drop_credentials(submodule, "name")
+    return Reader(_SETTINGS, body).child("result")
+
+
+def hosting(answer: Reader) -> ProjectHosting:
+    """Return what the Settings page of a project shows of its storage and workers, from its settings' `result`."""
+    repo = answer.child("repository")
     return ProjectHosting(
         storage_used_bytes=_bytes(repo, "used_storage"),
         storage_quota_bytes=_bytes(repo, "max_storage"),
@@ -149,6 +173,32 @@ def _drop(body: object, path: tuple[str, ...], *keys: str) -> None:
     if isinstance(fields, dict):
         for key in keys:
             fields.pop(key, None)
+
+
+def _drop_credentials(fields: object, key: str) -> None:
+    # Before anything is read. The user information ends at the last `@` before the path: the first `/`
+    # after `//` in a URL, the first `/` at all in an scp-like `user@host:path`.
+    url = fields.get(key) if isinstance(fields, dict) else None
+    if not isinstance(fields, dict) or not isinstance(url, str):
+        return
+    url = re.split(r"[?#]", url, maxsplit=1)[0]
+    scheme, separator, rest = url.partition("://")
+    if not separator:
+        scheme, rest = "", url
+    head, slash, path = rest.partition("/")
+    user, at, host = head.rpartition("@")
+    if separator and (not _SCHEME.fullmatch(scheme) or not _AUTHORITY.fullmatch(host) or (":" in user and "@" in path)):
+        # What is left could still hold part of a password, such as one with a `/`: the value goes whole.
+        fields[key] = ""
+        return
+    # An scp-like `user@host:path` is SSH too.
+    ssh = scheme.lower() in _SSH_SCHEMES if separator else True
+    kept = f"{user}@" if at and ssh and _ssh_user(user) else ""
+    fields[key] = f"{scheme}{separator}{kept}{host}{slash}{path}"
+
+
+def _ssh_user(user: str) -> bool:
+    return bool(_SSH_USER.fullmatch(user)) and not user.startswith(_TOKEN_PREFIXES)
 
 
 def _bytes(repo: Reader, key: str) -> int:

@@ -28,6 +28,7 @@ from odouche_cli._context import (
 )
 from odouche_cli._errors import EXIT_DECLINED
 from odouche_cli._output import Column, Format, Output, strip_control
+from odouche_cli._settings import shown
 from odouche_cli._time import ago
 
 
@@ -153,13 +154,13 @@ def history(
 
 _SETTINGS = [
     Column[odouche.BranchSettings]("On new commit", lambda read: read.push_behavior.value),
-    Column[odouche.BranchSettings]("Project defaults", lambda read: "yes" if read.project_defaults else "no"),
-    Column[odouche.BranchSettings]("Install", lambda read: read.module_install.value),
-    Column[odouche.BranchSettings]("Modules", lambda read: ", ".join(read.modules)),
-    Column[odouche.BranchSettings]("Tests", lambda read: read.tests.value),
-    Column[odouche.BranchSettings]("Test tags", lambda read: read.test_tags),
-    Column[odouche.BranchSettings]("Demo data", lambda read: "yes" if read.demo_data else "no"),
-    Column[odouche.BranchSettings]("AI agent", lambda read: read.ai_agent.value),
+    Column[odouche.BranchSettings]("Project defaults", lambda read: shown(read.project_defaults)),
+    Column[odouche.BranchSettings]("Install", lambda read: shown(read.module_install)),
+    Column[odouche.BranchSettings]("Modules", lambda read: shown(read.modules)),
+    Column[odouche.BranchSettings]("Tests", lambda read: shown(read.tests)),
+    Column[odouche.BranchSettings]("Test tags", lambda read: shown(read.test_tags)),
+    Column[odouche.BranchSettings]("Demo data", lambda read: shown(read.demo_data)),
+    Column[odouche.BranchSettings]("AI agent", lambda read: shown(read.ai_agent)),
     Column[odouche.BranchSettings]("Odoo version", lambda read: read.odoo_version or "the project's"),
     Column[odouche.BranchSettings](
         "Revision id", lambda read: "latest" if read.odoo_revision_id is None else read.odoo_revision_id
@@ -318,14 +319,8 @@ def _changing(
 
 
 def _shown(value: object) -> str:
-    """Return a setting's value as `osh branches settings show` prints it, with tags quoted and no tags as `none`."""
-    if isinstance(value, bool):
-        return "yes" if value else "no"
-    if isinstance(value, StrEnum):
-        return value.value
-    if isinstance(value, tuple):
-        return ", ".join(str(module) for module in value) or "none"
-    return f'"{value}"' if value else "none"
+    """Return a setting's value as `osh branches settings show` prints it, with tags quoted."""
+    return f'"{value}"' if type(value) is str and value else shown(value)
 
 
 _REVISION = [

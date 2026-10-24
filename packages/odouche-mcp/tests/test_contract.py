@@ -5,6 +5,7 @@ asks the client.
 """
 
 import asyncio
+import ipaddress
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -125,6 +126,26 @@ RESULTS: dict[str, object] = {
         hosting=odouche.ProjectHosting(1024, 2048, 1, 1),
         stages=(odouche.StageCount(odouche.Stage.DEVELOPMENT, "dev", 1),),
         branches=(odouche.BranchSummary(BRANCH, None),),
+    ),
+    "project_settings": odouche.ProjectSettings(
+        name=PROJECT.name,
+        odoo_domain_blocked=False,
+        session_lifetime=odouche.SessionLifetime.AUTO,
+        public=False,
+        commit_statuses_suspended=False,
+        deploy_key_writable=False,
+        submodules=(),
+        hosting=odouche.ProjectHosting(1024, 2048, 1, 1),
+        dedicated=False,
+        http_timeout_seconds=900,
+        cron_timeout_seconds=900,
+        module_install=odouche.ModuleInstall.REPOSITORY,
+        modules=(),
+        tests=odouche.BuildTests.MODULES,
+        test_tags=None,
+        demo_data=True,
+        ai_agent=odouche.AiAgent.CLAUDE,
+        ip_allow_list=(ipaddress.ip_address("198.51.100.42"), ipaddress.ip_network("203.0.113.0/24")),
     ),
     "rebuild": BUILD,
     "check_settings_change": odouche.SettingsChange(ai_agent=odouche.AiAgent.OPENCODE),
