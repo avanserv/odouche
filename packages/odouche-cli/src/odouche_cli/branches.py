@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Annotated
 
 import typer
@@ -32,8 +33,8 @@ from odouche_cli._time import ago
 
 app = typer.Typer(
     name="branches",
-    help="List the branches of an Odoo.sh project, a branch's history, show and change its settings, and the "
-    "revision a build runs.",
+    help="List the branches of an Odoo.sh project, a branch's history, show and change its settings, the "
+    "revision a build runs, and move a branch between development and staging.",
     epilog="Example: osh branches list --stage staging",
     no_args_is_help=True,
 )
@@ -69,6 +70,22 @@ LimitOption = Annotated[
 CommitsOption = Annotated[
     bool,
     typer.Option("--commits", help="Print each commit in full: its whole hash, its address and its whole message."),
+]
+
+
+class _Target(StrEnum):
+    """The stages a branch is moved to: production is not one."""
+
+    STAGING = odouche.Stage.STAGING.value
+    DEVELOPMENT = odouche.Stage.DEVELOPMENT.value
+
+
+TargetOption = Annotated[
+    _Target,
+    typer.Option(
+        "--to",
+        help="The stage to move the branch to. A branch is moved to or from production in the Odoo.sh page.",
+    ),
 ]
 SettingsArgument = Annotated[
     list[str],
@@ -248,6 +265,55 @@ def _changing(
         before, after = quoted(getattr(current, name)), quoted(value)
         lines.append(f"{name}: {before} → {after}" if name in sent else f"{name} is already {after}.")
     return lines
+
+
+_BRANCH = [Column[odouche.Branch]("Name", lambda read: read.name), Column[odouche.Branch]("Stage", stage_of)]
+# What Odoo.sh does to a branch it moves, by its new stage, as its page and its history say.
+_MOVED = {
+    odouche.Stage.STAGING: "Odoo.sh starts a new build of the branch on a copy of production's data, with outgoing "
+    "mails caught and scheduled actions turned off, and builds its next commits the same way.",
+    odouche.Stage.DEVELOPMENT: "Odoo.sh drops the branch's staging builds, which are not backed up and are lost for "
+    "good. Its next builds start from a fresh database with demonstration data.",
+}
+
+
+@app.command(epilog="Example: osh branches move --branch feature-x --to staging")
+def move(
+    ctx: typer.Context,
+    to: TargetOption,
+    project: ProjectOption = None,
+    branch: BranchOption = None,
+    *,
+    yes: _settings.YesOption = False,
+) -> None:
+    """Change state on Odoo.sh: move a branch between development and staging.
+
+    A move to staging starts a build of the branch on a copy of production's data. A move to development drops its staging builds, which are not backed up. A production branch is not moved. It asks first, unless `--yes` is given.
+    """
+    output: Output = ctx.obj
+    target = odouche.Stage(to.value)
+    name = resolve_branch(ctx, branch)
+    _settings.can_ask(ctx, yes=yes)
+    with open_client(writes=True) as client:
+        project_name, found = project_branch(ctx, client, project, name)
+        client.check_move(found, target)
+        for line in (
+            f"Project: {project_name}",
+            f"Branch: {found.name} ({stage_of(found)})",
+            f"Move: {stage_of(found)} → {target.value}",
+            _MOVED[target],
+        ):
+            _settings.say(line)
+        if not yes and not _terminal.confirmed(f"Move this branch to {target.value}?"):
+            typer.echo("Nothing was sent.", err=True)
+            raise typer.Exit(EXIT_DECLINED)
+        # Sent once: an error is reported, never retried.
+        moved = client.move_branch(found, target)
+    said = f"Branch {moved.name} is now in {moved.stage.value}."
+    if moved.stage is odouche.Stage.STAGING:
+        said += f" Follow its new build with `osh builds watch --branch {moved.name}`."
+    _settings.say(said)
+    output.one(moved, _BRANCH)
 
 
 _REVISION = [

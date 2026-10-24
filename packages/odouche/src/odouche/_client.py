@@ -54,6 +54,7 @@ from odouche.models import (
     SettingsChange,
     SettingsOutcome,
     SshTarget,
+    Stage,
     Tracking,
 )
 from odouche.secret import Secret
@@ -368,6 +369,29 @@ class Client:
         and nothing changes, on a read-only client too: call it before asking the user.
         """
         return settings.narrow(branch.stage, current, change)
+
+    def move_branch(self, branch: Branch | int, to: Stage) -> Branch:
+        """Change state on Odoo.sh: move a branch between development and staging, and return it in its new stage.
+
+        A move to staging starts a build of the branch on a copy of production's data; a move to
+        development drops its staging builds, which are not backed up. A production branch, a move
+        to production, a stage the library does not know and a branch already in `to` raise
+        `StageRefusedError` before the request. The stage that decides is read again first.
+
+        Sent once. Raises `OutcomeUnknownError` when Odoo.sh did not confirm it or the branch read
+        back is not in `to`, `ReadOnlyError` on a read-only client, `PermissionDeniedError` when
+        refused, and `NotFoundError` for a branch out of reach. Asks Odoo.sh three times. A branch
+        that is not a number raises `TypeError`.
+        """
+        held = branch.stage if isinstance(branch, Branch) else None
+        return branches.move(self._transport, _branch_id(branch), to, held)
+
+    def check_move(self, branch: Branch, to: Stage) -> None:
+        """Raise `StageRefusedError` when `move_branch` would refuse the move for the branch's stage or `to`.
+
+        Odoo.sh is not asked and nothing changes, on a read-only client too.
+        """
+        branches.allow_move(branch.id, branch.stage, Stage(to))
 
     def build_revision(self, project: Project | str, build: Build) -> BuildRevision:
         """Return the revision a build of a project runs: its head commit, its Odoo version, and its branch's selected Odoo revision.

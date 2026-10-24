@@ -152,6 +152,12 @@ These calls change something on Odoo.sh. Every other call only reads.
 - A change of a project's settings sets only the settings named, for an admin of the project:
   the session lifetime, public access, the defaults of new development branches, the timeouts on
   a dedicated server, and the IP allow list, by entry, never replaced whole.
+- A move takes a branch from development to staging, which starts a build on a copy of
+  production's data, or from staging to development, which drops its staging builds. Production is
+  refused as the branch and as the target before anything is sent, from the stage Odoo.sh gives in
+  the same call: the request can carry no other stage than staging or development. A branch made
+  production in the page between that read and the move, one request apart, is not caught; only
+  Odoo.sh could close that window.
 - A backup is taken of a staging or a production branch's latest build, and Odoo.sh keeps it for
   three days.
 - Allowing an IP lets the address of the machine that sends it connect to the builds with `ssh`
@@ -178,6 +184,8 @@ documents what it does and what it can touch. Such tools, a rebuild and a change
 a project's settings, are registered only when the server is started with
 [`--allow-changes`](mcp.md#changing-state), and each call of one writes a line to the server's
 stderr, with the names of the settings changed but never their values.
+No tool moves a branch between stages, with or without `--allow-changes`: a move to staging copies
+production's data onto the branch, which only `osh branches move` does, behind its question.
 
 The tools that read a build's log and the mails it caught put text the build wrote into an agent's
 context: `read_log`, `list_mails` and `read_mail`. It is

@@ -85,7 +85,7 @@ class ReadOnlyError(OdoucheError):
 
 
 class StageRefusedError(OdoucheError):
-    """Raised when a branch is in a stage the library does not change. Nothing was changed."""
+    """Raised when a branch is in a stage, or is asked into one, the library does not change. Nothing was sent."""
 
 
 class SettingsConflictError(ValueError):

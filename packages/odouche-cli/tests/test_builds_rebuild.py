@@ -38,8 +38,9 @@ PULL = ("backups", "pull")
 OPEN = ("builds", "open")
 SETTINGS = ("branches", "settings", "set")
 PROJECT_SETTINGS = ("projects", "settings", "set")
+MOVE = ("branches", "move")
 # The commands that open a client that writes.
-WRITERS = {REBUILD, BACKUP, DOWNLOAD, SETTINGS, PROJECT_SETTINGS}
+WRITERS = {REBUILD, BACKUP, DOWNLOAD, SETTINGS, PROJECT_SETTINGS, MOVE}
 
 
 def build(number: int, **changes: object) -> Build:
@@ -236,6 +237,7 @@ class StubClient:
     check_settings_change = odouche.Client.check_settings_change
     check_project_settings_change = odouche.Client.check_project_settings_change
     check_backup = odouche.Client.check_backup
+    check_move = odouche.Client.check_move
     ssh_target = odouche.Client.ssh_target
     panel_url = odouche.Client.panel_url
 
@@ -255,6 +257,10 @@ class StubClient:
         self.calls.append(f"settings {branch.name}")
         before = self.branch_settings(branch)
         return odouche.SettingsOutcome(before, replace(before, **change.given()), ())  # pyright: ignore[reportArgumentType]
+
+    def move_branch(self, branch: Branch, to: Stage) -> Branch:
+        self.calls.append(f"move {branch.name}")
+        return replace(branch, stage=to, stage_name=to.value)
 
     def change_project_settings(
         self, project: str, change: odouche.ProjectSettingsChange
@@ -683,6 +689,7 @@ ARGUMENTS: dict[tuple[str, ...], tuple[str, ...]] = {
     # What a new commit does: a staging branch has no new build options.
     SETTINGS: ("--yes", "push_behavior=update"),
     PROJECT_SETTINGS: ("--yes", "public=yes"),
+    MOVE: ("--yes", "--to", "development"),
 }
 # The commands that build no client.
 CLIENTLESS = {("auth", "logout")}

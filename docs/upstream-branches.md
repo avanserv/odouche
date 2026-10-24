@@ -202,20 +202,32 @@ name or its stage is not known.
 
 ## Stage moves
 
-`POST /app/branch/<id>/set_stage`, params `{"stage": "<stage>"}`, read from the script. Its
-`result` is the branch, in the fields of [Branches](upstream.md#branches), which the page takes
-in place of the one it holds.
+`POST /app/branch/<id>/set_stage`, params `{"stage": "<stage>"}`, read from the script, with the
+wire values `production`, `staging` and `dev`. Its `result` is the branch, in the fields of
+[Branches](upstream.md#branches), which the page takes in place of the one it holds.
 
-- The page sends it when a branch is dragged onto a stage. It lets any branch be dragged and
-  checks no access level.
+- The page sends it when a branch is dropped on a stage's header in the sidebar; dropped on
+  another branch, it opens the merge dialog instead. It lets any branch be dragged: a
+  `restricted_access` class only hides the drag handle, so the access level is a hint there, not a
+  gate.
 - To `production`, the page refuses when the project already has a production branch: "You can
   only have one production branch per project". Whether upstream refuses too is unknown, since
-  the page never asks.
+  the page never asks. The page returns without a request for a move to the branch's own stage.
 - From `staging` or `production`, the page asks to confirm first: moving the production branch
   "will drop your production database and staging builds", and a staging branch's builds "are not
   backed up and will be lost forever". From `dev` it asks nothing.
+- The history's note on a move to `staging`: "Commits start builds with production data", outgoing
+  emails are caught and scheduled actions deactivated. On a move to `dev`: builds are created
+  "with a fresh new database loading demonstration data". In the captured history, a
+  `dev → staging` move carries a build, as `dev → production` does.
 - The page's "unmute" restores `push_behavior` to `new` on `dev` and `update` elsewhere, the
   values seen per stage. Whether a stage move changes it is unknown.
+
+The library sends a move between `dev` and `staging` only. The stage it moves from is the one
+`builds` gives in the same call, before the request, and production is refused as a branch and as
+a target: the wire value comes from a table that has no `production`. It reads the branch back
+from `builds` and takes the move as done only when that shows the new stage; `result` is not read.
+`set_stage.json` stands for the answer, which was not captured.
 
 ## Not seen
 
@@ -226,3 +238,5 @@ in place of the one it holds.
 - The revision requests for a version past its end of life.
 - The answer for a pinned revision past its `date_expiration`.
 - What a user below a stage's access level gets from these requests.
+- A stage move and its answer, whether a move from `staging` to `dev` starts a build, and what
+  upstream answers when the subscription's staging branches are all in use.

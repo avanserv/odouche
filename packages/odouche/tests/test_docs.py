@@ -21,6 +21,7 @@ BLOCK = re.compile(r"^```python\n(.*?)^```$", re.MULTILINE | re.DOTALL)
 ENTRY = re.compile(r"^::: (\S+)$", re.MULTILINE)
 BUILDS = "/app/branch/51044/builds"
 BACKUPS = "/app/project/acme-corp-odoo-addons-4217/backups"
+BRANCHES = "/app/project/acme-corp-odoo-addons-4217/branches"
 INFO = "/app/project/acme-shop/get_info"
 LOG = b"Installing modules\nModules loaded\n"
 # What the guide is to show, each by a call only its example makes.
@@ -46,6 +47,7 @@ SHOWN = [
     ".rebuild(",
     ".change_branch_settings(",
     ".change_project_settings(",
+    ".move_branch(",
     ".create_backup(",
     ".download(",
     "except odouche.OdoucheError",
@@ -71,6 +73,23 @@ def log(request):
     first = max(len(LOG) - int(asked[7:]), 0) if asked.startswith("bytes=-") else int(asked[6:-1])
     headers = {"Content-Range": f"bytes {first}-{len(LOG) - 1}/{len(LOG)}"}
     return httpx2.Response(206, headers=headers, content=LOG[first:])
+
+
+def moving_branch(upstream):
+    """Add a development branch to move to staging, which Odoo.sh is taken to move as asked."""
+    moving = copy.deepcopy(upstream.bodies[BUILDS])
+    moving["result"][0]["branch_info"] |= {"id": 51060, "name": "feature-reports", "stage": "dev"}
+    upstream.bodies["/app/branch/51060/builds"] = moving
+    upstream.bodies[BRANCHES]["result"].append(
+        upstream.bodies[BRANCHES]["result"][1]
+        | {"id": 51060, "name": "feature-reports", "slug": "feature-reports-51060"}
+    )
+
+    def set_stage(request):
+        moving["result"][0]["branch_info"]["stage"] = json.loads(request.content)["params"]["stage"]
+        return httpx2.Response(200, json=upstream.load("set_stage.json"))
+
+    upstream.bodies["/app/branch/51060/set_stage"] = set_stage
 
 
 @pytest.fixture
@@ -124,6 +143,7 @@ def odoo_sh(upstream, backend, session, monkeypatch, tmp_path):
     staging["result"][0]["branch_info"] |= {"id": 51020, "name": "staging"}
     staging["result"][0]["builds"] = [listed[1] | {"id": 88124, "name": backups[0]["name"]}]
     upstream.bodies["/app/branch/51020/builds"] = staging
+    moving_branch(upstream)
     worker, taken = listed[1]["worker_url"], backups[0]["backup_datetime_utc"]
     link = f"{worker}/paas/build/88124/download/dump?{urlencode({'backup_datetime_utc': taken, 'test_dump': 1, 'filestore': 1})}"
     ready = {"id": 9001, "notif_type": "dump", "buttons": [{"type": "download", "url": link}]}
