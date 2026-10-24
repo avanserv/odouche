@@ -408,6 +408,8 @@ with odouche.Client() as client:
   While `project_defaults` is true the project's development defaults apply instead, and those are
   not read.
 - Odoo.sh has no settings request for a build, as `Client.build` says.
+- `client.change_branch_settings` changes them, as
+  [State-changing operations](#state-changing-operations) has it.
 
 ### Build revision
 
@@ -653,6 +655,7 @@ Every other call of the client only reads. These are the calls that change somet
 | `client.allow_ip(branch)` | Lets this machine's address connect with `ssh` for one hour, to the branch's builds and, as [seen](upstream.md#allow-an-ip), the project's others. |
 | `client.create_backup(project, branch)` | Takes a manual backup of the branch's latest build, which Odoo.sh keeps for three days. |
 | `client.prepare_download(project, backup)` | Has Odoo.sh prepare the backup's file, which it keeps for 2 hours. |
+| `client.change_branch_settings(branch, change)` | Sets the settings a `SettingsChange` gives on the branch. |
 
 ```python
 import odouche
@@ -702,6 +705,42 @@ with odouche.Client() as client:
     for backup in client.wait_for_backup("acme-shop", request, timeout=600):
         if backup is not None:
             print(backup.taken_at)
+```
+
+- `change_branch_settings` takes a `Branch` or a branch's number and a `SettingsChange`, whose
+  fields are those of `BranchSettings` from `push_behavior` to `ai_agent`, and returns a
+  `SettingsOutcome`: the settings `before` and `after` the change. A field left `None` is not sent. Of the others, only those that differ from
+  the branch's are sent, in one request, as the page sends one section of the Settings tab, and
+  the rest keep their value: that this holds for every field is inferred, not seen
+  ([Upstream reference](upstream-branches.md#change-a-branchs-settings)). Nothing differing, it
+  sends nothing. It asks Odoo.sh four times: for the branch's stage, its settings, the change,
+  then its settings again. When a setting sent does not read back as sent, it raises
+  `OutcomeUnknownError` naming it; sending the same change again does no harm. A setting not sent
+  that Odoo.sh changed along, as it may one that depends on another, is in the outcome's `moved`.
+- `SettingsChange` raises `ValueError` when it gives nothing, for a module name of anything but
+  ASCII letters, digits and underscores, and for test tags of other characters than
+  `A-Z a-z 0-9 _/:.,*+-[]`; an empty `test_tags` clears them.
+- What a new commit does is not changed on a production branch, and the new build options only on
+  a development branch: any other raises `StageRefusedError` before the change is sent. An option
+  the Settings tab disables or hides, given the settings after the change, raises
+  `SettingsConflictError`, a `ValueError`:
+  one of the branch's own while `project_defaults` stays true, `modules` but for `LISTED`, tests
+  with `ALL`, or `test_tags` but for `TAGS`.
+- `client.check_settings_change(branch, current, change)` returns the part of the change that
+  differs from `current`, or `None`, and raises as the change would, asking nothing: call it
+  before asking the user.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    branches = {branch.name: branch for branch in client.branches("acme-shop")}
+    branch = branches["feature-invoicing"]
+    change = odouche.SettingsChange(push_behavior=odouche.PushBehavior.UPDATE)
+    if client.check_settings_change(branch, client.branch_settings(branch), change) is not None:
+        outcome = client.change_branch_settings(branch, change)
+        print(outcome.after.push_behavior, outcome.moved)
 ```
 
 - `prepare_download` takes the project and a `Backup` that is `downloadable`, and

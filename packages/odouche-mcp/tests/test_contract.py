@@ -127,6 +127,44 @@ RESULTS: dict[str, object] = {
         branches=(odouche.BranchSummary(BRANCH, None),),
     ),
     "rebuild": BUILD,
+    "check_settings_change": odouche.SettingsChange(ai_agent=odouche.AiAgent.OPENCODE),
+    "change_branch_settings": odouche.SettingsOutcome(
+        odouche.BranchSettings(
+            push_behavior=odouche.PushBehavior.NEW_BUILD,
+            project_defaults=False,
+            module_install=odouche.ModuleInstall.REPOSITORY,
+            modules=(),
+            tests=odouche.BuildTests.MODULES,
+            test_tags=None,
+            demo_data=True,
+            ai_agent=odouche.AiAgent.OPENCODE,
+            odoo_version=None,
+            odoo_revision_id=None,
+            machine="ubuntu-24.04",
+            recommended_machine="ubuntu-24.04",
+            next_machine=None,
+            domains=(),
+            dns_target=None,
+        ),
+        odouche.BranchSettings(
+            push_behavior=odouche.PushBehavior.NEW_BUILD,
+            project_defaults=False,
+            module_install=odouche.ModuleInstall.ALL,
+            modules=(),
+            tests=odouche.BuildTests.OFF,
+            test_tags=None,
+            demo_data=True,
+            ai_agent=odouche.AiAgent.OPENCODE,
+            odoo_version=None,
+            odoo_revision_id=None,
+            machine="ubuntu-24.04",
+            recommended_machine="ubuntu-24.04",
+            next_machine=None,
+            domains=(),
+            dns_target=None,
+        ),
+        ("tests",),
+    ),
     "logs": [odouche.Log(odouche.LogKind.INSTALL, "install", datetime(2026, 1, 1, tzinfo=UTC), "1 KB")],
     "read_log": [odouche.LogLine("Loading modules", offset=16, truncated=False)],
     "mails": [MAIL],
@@ -140,6 +178,8 @@ FAILURES: list[odouche.OdoucheError] = [
 ]
 
 SAMPLES: dict[str, object] = {"string": "acme", "integer": 1, "number": 1.0, "boolean": False}
+# What a tool needs beyond its required arguments to do anything, by its name.
+OPTIONAL: dict[str, dict[str, object]] = {"change_branch_settings": {"ai_agent": "opencode"}}
 
 
 class StandIn:
@@ -202,7 +242,8 @@ def violations(server: MCPServer[Any]) -> list[str]:
 
 def _arguments(tool: Tool) -> dict[str, object]:
     properties: dict[str, dict[str, Any]] = tool.input_schema.get("properties", {})
-    return {name: SAMPLES[properties[name]["type"]] for name in tool.input_schema.get("required", [])}
+    required = {name: SAMPLES[properties[name]["type"]] for name in tool.input_schema.get("required", [])}
+    return required | OPTIONAL.get(tool.name, {})
 
 
 async def _leaks(server: MCPServer[Any]) -> list[str]:

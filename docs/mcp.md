@@ -2,7 +2,7 @@
 
 `odouche-mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server that lets
 development agents work with your Odoo.sh projects. It runs over stdio, and started as below its
-tools read: none changes anything on Odoo.sh. The one tool that does is
+tools read: none changes anything on Odoo.sh. The tools that do are
 [yours to turn on](#changing-state).
 
 The [reference](mcp-reference.md) lists every tool with its arguments, what it returns, what it
@@ -188,6 +188,21 @@ Every part of the mail comes in an `untrusted_` field: `untrusted_mail`, `untrus
 `truncated` is true when a header, a name, the body or the parts were cut, past 1000 MIME parts
 counted with their containers, or the mail was over 16 MiB and not read at all.
 
+### `change_branch_settings`
+
+It is listed only when the server is started with [`--allow-changes`](#changing-state). It sends
+only the settings given that differ from the branch's, in one request, and the others keep their
+value; with nothing to change it sends nothing. The arguments are named and valued as
+`get_branch_settings` returns them, except `modules`, which is names separated by commas.
+
+Everything is checked before the request: a value that is no choice fails the schema, what a new
+commit does is refused on a production branch, and the new build options on any branch but a
+development one, or while `project_defaults` stays true. The result names the settings changed and
+those already at that value, and in `moved` each other setting Odoo.sh changed along with them,
+such as the tests once every module is installed, with its value before and after. When Odoo.sh
+does not confirm the change, or a setting sent does not read back as sent, the error tells the
+agent to read the settings before trying again.
+
 ### `rebuild_branch`
 
 It is listed only when the server is started with [`--allow-changes`](#changing-state). Only a
@@ -202,7 +217,9 @@ again, since a second call can start a second build.
 - **By default** the server reads your projects, their branches, a branch's settings, their builds,
   the builds' logs and the mails a development or staging build caught. It changes nothing on
   Odoo.sh.
-- **With `--allow-changes`** it can also start a rebuild of a development or a staging branch.
+- **With `--allow-changes`** it can also start a rebuild of a development or a staging branch, and
+  change a branch's settings: what a new commit does, and a development branch's new build
+  options.
 - **It never** logs in, takes a session as an argument, returns the session in a result or writes
   a file.
 
@@ -224,16 +241,17 @@ The tools that change state on Odoo.sh are off until you start the server with `
 
 - The flag is read once, when the server starts. No tool and no argument sets it, so nothing an
   agent does during a session turns it on.
-- Without it, `rebuild_branch` is not registered, and every tool opens the library's client
-  read-only, which refuses a change before anything is sent.
-- With it, `rebuild_branch` is listed without the read-only hint and with the destructive one, so
-  a client that asks before such tools asks before this one. The server itself does not ask.
+- Without it, `change_branch_settings` and `rebuild_branch` are not registered, and every tool
+  opens the library's client read-only, which refuses a change before anything is sent.
+- With it, both are listed without the read-only hint and with the destructive one, so a client
+  that asks before such tools asks before these. The server itself does not ask.
 - Each call writes one line to the server's stderr: the tool, the project, the branch, and the
-  build started or the kind of error. It never holds the session.
+  build started, the names of the settings changed, or the kind of error. It never holds the
+  session or a setting's value.
 
 ### Asking before a change
 
-The flag decides whether `rebuild_branch` exists. Whether an agent may call a tool without asking
+The flag decides whether `change_branch_settings` and `rebuild_branch` exist. Whether an agent may call a tool without asking
 you is your client's decision. For Claude Code, a hook lets the tools that read pass and leaves
 the rest to the usual prompt:
 [`examples/claude-code/odouche_read_only_hook.py`](https://github.com/avanserv/odouche/blob/main/examples/claude-code/odouche_read_only_hook.py).
@@ -341,6 +359,6 @@ A tool's error says what happened and, when there is one, what the agent or you 
 | An expired session that comes from `ODOUCHE_SESSION` | Restart the server with a current value, or without the variable to use the one `osh auth login` stores. A login is not read while the variable is set. |
 | No usable keyring | Install a [Secret Service provider](security.md#where-the-session-is-stored), or restart the server with `ODOUCHE_SESSION` set. A locked keyring is unlocked in its own dialog. |
 | Odoo.sh changed shape | Odoo.sh has no public API, and an answer no longer has the shape odouche reads. Upgrade to the latest release, and [report it](https://github.com/avanserv/odouche/issues) with the request and the field the error names if it remains. |
-| A tool is missing | `rebuild_branch` exists only with [`--allow-changes`](#changing-state). |
+| A tool is missing | `change_branch_settings` and `rebuild_branch` exist only with [`--allow-changes`](#changing-state). |
 
 The server is built on the [`odouche` library](library.md) and never talks to Odoo.sh directly.

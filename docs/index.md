@@ -11,9 +11,10 @@ environment.
     agreement with Odoo is your responsibility. See [Unofficial status](unofficial.md).
 
     The library and the `osh` command log in, list projects, branches, builds and backups, watch a build,
-    read and follow its logs and start a rebuild, and `osh ssh` opens a shell on a build with
+    read and follow its logs, start a rebuild and change a branch's settings, and `osh ssh` opens a shell on a build with
     your own `ssh`: see the [library](library.md) and the [CLI](cli.md). The [MCP server](mcp.md) reports its session, lists projects, branches and
-    builds, reads one build and its logs and, when you allow it, starts a rebuild.
+    builds, reads one build and its logs and, when you allow it, starts a rebuild and changes a
+    branch's settings.
 
 ## Three packages, one library
 

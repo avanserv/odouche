@@ -31,6 +31,10 @@ READS = [
 ]
 
 
+# In the order they are registered.
+CHANGES = ["change_branch_settings", "rebuild_branch"]
+
+
 def test_server_says_what_its_untrusted_fields_hold():
     instructions = create_server().instructions or ""
 
@@ -47,10 +51,10 @@ def test_server_exposes_its_tools():
 
 
 def test_server_exposes_the_tool_that_changes_state_only_when_allowed():
-    assert _names(create_server(allow_changes=True)) == [*READS, "rebuild_branch"]
+    assert _names(create_server(allow_changes=True)) == [*READS, *CHANGES]
 
 
-@pytest.mark.parametrize(("argv", "tools"), [([], READS), (["--allow-changes"], [*READS, "rebuild_branch"])])
+@pytest.mark.parametrize(("argv", "tools"), [([], READS), (["--allow-changes"], [*READS, *CHANGES])])
 def test_main_serves_over_stdio(monkeypatch: pytest.MonkeyPatch, argv: list[str], tools: list[str]):
     served: list[tuple[list[str], str]] = []
     monkeypatch.setattr(MCPServer, "run", lambda self, transport: served.append((_names(self), transport)))
@@ -79,4 +83,4 @@ def test_main_reads_the_arguments_of_the_process(monkeypatch: pytest.MonkeyPatch
 
     main()
 
-    assert served == [[*READS, "rebuild_branch"]]
+    assert served == [[*READS, *CHANGES]]
