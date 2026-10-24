@@ -185,7 +185,12 @@ class StubClient:
             access_level="developer",
             hosting=None,
             stages=(),
-            branches=(),
+            # Healthy, so that `osh projects check` exits 0.
+            branches=(
+                odouche.BranchSummary(
+                    MAIN, odouche.TrackedBuild(103, BuildStatus.DONE, "done", BuildResult.SUCCESS, "success")
+                ),
+            ),
         )
 
     # The library's own, which asks nothing.

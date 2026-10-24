@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 official public API; this project is an **unofficial** client for what the Odoo.sh web UI uses.
 
 Status: the workspace, tooling and CI exist. The CLI has the commands of its first milestone:
-`osh auth`, `osh projects list` and `show`, `osh branches list`, `history`, `settings show` and `set` and `revision`, `osh backups list`, `create`, `download`
+`osh auth`, `osh projects list`, `show` and `check`, `osh branches list`, `history`, `settings show` and `set` and `revision`, `osh backups list`, `create`, `download`
 and `pull`, `osh builds list`, `show`, `watch`, `rebuild`, `open` and `mails`, `osh logs` and `osh ssh`, with a
 reference page generated from them.
 The MCP server has thirteen read-only
