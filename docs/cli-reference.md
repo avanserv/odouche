@@ -31,7 +31,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project, a branch's history and settings, and the revision a build runs. |
 | [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, start a new one, open its panels and read the mails it caught. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
-| [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach. |
+| [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach, and show one's overview. |
 | [`osh ssh`](#osh-ssh) | Open a shell on the branch's latest build, with your own `ssh`, its configuration and its keys. |
 
 ## `osh auth`
@@ -513,7 +513,7 @@ osh logs --follow
 
 ## `osh projects`
 
-List the Odoo.sh projects you can reach.
+List the Odoo.sh projects you can reach, and show one's overview.
 
 ```text
 osh projects [OPTIONS] COMMAND [ARGS]...
@@ -522,6 +522,7 @@ osh projects [OPTIONS] COMMAND [ARGS]...
 | Command | Description |
 | --- | --- |
 | [`osh projects list`](#osh-projects-list) | List the projects you can reach, with their repository and address. |
+| [`osh projects show`](#osh-projects-show) | Show a project's overview, one fact per line: its subscription, Odoo version, hosting, production build and branches by stage. |
 
 ### `osh projects list`
 
@@ -535,6 +536,26 @@ Example:
 
 ```bash
 osh projects list
+```
+
+### `osh projects show`
+
+Show a project's overview, one fact per line: its subscription, Odoo version, hosting, production build and branches by stage.
+
+Storage, workers and staging branches are on the project's Settings page, which Odoo.sh shows to an admin of the project only: anyone else gets `admins only`.
+
+```text
+osh projects show [OPTIONS]
+```
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+
+Example:
+
+```bash
+osh projects show --project acme-shop
 ```
 
 ## `osh ssh`

@@ -89,6 +89,15 @@ session's [max age](security.md).
 
 Every other tool takes a project by its name, so an agent calls this one first.
 
+### `get_project_overview`
+
+Storage is in bytes. `hosting`, which holds the storage, the workers and the staging branches, is
+null when the user is not an admin of the project: Odoo.sh shows them on the project's Settings
+page, to an admin only, and they are not asked otherwise. The region is there for every member.
+`branches` holds 200 at most, with `truncated` true when there are more, while `stages` counts
+every branch. Each branch's last build holds its number, status and result only: `get_build` reads
+the rest. No token or code is in the result.
+
 ### `list_branches`
 
 The branches come in the order Odoo.sh answers them.

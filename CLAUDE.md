@@ -8,14 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 official public API; this project is an **unofficial** client for what the Odoo.sh web UI uses.
 
 Status: the workspace, tooling and CI exist. The CLI has the commands of its first milestone:
-`osh auth`, `osh projects list`, `osh branches list`, `history`, `settings` and `revision`, `osh backups list`, `create`, `download`
+`osh auth`, `osh projects list` and `show`, `osh branches list`, `history`, `settings` and `revision`, `osh backups list`, `create`, `download`
 and `pull`, `osh builds list`, `show`, `watch`, `rebuild`, `open` and `mails`, `osh logs` and `osh ssh`, with a
 reference page generated from them.
-The MCP server has twelve read-only
-tools: `get_session`, `list_projects`, `list_branches`, `list_builds`, `list_history`, `get_build`, `get_branch_settings`, `get_build_revision`, `wait_for_build`,
-`read_log`, `list_mails` and `read_mail`. A thirteenth, `rebuild_branch`, changes state and is registered only with `--allow-changes`. A reference page is generated from the tools. The library has its transport, session
+The MCP server has thirteen read-only
+tools: `get_session`, `list_projects`, `get_project_overview`, `list_branches`, `list_builds`, `list_history`, `get_build`, `get_branch_settings`, `get_build_revision`, `wait_for_build`,
+`read_log`, `list_mails` and `read_mail`. A fourteenth, `rebuild_branch`, changes state and is registered only with `--allow-changes`. A reference page is generated from the tools. The library has its transport, session
 store, login, logout and a client that
-reports the session's user, lists projects, branches, builds and backups, reads a branch's history and its settings, reports the revision a build runs, takes a backup and waits
+reports the session's user, reports a project's overview, lists projects, branches, builds and backups, reads a branch's history and its settings, reports the revision a build runs, takes a backup and waits
 for it, prepares a backup's file and downloads it, watches a build, reads and
 follows a build's logs, lists the mails a build caught and reads one, triggers a rebuild, gives the SSH target of a build and the URL of its panels, and allows the
 caller's IP for SSH. The architecture
@@ -86,7 +86,14 @@ Rules that hold across packages:
 
 These are design constraints, not guidelines:
 
-- The user's credentials (password, GitHub token) are never seen, stored, or logged.
+- The user's credentials (password, GitHub token) are never seen, stored, or logged by the sign-in.
+- Exception, as a rule: an Odoo.sh answer can carry a token or a code (a project's access token,
+  the GitHub token a project sets for commit statuses, a subscription or enterprise code). Each is
+  dropped unread in the upstream layer, before any reader or model is built, and is never stored,
+  logged, shown or returned. Two are read, each held as a `Secret` in memory for the one call:
+  the project's access token from `get_info`, which opens a build's logs and mails on its worker,
+  and the `token` of the redirect Odoo.sh answers for a backup's file, which the download sends
+  back to fetch it.
 - Authentication is a browser-based GitHub login flow. Only the resulting Odoo.sh session is kept
   across runs, in the OS keyring — never in a plaintext file, config file, or cache.
 - The store accepts three keyring backends and picks among them itself, not through

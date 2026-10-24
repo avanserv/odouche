@@ -17,7 +17,7 @@ from rich.live import Live
 from rich.text import Text
 
 import odouche
-from odouche_cli import _terminal, ssh
+from odouche_cli import _size, _terminal, ssh
 from odouche_cli._client import open_client
 from odouche_cli._context import (
     BranchOption,
@@ -43,8 +43,6 @@ app = typer.Typer(
 
 _HASH_LENGTH = 7
 _TAKEN = "%Y-%m-%d %H:%M:%S"
-_UNITS = ("B", "KiB", "MiB", "GiB")
-_STEP = 1024
 _DEFAULT_TIMEOUT = 600
 _LATEST = "latest"
 # `O_BINARY` is Windows' alone, where without it the zip would be written as text.
@@ -557,7 +555,7 @@ def _write(client: odouche.Client, prepared: odouche.PreparedDownload, path: Pat
 
 
 def _written(written: int, size: int | None) -> str:
-    return f"Downloaded {_size(written)}" + ("" if size is None else f" of {_size(size)}")
+    return f"Downloaded {_size.size(written)}" + ("" if size is None else f" of {_size.size(size)}")
 
 
 def _columns() -> list[Column[odouche.Backup]]:
@@ -567,16 +565,6 @@ def _columns() -> list[Column[odouche.Backup]]:
         Column[odouche.Backup]("Branch", lambda backup: backup.branch_name),
         Column[odouche.Backup]("Build", lambda backup: backup.build_name),
         Column[odouche.Backup]("Commit", lambda backup: backup.commit_hash[:_HASH_LENGTH]),
-        Column[odouche.Backup]("Size", lambda backup: "" if backup.size is None else _size(backup.size)),
+        Column[odouche.Backup]("Size", lambda backup: "" if backup.size is None else _size.size(backup.size)),
         Column[odouche.Backup]("Downloadable", lambda backup: "yes" if backup.downloadable else "no"),
     ]
-
-
-def _size(size: int) -> str:
-    value = float(size)
-    for unit in _UNITS[:-1]:
-        # Compared as shown, so 1048575 bytes is 1.0 MiB and not 1024.0 KiB.
-        if round(value, 1) < _STEP:
-            return f"{value:.0f} {unit}" if unit == "B" else f"{value:.1f} {unit}"
-        value /= _STEP
-    return f"{value:.1f} {_UNITS[-1]}"

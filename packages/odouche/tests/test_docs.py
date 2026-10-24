@@ -27,6 +27,7 @@ SHOWN = [
     "odouche.login(",
     "odouche.logout(",
     ".projects()",
+    ".project_overview(",
     ".branches(",
     ".backups(",
     ".builds(",

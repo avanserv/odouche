@@ -14,6 +14,7 @@ from odouche._upstream import (
     history,
     logs,
     mails,
+    overview,
     panels,
     projects,
     rebuild,
@@ -41,6 +42,7 @@ from odouche.models import (
     Panel,
     PreparedDownload,
     Project,
+    ProjectOverview,
     SessionInfo,
     SshTarget,
     Tracking,
@@ -100,6 +102,19 @@ class Client:
     def projects(self) -> list[Project]:
         """List the projects the session's user can reach."""
         return projects.projects(self._transport)
+
+    def project_overview(self, project: Project | str) -> ProjectOverview:
+        """Return a project's overview, given as a `Project` or by its name.
+
+        Its subscription, Odoo version, production build and branches by stage come from the
+        requests its page sends, for its info and its branches, and its region from the projects.
+        Its storage, workers and staging branches come from its settings, a fourth request, sent
+        only when the session's user is an admin of the project, as the page shows them to an
+        admin only: otherwise `hosting` is `None`. Only reads. Every token and code in the answers
+        is dropped unread. Raises `NotFoundError` when the project is not one the session's user
+        can reach, and `PermissionDeniedError` when Odoo.sh refuses its branches or its settings.
+        """
+        return overview.overview(self._transport, _project_name(project))
 
     def branches(self, project: Project | str) -> list[Branch]:
         """List the branches of a project, given as a `Project` or by its name.

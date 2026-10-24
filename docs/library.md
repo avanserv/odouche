@@ -148,6 +148,58 @@ holds the session itself.
 | `repository` | The GitHub repository the project builds, as `owner/name`. |
 | `url` | The address of the project's page on Odoo.sh. |
 
+### Project overview
+
+`client.project_overview(project)` returns what a project's page and its Settings page tell about
+it, as a `ProjectOverview`. `project` is a `Project` or a project's name.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    overview = client.project_overview("acme-shop")
+    print(overview.subscription, overview.odoo_version, overview.region, overview.access_level)
+    for counted in overview.stages:
+        print(counted.stage, counted.count)
+    if overview.hosting is not None:
+        print(overview.hosting.storage_used_bytes, overview.hosting.storage_quota_bytes, overview.hosting.workers)
+```
+
+| Field | Meaning |
+| --- | --- |
+| `id`, `name`, `repository` | As in `Project`. |
+| `subscription` | A `Subscription`: `VALID`, `TRIAL`, `NON_STANDARD`, `EXPIRED` or `UNKNOWN`. |
+| `subscription_name` | What Odoo.sh calls that state, such as `valid`. |
+| `trial_days_left` | The days left of a trial given by a partnership code, or `None`. |
+| `odoo_version` | The project's Odoo version, such as `19.0`. |
+| `region` | Where the project is hosted, in Odoo.sh's own words, such as `Europe`. |
+| `dedicated` | Whether the project pays for a dedicated server. |
+| `production_build` | A `ProductionBuild`, or `None` when there is none. |
+| `access_level` | What the session's user is on the project: `admin`, `tester` or `developer`. |
+| `hosting` | A `ProjectHosting`, or `None` when the user is not an admin of the project. |
+| `stages` | A `StageCount` for production, staging and development, even at 0, then one for each stage the library does not know. |
+| `branches` | A `BranchSummary` for each branch, in the order Odoo.sh answers them. |
+
+| Model | Fields |
+| --- | --- |
+| `ProductionBuild` | `id`, `branch_name` and `url`, the address of the production database. |
+| `ProjectHosting` | `storage_used_bytes` and `storage_quota_bytes`, `workers` of the production branch and `staging_branches` the subscription allows. |
+| `StageCount` | `stage`, `stage_name` and `count`. |
+| `BranchSummary` | `branch`, a `Branch`, and `last_build`, a `TrackedBuild` or `None` when it has none. |
+
+- It asks Odoo.sh for the project's info, then the projects for its region, then its branches, as
+  its page does, then for an admin its settings, as its Settings page does.
+- Odoo.sh shows the Settings page to an admin of the project only, so `hosting` is `None` for anyone
+  else and the settings are not asked.
+- Sizes are in bytes. The storage used is what Odoo.sh accounts the project for.
+- A subscription state the library does not know is `Subscription.UNKNOWN`, not an error.
+- The project's access token, the GitHub token set for commit statuses, the subscription code and
+  the enterprise code are in Odoo.sh's answers. They are dropped before anything is read, and none
+  is in the model.
+- A project the user cannot reach raises `NotFoundError`. Branches or settings Odoo.sh refuses
+  raise `PermissionDeniedError`.
+
 ### Branches
 
 `client.branches(project)` returns the branches of a project, as a list of `Branch`. `project` is a

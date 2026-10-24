@@ -481,9 +481,9 @@ another, and an IPv6 address.
 
 ### Enumerations
 
-"Declared" values come from `mappings` in `get_info`, which lists values with their labels, or
-from the radios of a branch's Settings tab, as marked. A declared value that was not seen has never
-been observed in a payload.
+"Declared" values come from `mappings` in `get_info`, which lists values with their labels, from
+the radios of a branch's Settings tab, or from the page's templates, as marked. A declared value
+that was not seen has never been observed in a payload.
 
 | Enumeration | Seen | Declared, not seen |
 | --- | --- | --- |
@@ -496,6 +496,7 @@ been observed in a payload.
 | `test_mode` | `custom` | `off`, `all`, by the form |
 | `ai_agent` | `claude` | `opencode`, by the form |
 | `tracking_type` | `push`, `rebuild`, `stage` | Not declared anywhere |
+| Project `subscription_validity` | `valid` | `trial`, `custom`, `invalid`, from the page's templates |
 | Log names | `install`, `pip`, `odoo`, `update`, `neutralize` | `upgrade`, named in the page's script |
 
 - `warning` was only seen in the history, never in a `builds` answer.

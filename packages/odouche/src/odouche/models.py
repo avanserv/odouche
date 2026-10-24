@@ -237,7 +237,9 @@ class PushedCommit:
 
 @dataclass(frozen=True, slots=True)
 class TrackedBuild:
-    """The build an event of a branch's history made, as it is now. `Client.build` has the rest of it."""
+    """A build as a summary gives it: its number, status and result, for an event of a branch's history or a
+    branch's last build. `Client.build` has the rest of it.
+    """
 
     id: int
     """The number Odoo.sh gives the build."""
@@ -285,6 +287,126 @@ class Tracking:
 
     target_stage: Stage | None
     """The stage a branch moved to or was created in, or `None` for any event but a stage one."""
+
+
+class Subscription(StrEnum):
+    """The state of a project's subscription, as Odoo.sh reports it."""
+
+    VALID = "valid"
+    TRIAL = "trial"
+    NON_STANDARD = "non_standard"
+    """A subscription Odoo.sh calls `custom`, which its page shows as non-standard."""
+    EXPIRED = "expired"
+    """A subscription Odoo.sh calls `invalid`, which its page shows as expired."""
+    UNKNOWN = "unknown"
+    """A state the library does not know. The overview's `subscription_name` holds what Odoo.sh calls it."""
+
+
+@dataclass(frozen=True, slots=True)
+class ProductionBuild:
+    """The build a project's production branch serves."""
+
+    id: int
+    """The number Odoo.sh gives the build."""
+
+    branch_name: str
+    """The git branch."""
+
+    url: str
+    """The address of the production database."""
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectHosting:
+    """What a project's subscription allows and how much storage it uses, as its Settings page shows them."""
+
+    storage_used_bytes: int
+    """The storage the project is accounted for, in bytes."""
+
+    storage_quota_bytes: int
+    """The storage the subscription allows, in bytes."""
+
+    workers: int
+    """The workers of the production branch."""
+
+    staging_branches: int
+    """The staging branches the subscription allows."""
+
+
+@dataclass(frozen=True, slots=True)
+class StageCount:
+    """How many branches of a project sit in one stage."""
+
+    stage: Stage
+    """The stage."""
+
+    stage_name: str
+    """What Odoo.sh calls that stage, such as `dev`."""
+
+    count: int
+    """The branches in it, which can be 0."""
+
+
+@dataclass(frozen=True, slots=True)
+class BranchSummary:
+    """A branch of a project, with its last build."""
+
+    branch: Branch
+    """The branch."""
+
+    last_build: TrackedBuild | None
+    """Its last build, or `None` when it has none."""
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectOverview:
+    """What a project's page and its Settings page tell about it. No token or code is part of it."""
+
+    id: int
+    """The number Odoo.sh gives the project."""
+
+    name: str
+    """The project's name on Odoo.sh, as in the address of its page."""
+
+    repository: str
+    """The GitHub repository the project builds, as `owner/name`."""
+
+    subscription: Subscription
+    """The state of the project's subscription."""
+
+    subscription_name: str
+    """What Odoo.sh calls that state, such as `valid`."""
+
+    trial_days_left: int | None
+    """The days left of a trial given by a partnership code, or `None` when there is none."""
+
+    odoo_version: str
+    """The project's Odoo version, such as `19.0`."""
+
+    region: str
+    """Where the project is hosted, in Odoo.sh's own words, such as `Europe`."""
+
+    dedicated: bool
+    """Whether the project pays for a dedicated server."""
+
+    production_build: ProductionBuild | None
+    """The build the production branch serves, or `None` when there is none."""
+
+    access_level: str
+    """What the session's user is on the project, in Odoo.sh's own words, such as `admin` or `developer`."""
+
+    hosting: ProjectHosting | None
+    """Its storage, workers and staging branches, or `None` when the session's user is not an admin of
+    the project: Odoo.sh shows them to an admin only, and they are not asked otherwise.
+    """
+
+    stages: tuple[StageCount, ...]
+    """The branches in production, staging and development, each counted even at 0, then in each stage the
+    library does not know, by name.
+    """
+
+    branches: tuple[BranchSummary, ...]
+    """The branches with their last builds, in the order Odoo.sh answers them."""
 
 
 class PushBehavior(StrEnum):
