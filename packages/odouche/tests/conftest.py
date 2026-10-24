@@ -129,6 +129,7 @@ class Upstream:
             "/app/user/profile": self.load("user_profile.json"),
             "/app/project/acme-shop/get_info": self.load("project_info.json"),
             "/app/project/acme-corp-odoo-addons-4217/get_settings": self.load("project_settings.json"),
+            "/app/project/acme-corp-odoo-addons-4217/audit_logs": self.load("audit_logs.json"),
             "/paas/build/88212/logs/list": self.load("build_logs_list.json"),
             "/paas/88212/mail/json/fetch": self.load("mails.json"),
         }

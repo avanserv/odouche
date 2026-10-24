@@ -165,6 +165,17 @@ RESULTS: dict[str, object] = {
         ),
         ("tests",),
     ),
+    "audit_log": [
+        odouche.AuditEntry(
+            logged_at=datetime(2026, 1, 1, tzinfo=UTC),
+            author="octo-dev",
+            kind=odouche.AuditKind.OPEN_SHELL,
+            kind_name="Open Shell",
+            stage=odouche.Stage.DEVELOPMENT,
+            details="",
+            succeeded=True,
+        )
+    ],
     "logs": [odouche.Log(odouche.LogKind.INSTALL, "install", datetime(2026, 1, 1, tzinfo=UTC), "1 KB")],
     "read_log": [odouche.LogLine("Loading modules", offset=16, truncated=False)],
     "mails": [MAIL],

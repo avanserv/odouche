@@ -31,7 +31,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project, a branch's history, show and change its settings, and the revision a build runs. |
 | [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, start a new one, open its panels and read the mails it caught. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
-| [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach, show one's overview, and check it. |
+| [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach, show one's overview, check it, and read its audit log. |
 | [`osh ssh`](#osh-ssh) | Open a shell on the branch's latest build, with your own `ssh`, its configuration and its keys. |
 
 ## `osh auth`
@@ -552,7 +552,7 @@ osh logs --follow
 
 ## `osh projects`
 
-List the Odoo.sh projects you can reach, show one's overview, and check it.
+List the Odoo.sh projects you can reach, show one's overview, check it, and read its audit log.
 
 ```text
 osh projects [OPTIONS] COMMAND [ARGS]...
@@ -562,6 +562,7 @@ osh projects [OPTIONS] COMMAND [ARGS]...
 | --- | --- |
 | [`osh projects list`](#osh-projects-list) | List the projects you can reach, with their repository and address. |
 | [`osh projects show`](#osh-projects-show) | Show a project's overview, one fact per line: its subscription, Odoo version, hosting, production build and branches by stage. |
+| [`osh projects audit`](#osh-projects-audit) | List a project's audit log, newest first: who did what, when, on which stage, and what Odoo.sh adds about it. |
 | [`osh projects check`](#osh-projects-check) | Check a project's subscription, production build, storage and branches, and exit 30 when one fails, 31 when one warns. |
 
 ### `osh projects list`
@@ -596,6 +597,28 @@ Example:
 
 ```bash
 osh projects show --project acme-shop
+```
+
+### `osh projects audit`
+
+List a project's audit log, newest first: who did what, when, on which stage, and what Odoo.sh adds about it.
+
+Odoo.sh sends the last 30 days in one answer, and shows the log to an admin of the project only: anyone else gets exit code 5. Nothing older than 30 days can be read, whatever `--since` says.
+
+```text
+osh projects audit [OPTIONS]
+```
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--limit LIMIT` | The most entries to list, 200 at most. From 1 to 200. Default: `20`. | |
+| `--since DATE` | List only the entries at or after this moment, in UTC, such as 2026-10-01 or 2026-10-01T09:30:00. | |
+
+Example:
+
+```bash
+osh projects audit --limit 10
 ```
 
 ### `osh projects check`

@@ -1,8 +1,11 @@
-"""`osh projects`: the Odoo.sh projects the session's user can reach, one's overview and its checks."""
+"""`osh projects`: the Odoo.sh projects the session's user can reach, one's overview, its checks and its audit log."""
 
 from collections.abc import Callable, Iterable
+from contextlib import closing
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
+from itertools import takewhile
 from typing import Annotated
 
 import typer
@@ -12,12 +15,12 @@ from odouche_cli import _size
 from odouche_cli._client import open_client
 from odouche_cli._context import ProjectOption, resolve_project, result_of, status_of
 from odouche_cli._errors import EXIT_CHECK_FAILED, EXIT_CHECK_WARNED
-from odouche_cli._output import Column, Output
+from odouche_cli._output import Column, Output, strip_line_control
 
 
 app = typer.Typer(
     name="projects",
-    help="List the Odoo.sh projects you can reach, show one's overview, and check it.",
+    help="List the Odoo.sh projects you can reach, show one's overview, check it, and read its audit log.",
     epilog="Example: osh projects list",
     no_args_is_help=True,
 )
@@ -67,6 +70,77 @@ def show(ctx: typer.Context, project: ProjectOption = None) -> None:
     with open_client() as client:
         read = client.project_overview(resolve_project(ctx, project, client.projects))
     output.one(read, _OVERVIEW)
+
+
+_AUDIT_LIMIT = 20
+_MAX_AUDIT_LIMIT = 200
+# Two requests: the project's info, then its whole log.
+_AUDIT_TIMEOUT = 60.0
+_LOGGED = "%Y-%m-%d %H:%M:%S"
+
+AuditLimitOption = Annotated[
+    int,
+    typer.Option("--limit", min=1, max=_MAX_AUDIT_LIMIT, help=f"The most entries to list, {_MAX_AUDIT_LIMIT} at most."),
+]
+SinceOption = Annotated[
+    datetime | None,
+    typer.Option(
+        "--since",
+        formats=["%Y-%m-%d", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"],
+        metavar="DATE",
+        help="List only the entries at or after this moment, in UTC, such as 2026-10-01 or 2026-10-01T09:30:00.",
+    ),
+]
+
+
+def _untrusted(text: str) -> str:
+    """Put text others wrote on one line, without its escape sequences."""
+    return strip_line_control(" ".join(text.splitlines()))
+
+
+def _action(entry: odouche.AuditEntry) -> str:
+    named = _untrusted(entry.kind_name) if entry.kind is odouche.AuditKind.UNKNOWN else entry.kind.value
+    return named if entry.succeeded else f"{named} (failed)"
+
+
+_AUDIT_COLUMNS = [
+    Column[odouche.AuditEntry]("Date (UTC)", lambda entry: entry.logged_at.strftime(_LOGGED)),
+    Column[odouche.AuditEntry]("By", lambda entry: _untrusted(entry.author)),
+    Column[odouche.AuditEntry]("Stage", lambda entry: "project" if entry.stage is None else entry.stage.value),
+    Column[odouche.AuditEntry]("Action", _action),
+    Column[odouche.AuditEntry]("Details", lambda entry: _untrusted(entry.details)),
+]
+
+
+@app.command(epilog="Example: osh projects audit --limit 10")
+def audit(
+    ctx: typer.Context,
+    project: ProjectOption = None,
+    *,
+    limit: AuditLimitOption = _AUDIT_LIMIT,
+    since: SinceOption = None,
+) -> None:
+    """List a project's audit log, newest first: who did what, when, on which stage, and what Odoo.sh adds about it.
+
+    Odoo.sh sends the last 30 days in one answer, and shows the log to an admin of the project only: anyone else gets exit code 5. Nothing older than 30 days can be read, whatever `--since` says.
+    """
+    output: Output = ctx.obj
+    start = None if since is None else since.replace(tzinfo=UTC)
+    # With `--since`, one more tells whether the limit left out entries the date asked for.
+    asked = limit if start is None else limit + 1
+    with open_client() as client:
+        name = resolve_project(ctx, project, client.projects)
+        # Closed on leaving, so the first entry older than `start` is the last one read.
+        with closing(client.audit_log(name, limit=asked, timeout=_AUDIT_TIMEOUT)) as read:
+            found = list(read if start is None else takewhile(lambda entry: entry.logged_at >= start, read))
+    output.rows(found[:limit], _AUDIT_COLUMNS, empty="No audit log entries.")
+    if start is not None and len(found) > limit:
+        more = f"raise --limit, up to {_MAX_AUDIT_LIMIT}" if limit < _MAX_AUDIT_LIMIT else "give a later --since"
+        typer.echo(
+            f"Showing the newest {limit} entries: older ones since {start.strftime(_LOGGED)} UTC were left out. "
+            f"To see them, {more}.",
+            err=True,
+        )
 
 
 class Verdict(StrEnum):

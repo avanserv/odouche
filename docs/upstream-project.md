@@ -81,12 +81,20 @@ shows the last 30 days.
 | `successful` | bool | `true`; the page shows it only when the project `is_staff_restricted` |
 
 - A role change is logged as "Change access rights of user `<login>` from `<old>` to `<new>`".
+- The page asks once, in `onWillStart`, and its `SearchTable` pages the rows itself, 25 a screen,
+  sorted by `date` descending.
+- The CSV export also holds `Change branch stage`, `Add domain name` and `Manage settings`, which
+  the 30 days of JSON did not.
 - `GET .../audit_logs/download/csv` and `.../download/xls` give up to a year, as attachments named
   `audit_log_<project_name>`. The CSV columns are `Date`, `Github User`, `Repository`
   (`<owner>/<name>`), `Stage`, `Database`, `Action` and `Extra Information`. Its dates were two
   hours ahead of the JSON's, which matches the zone of the `tz` cookie.
 
 Seen once.
+
+`Client.audit_log` asks `get_info`, applies the page's admin test to it, then asks `audit_logs`
+once and reads every field above but none of the exports. It sorts the entries by `date` itself,
+as the page does.
 
 ## Project settings
 
