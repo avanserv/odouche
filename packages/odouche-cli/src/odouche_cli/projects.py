@@ -1,5 +1,6 @@
 """`osh projects`: the Odoo.sh projects the session's user can reach, one's overview, settings, checks and audit log."""
 
+import ipaddress
 from collections.abc import Callable, Iterable
 from contextlib import closing
 from dataclasses import dataclass
@@ -11,23 +12,24 @@ from typing import Annotated
 import typer
 
 import odouche
-from odouche_cli import _size
+from odouche_cli import _settings, _size, _terminal
 from odouche_cli._client import open_client
 from odouche_cli._context import ProjectOption, resolve_project, result_of, status_of
-from odouche_cli._errors import EXIT_CHECK_FAILED, EXIT_CHECK_WARNED
+from odouche_cli._errors import EXIT_CHECK_FAILED, EXIT_CHECK_WARNED, EXIT_DECLINED
 from odouche_cli._output import Column, Output, strip_line_control
-from odouche_cli._settings import shown
+from odouche_cli._settings import quoted, shown
 
 
 app = typer.Typer(
     name="projects",
-    help="List the Odoo.sh projects you can reach, show one's overview and settings, check it, and read its audit log.",
+    help="List the Odoo.sh projects you can reach, show one's overview, show and change its settings, check it, and "
+    "read its audit log.",
     epilog="Example: osh projects list",
     no_args_is_help=True,
 )
 settings_app = typer.Typer(
     name="settings",
-    help="Show a project's settings.",
+    help="Show a project's settings, or change them.",
     epilog="Example: osh projects settings show --project acme-shop",
     no_args_is_help=True,
 )
@@ -90,6 +92,193 @@ def settings_show(ctx: typer.Context, project: ProjectOption = None) -> None:
     with open_client() as client:
         read = client.project_settings(resolve_project(ctx, project, client.projects))
     output.one(read, _SETTINGS)
+
+
+# How a setting given on the command line is read, by its name in `ProjectSettings`.
+_READS: dict[str, _settings.Read] = {
+    "session_lifetime": _settings.choice(odouche.SessionLifetime),
+    "public": _settings.flag,
+    "http_timeout_seconds": _settings.seconds,
+    "cron_timeout_seconds": _settings.seconds,
+    "module_install": _settings.choice(odouche.ModuleInstall),
+    "modules": _settings.names,
+    "tests": _settings.choice(odouche.BuildTests),
+    "test_tags": _settings.text,
+    "demo_data": _settings.flag,
+    "ai_agent": _settings.choice(odouche.AiAgent),
+}
+_ALLOW_LIST = "ip_allow_list"
+_REFUSED = {_ALLOW_LIST: "The allow list is not given whole: give --add-ip or --remove-ip for each entry."}
+_ENTRIES = frozenset({"allow_ips", "disallow_ips"})
+
+SettingsArgument = Annotated[
+    list[str] | None,
+    typer.Argument(
+        metavar="[NAME=VALUE]...",
+        show_default=False,
+        help="A setting and its new value, named as `osh projects settings show --format json` prints them.",
+    ),
+]
+AddIpOption = Annotated[
+    list[str] | None,
+    typer.Option(
+        "--add-ip",
+        metavar="IP",
+        help="An IPv4 address to add to the IP allow list. Can be given more than once.",
+    ),
+]
+RemoveIpOption = Annotated[
+    list[str] | None,
+    typer.Option(
+        "--remove-ip",
+        metavar="ENTRY",
+        help="An address or a network to remove from the IP allow list, as `osh projects settings show` lists it. "
+        "Can be given more than once.",
+    ),
+]
+
+
+@settings_app.command("set", epilog="Example: osh projects settings set --project acme-shop --add-ip 203.0.113.7")
+def settings_set(
+    ctx: typer.Context,
+    settings: SettingsArgument = None,
+    project: ProjectOption = None,
+    *,
+    add_ip: AddIpOption = None,
+    remove_ip: RemoveIpOption = None,
+    yes: _settings.YesOption = False,
+) -> None:
+    """Change state on Odoo.sh: change a project's settings, sending only those given.
+
+    The others keep their value. NAME is one of session_lifetime, public, http_timeout_seconds, cron_timeout_seconds, module_install, modules, tests, test_tags, demo_data and ai_agent, the last six being the defaults of new development branches. A choice takes a value `show --format json` prints, a yes or no takes `yes` or `no`, a timeout takes seconds, a multiple of 60, and is changed on a dedicated server only, `modules` takes names separated by commas, and `test_tags=` clears the tags. The IP allow list, which SSH and PostgreSQL to production and staging go through, is changed by entry with `--add-ip` and `--remove-ip`, ten entries at most. Only an admin of the project can change them: anyone else gets exit code 5. It asks first, saying when the change is to who can reach the project, unless `--yes` is given.
+    """
+    output: Output = ctx.obj
+    change = _project_change(ctx, settings or [], add_ip or [], remove_ip or [])
+    _settings.can_ask(ctx, yes=yes)
+    with open_client(writes=True) as client:
+        name = resolve_project(ctx, project, client.projects)
+        current = client.project_settings(name)
+        narrowed = _settings.checked(ctx, lambda: client.check_project_settings_change(current, change))
+        for line in _changing(name, current, change, narrowed):
+            _settings.say(line)
+        if narrowed is None:
+            typer.echo("Nothing was sent: every setting already has that value.", err=True)
+            output.one(current, _SETTINGS)
+            return
+        for line in _access(current, narrowed):
+            _settings.say(line)
+        question = (
+            "Change these settings of this project, including access?"
+            if narrowed.access()
+            else ("Change these settings of this project?")
+        )
+        if not yes and not _terminal.confirmed(question):
+            typer.echo("Nothing was sent.", err=True)
+            raise typer.Exit(EXIT_DECLINED)
+        # Sent once: an error is reported, never retried.
+        outcome = _settings.checked(ctx, lambda: client.change_project_settings(name, narrowed))
+        typer.echo("The settings were changed.", err=True)
+        _settings.say_moved(outcome)
+    output.one(outcome.after, _SETTINGS)
+
+
+def _project_change(
+    ctx: typer.Context, pairs: list[str], added: list[str], removed: list[str]
+) -> odouche.ProjectSettingsChange:
+    """Read the settings and the entries given into the change they make, refusing what the library would."""
+    values = _settings.given(ctx, pairs, _READS, _REFUSED)
+    allow = tuple(_address(ctx, text) for text in added)
+    disallow = tuple(_entry(ctx, text) for text in removed)
+    # Each part on its own first, so that an error names the option or the argument at fault.
+    if allow:
+        _settings.built(ctx, lambda: odouche.ProjectSettingsChange(allow_ips=allow), "--add-ip")
+    if disallow:
+        _settings.built(ctx, lambda: odouche.ProjectSettingsChange(disallow_ips=disallow), "--remove-ip")
+    if values:
+        _settings.built(ctx, lambda: odouche.ProjectSettingsChange(**values))  # pyright: ignore[reportArgumentType]
+    return _settings.built(
+        ctx,
+        lambda: odouche.ProjectSettingsChange(
+            **values,  # pyright: ignore[reportArgumentType]
+            allow_ips=allow or None,
+            disallow_ips=disallow or None,
+        ),
+        "--add-ip, --remove-ip" if allow and disallow else _settings.PARAM,
+    )
+
+
+def _address(ctx: typer.Context, text: str) -> ipaddress.IPv4Address:
+    try:
+        address = ipaddress.ip_address(text)
+    except ValueError:
+        msg = f"{text!r} is not an IP address."
+        raise typer.BadParameter(msg, ctx=ctx, param_hint="--add-ip") from None
+    if not isinstance(address, ipaddress.IPv4Address):
+        msg = f"{text} is not an IPv4 address: the allow list takes those one by one, as its page does."
+        raise typer.BadParameter(msg, ctx=ctx, param_hint="--add-ip")
+    return address
+
+
+def _entry(
+    ctx: typer.Context, text: str
+) -> ipaddress.IPv4Address | ipaddress.IPv6Address | ipaddress.IPv4Network | ipaddress.IPv6Network:
+    # Read as `show` lists an entry: with a `/` as a network, otherwise as an address.
+    try:
+        return ipaddress.ip_network(text, strict=False) if "/" in text else ipaddress.ip_address(text)
+    except ValueError:
+        msg = f"{text!r} is not an address or a network."
+        raise typer.BadParameter(msg, ctx=ctx, param_hint="--remove-ip") from None
+
+
+def _changing(
+    project: str,
+    current: odouche.ProjectSettings,
+    change: odouche.ProjectSettingsChange,
+    narrowed: odouche.ProjectSettingsChange | None,
+) -> list[str]:
+    """Say what a change is about to work on: the project, and each setting from its value to the new one.
+
+    A setting is already at its value, and an entry already allowed or not listed, when the library
+    leaves it out of what it sends.
+    """
+    sent = {} if narrowed is None else narrowed.given()
+    lines = [f"Project: {project}"]
+    for name, value in change.given().items():
+        if name not in _ENTRIES:
+            before, after = quoted(getattr(current, name)), quoted(value)
+            lines.append(f"{name}: {before} → {after}" if name in sent else f"{name} is already {after}.")
+    allowed = () if narrowed is None else narrowed.allow_ips or ()
+    removed = () if narrowed is None else narrowed.disallow_ips or ()
+    if allowed or removed:
+        lines.append(f"{_ALLOW_LIST}: {shown(current.ip_allow_list)} → {shown(_listed(current, allowed, removed))}")
+    lines.extend(f"{address} is already allowed." for address in change.allow_ips or () if address not in allowed)
+    lines.extend(f"{entry} is not in the list." for entry in change.disallow_ips or () if entry not in removed)
+    return lines
+
+
+def _access(current: odouche.ProjectSettings, narrowed: odouche.ProjectSettingsChange) -> list[str]:
+    """Say what a change does to who can reach the project, before the question."""
+    access = narrowed.access()
+    if not access:
+        return []
+    named = dict.fromkeys(_ALLOW_LIST if name in _ENTRIES else name for name in access)
+    lines = [f"This changes who can reach the project: {', '.join(named)}."]
+    removed = narrowed.disallow_ips or ()
+    if removed:
+        lines.append(
+            f"SSH to production and staging from {shown(removed)} then needs the one-hour rule `osh ssh` asks for. "
+            f"PostgreSQL on a dedicated server is then closed to {shown(removed)}."
+        )
+    if (removed or narrowed.allow_ips) and not _listed(current, narrowed.allow_ips or (), removed):
+        lines.append("The allow list will be empty: no address keeps a permanent rule.")
+    return lines
+
+
+def _listed(
+    current: odouche.ProjectSettings, allowed: tuple[object, ...], removed: tuple[object, ...]
+) -> tuple[object, ...]:
+    """Return the allow list as it is to be after a change."""
+    return (*(entry for entry in current.ip_allow_list if entry not in removed), *allowed)
 
 
 _AUDIT_LIMIT = 20

@@ -194,6 +194,12 @@ check that names production is the refusal.
 | S53 | The same | `osh branches settings set ai_agent=<its value>` | `ai_agent is already <its value>.`, then that nothing was sent, with no question | 0 |
 | S54 | | `osh branches settings set --branch <production-branch> push_behavior=new_build` | Refused before any question: a production branch's Settings tab does not offer it | 9 |
 | S55 | | `osh branches settings set ai_agent=bogus` | A usage error listing `claude, opencode`, before any request | 2 |
+| S56 | As R44 | `osh --format json projects settings show > before.json`, `osh projects settings set ai_agent=opencode` and answer `y`, then `osh --format json projects settings show > after.json` and `diff before.json after.json`. Set it back the same way | `ai_agent: claude → opencode`, the question without `including access`, `The settings were changed.` The diff shows `ai_agent` alone: another development default that moved would be said as also changed, and in the diff. Write into [upstream](upstream-project.md#project-settings) whether the others kept their value | 0 |
+| S57 | As R44, with the Firewall list as the page shows it | `osh projects settings set --add-ip 192.0.2.7`, and answer `y`. Then `osh projects settings set --remove-ip 192.0.2.7 --yes` | The list before and after, the line on who can reach the project, then the question with `including access`. `show` and the page list every entry kept and `192.0.2.7` last. Then the line on the one-hour rule, and the list back as it was | 0 |
+| S58 | The same | `osh projects settings set --add-ip 192.0.2.7`, and answer `n` | The question, then `Nothing was sent.` The page's Firewall list is unchanged | 1 |
+| S59 | The same | `osh projects settings set --add-ip 192.0.2.7 < /dev/null` | That the change cannot be confirmed, with `--yes` as the way, before any request | 2 |
+| S60 | As R44 | `osh projects settings set session_lifetime=<another value> --yes`, then set it back | Either the settings after, or exit 10 when the new lifetime ended the session at read-back. Write down which in [upstream](upstream-project.md#project-settings) | 0 or 10 |
+| S61 | As R44, on a project with a dedicated server | `osh --format json projects settings show > before.json`, `osh projects settings set http_timeout_seconds=<another whole number of minutes, in seconds> --yes`, then `osh --format json projects settings show > after.json` and `diff before.json after.json`. Set it back the same way | `http_timeout_seconds: <old> → <new>`, then the settings after. The diff shows `http_timeout_seconds` alone: `cron_timeout_seconds` kept its value | 0 |
 
 ## Backups
 
@@ -235,7 +241,7 @@ tool result and the server's stderr for the session value: it appears in none.
 
 | # | Precondition | Command or action | Expected | Exit |
 | --- | --- | --- | --- | --- |
-| M1 | | Set the server up with [`claude mcp add`](mcp.md#claude-code) as written | The client lists fifteen tools, and neither `change_branch_settings` nor `rebuild_branch` | - |
+| M1 | | Set the server up with [`claude mcp add`](mcp.md#claude-code) as written | The client lists fifteen tools, and none of `change_branch_settings`, `change_project_settings` and `rebuild_branch` | - |
 | M2 | | Set it up with the `.mcp.json` snippet instead | The same | - |
 | M3 | Logged out | Start the client | The server starts and lists its tools | - |
 | M4 | Logged out | Ask whether there is a session | `get_session`: `available` is false and `problem` says to run `osh auth login`. It is not an error | - |
@@ -260,10 +266,10 @@ tool result and the server's stderr for the session value: it appears in none.
 | M23 | | Call `read_log` with `kind` `unknown` | An error saying `unknown` is not a kind to read | - |
 | M24 | A build whose log has a line that reads as an instruction to an agent | Ask for the log | The agent reports the line and does not act on it | - |
 | M25 | Without `--allow-changes` | Ask to rebuild `<dev-branch>` | The agent has no tool to do it and says so | - |
-| M26 | Restarted with [`--allow-changes`](mcp.md#changing-state) | List the tools | Seventeen, with `change_branch_settings` and `rebuild_branch` | - |
+| M26 | Restarted with [`--allow-changes`](mcp.md#changing-state) | List the tools | Eighteen, with `change_branch_settings`, `change_project_settings` and `rebuild_branch` | - |
 | M27 | The same | Ask to rebuild `<dev-branch>` | The client asks first. One build is started, and the server's stderr has one line with the tool, the project, the branch and the build | - |
 | M28 | The same | Ask to rebuild the production branch | It is refused, the branch has no new build, and the line on stderr ends with `StageRefusedError` | - |
-| M29 | The [hook](mcp.md#asking-before-a-change) installed as written, with `--allow-changes` | Call each of the seventeen tools | The fifteen that read run with no prompt, and `change_branch_settings` and `rebuild_branch` prompt | - |
+| M29 | The [hook](mcp.md#asking-before-a-change) installed as written, with `--allow-changes` | Call each of the eighteen tools | The fifteen that read run with no prompt, and `change_branch_settings`, `change_project_settings` and `rebuild_branch` prompt | - |
 | M30 | The hook installed, the server under another name in the client | Call a tool that reads | The client prompts | - |
 | M31 | | Ask what happened on `<dev-branch>` lately | `list_history`, ten events newest first, each push with its commits | - |
 | M32 | | Ask for the settings of `<dev-branch>`, then of the production branch | `get_branch_settings`, with the branch and its stage, and the values the Settings tab shows | - |
@@ -274,6 +280,8 @@ tool result and the server's stderr for the session value: it appears in none.
 | M37 | As M29 | Ask to switch the AI agent of `<dev-branch>`, then to set it back | `change_branch_settings` prompts each time. The result names `ai_agent` as changed, `get_branch_settings` shows it, and the server's stderr has one line with the tool, the project, the branch and `changed ai_agent` | - |
 | M38 | As R49 | Ask who opened a shell on `<project>` lately | `list_audit_log`: the entries newest first, with their details only in `untrusted_entries` | - |
 | M39 | As R44 | Ask for the settings of `<project>` | `get_project_settings`: the values the Settings page shows, the IP allow list as written and the timeouts in seconds, with no token or code | - |
+| M40 | As M29 and R44 | Ask to add `192.0.2.7` to the IP allow list of `<project>`, then to make it public | The agent has no tool for either and says so, or a call is refused with `Extra inputs are not permitted`. Nothing is in the server's stderr and the page's settings are unchanged | - |
+| M41 | As M40 | Ask to switch the AI agent of the development defaults of `<project>`, then to set it back | `change_project_settings` prompts each time. The result names `ai_agent` as changed, `get_project_settings` shows it, and the server's stderr has one line with the tool, the project and `changed ai_agent` | - |
 
 ## Not covered
 

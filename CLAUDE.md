@@ -8,14 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 official public API; this project is an **unofficial** client for what the Odoo.sh web UI uses.
 
 Status: the workspace, tooling and CI exist. The CLI has the commands of its first milestone:
-`osh auth`, `osh projects list`, `show`, `settings show`, `check` and `audit`, `osh branches list`, `history`, `settings show` and `set` and `revision`, `osh backups list`, `create`, `download`
+`osh auth`, `osh projects list`, `show`, `settings show` and `set`, `check` and `audit`, `osh branches list`, `history`, `settings show` and `set` and `revision`, `osh backups list`, `create`, `download`
 and `pull`, `osh builds list`, `show`, `watch`, `rebuild`, `open` and `mails`, `osh logs` and `osh ssh`, with a
 reference page generated from them.
 The MCP server has fifteen read-only
 tools: `get_session`, `list_projects`, `get_project_overview`, `get_project_settings`, `list_audit_log`, `list_branches`, `list_builds`, `list_history`, `get_build`, `get_branch_settings`, `get_build_revision`, `wait_for_build`,
-`read_log`, `list_mails` and `read_mail`. Two more, `change_branch_settings` and `rebuild_branch`, change state and are registered only with `--allow-changes`. A reference page is generated from the tools. The library has its transport, session
+`read_log`, `list_mails` and `read_mail`. Three more, `change_branch_settings`, `change_project_settings` and `rebuild_branch`, change state and are registered only with `--allow-changes`. A reference page is generated from the tools. The library has its transport, session
 store, login, logout and a client that
-reports the session's user, reports a project's overview, reads a project's settings and audit log, lists projects, branches, builds and backups, reads a branch's history, reads and changes its settings, reports the revision a build runs, takes a backup and waits
+reports the session's user, reports a project's overview, reads and changes a project's settings, reads its audit log, lists projects, branches, builds and backups, reads a branch's history, reads and changes its settings, reports the revision a build runs, takes a backup and waits
 for it, prepares a backup's file and downloads it, watches a build, reads and
 follows a build's logs, lists the mails a build caught and reads one, triggers a rebuild, gives the SSH target of a build and the URL of its panels, and allows the
 caller's IP for SSH. The architecture
@@ -114,13 +114,17 @@ These are design constraints, not guidelines:
 - Headless use takes the session from the environment and keeps it in memory only.
 - Session values must not appear in logs, exceptions, `repr()`s, CLI output, or MCP tool results.
 - Every `osh` command opens its client read-only, except `osh builds rebuild`,
-  `osh branches settings set`, `osh backups create`, `osh backups download`, and `osh ssh` and `osh backups pull` when the
+  `osh branches settings set`, `osh projects settings set`, `osh backups create`, `osh backups download`, and `osh ssh` and `osh backups pull` when the
   user's `ssh` does not get in. Each asks before it sends unless `--yes` is given.
 - `osh ssh` replaces its process with the user's own `ssh`, and `osh backups pull` with their
   `rsync` or `scp` under umask `077`, with no flag that keeps the remote mode. odouche never reads,
   generates or uploads an SSH key, a backup's build name is checked before it is a remote path,
   and the target from upstream is checked as a user and a host before it is an argument. Before that it may try that `ssh` in batch mode with `true`, and allow the address
   Odoo.sh sees, never one it names. There is no MCP tool for it, opt-in or not.
+- The project's IP allow list takes only the addresses the user types into
+  `osh projects settings set`, behind a question that names the change as one to access. No MCP
+  tool changes it, public access or the session lifetime, opt-in or not: the tool's arguments
+  leave them out, and a changing tool refuses an argument it does not declare.
 - `osh builds open --open` hands the panel's URL, and nothing else, to the user's default browser
   through `webbrowser`, with `ODOUCHE_SESSION` removed from the environment it inherits; the
   browser signs in to Odoo.sh on its own. A panel's URL keeps only the host of the build's `url`,

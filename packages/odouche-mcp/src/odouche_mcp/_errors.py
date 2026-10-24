@@ -43,6 +43,7 @@ NEXT_STEPS: tuple[tuple[type[odouche.OdoucheError], str | None], ...] = (
 # Where to look after an unconfirmed change, by the operation the library names, when it is not a build.
 OUTCOME_STEPS = {
     "branch settings change": "Read the branch's settings with get_branch_settings before trying again.",
+    "project settings change": "Read the project's settings with get_project_settings before trying again.",
 }
 
 

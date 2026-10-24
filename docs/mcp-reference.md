@@ -27,6 +27,7 @@ A tool that changes Odoo.sh is registered only when the server is started with
 | [`list_mails`](#list_mails) | No | reads only |
 | [`read_mail`](#read_mail) | No | reads only |
 | [`change_branch_settings`](#change_branch_settings) | Yes | the settings given of the branch: what a new commit does, and on a development branch the new build options. |
+| [`change_project_settings`](#change_project_settings) | Yes | the settings given of the project: the defaults of new development branches and, on a dedicated server, the timeouts. Never the IP allow list, public access or the session lifetime. |
 | [`rebuild_branch`](#rebuild_branch) | Yes | starts a new build of the branch, which replaces its latest one. |
 
 ## `get_session`
@@ -356,6 +357,33 @@ Change state on Odoo.sh: change settings of a branch of a project, sending only 
 - **Returns**: the branch, the names of the settings changed and of those already at that value, each other setting Odoo.sh changed along with them, before and after, and the settings after.
 - **Touches**: the settings given of the branch: what a new commit does, and on a development branch the new build options.
 - **Bounds**: seven requests to Odoo.sh, three when every setting already has that value; the change is sent once and never retried.
+
+| Hint | Value |
+| --- | --- |
+| `readOnlyHint` | false |
+| `destructiveHint` | true |
+| `idempotentHint` | true |
+| `openWorldHint` | true |
+
+## `change_project_settings`
+
+Change state on Odoo.sh: change settings of a project, given by its name, sending only those given; the others keep their value. Only an admin of the project changes them. The timeouts are in seconds, a multiple of 60, and change on a dedicated server only. `module_install` to `ai_agent` are the defaults of new development branches: `modules` is module names separated by commas, and an empty `test_tags` clears the tags. The IP allow list, public access and session lifetime are not offered: they change who reaches the project, and only `osh projects settings set` changes them.
+
+| Argument | Type | Default |
+| --- | --- | --- |
+| `project` | string | Required. |
+| `http_timeout_seconds` | integer | |
+| `cron_timeout_seconds` | integer | |
+| `module_install` | one of `repository`, `all`, `listed` | |
+| `modules` | string | |
+| `tests` | one of `off`, `modules`, `tags` | |
+| `test_tags` | string | |
+| `demo_data` | boolean | |
+| `ai_agent` | one of `claude`, `opencode` | |
+
+- **Returns**: the project's name, the names of the settings changed and of those already at that value, each other setting Odoo.sh changed along with them, before and after, and the settings after.
+- **Touches**: the settings given of the project: the defaults of new development branches and, on a dedicated server, the timeouts. Never the IP allow list, public access or the session lifetime.
+- **Bounds**: six requests to Odoo.sh, two when every setting already has that value; the change is sent once and never retried.
 
 | Hint | Value |
 | --- | --- |

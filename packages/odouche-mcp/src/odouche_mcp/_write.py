@@ -28,7 +28,7 @@ class Rebuilt:
     build: odouche.Build
 
 
-type SettingValue = str | bool | list[str] | None
+type SettingValue = str | bool | int | list[str] | None
 
 
 @dataclass(frozen=True)
@@ -48,6 +48,16 @@ class SettingsChanged:
     settings: odouche.BranchSettings
 
 
+@dataclass(frozen=True)
+class ProjectSettingsChanged:
+    project: str
+    changed: list[str]
+    unchanged: list[str]
+    moved: list[MovedSetting]
+    """The settings not given that Odoo.sh changed along with those given."""
+    settings: odouche.ProjectSettings
+
+
 def changing_tool(*, allow_changes: bool) -> Callable[[str, str], Rebuilt]:
     """Return the rebuild tool, whose client is read-only unless `allow_changes`."""
 
@@ -60,9 +70,9 @@ def changing_tool(*, allow_changes: bool) -> Callable[[str, str], Rebuilt]:
                 # Sent once: an error is reported, never retried.
                 started = client.rebuild(find_branch(client, project, branch))
         except Exception as error:
-            _audit("rebuild_branch", project, branch, type(error).__name__)
+            _audit("rebuild_branch", _target(project, branch), type(error).__name__)
             raise
-        _audit("rebuild_branch", project, branch, f"build {started.id} started")
+        _audit("rebuild_branch", _target(project, branch), f"build {started.id} started")
         return Rebuilt(started)
 
     return rebuild_branch
@@ -93,7 +103,7 @@ def settings_tool(*, allow_changes: bool) -> Callable[..., SettingsChanged]:
                     push_behavior=push_behavior,
                     project_defaults=project_defaults,
                     module_install=module_install,
-                    modules=None if modules is None else tuple(filter(None, map(str.strip, modules.split(",")))),
+                    modules=_names(modules),
                     tests=tests,
                     test_tags=test_tags,
                     demo_data=demo_data,
@@ -110,26 +120,89 @@ def settings_tool(*, allow_changes: bool) -> Callable[..., SettingsChanged]:
                     # Sent once: an error is reported, never retried.
                     outcome = _refused(partial(client.change_branch_settings, found, narrowed))
         except Exception as error:
-            _audit("change_branch_settings", project, branch, type(error).__name__)
+            _audit("change_branch_settings", _target(project, branch), type(error).__name__)
             raise
         changed = [] if narrowed is None else list(narrowed.given())
         unchanged = [name for name in change.given() if name not in changed]
         # The names alone: a value, such as the tags, is the caller's text.
-        _audit("change_branch_settings", project, branch, f"changed {', '.join(changed) or 'nothing'}")
-        moved = [
-            MovedSetting(name, _plain(getattr(outcome.before, name)), _plain(getattr(outcome.after, name)))
-            for name in outcome.moved
-        ]
-        return SettingsChanged(found, changed, unchanged, moved, outcome.after)
+        _audit("change_branch_settings", _target(project, branch), f"changed {', '.join(changed) or 'nothing'}")
+        return SettingsChanged(found, changed, unchanged, _moved(outcome), outcome.after)
 
     return change_branch_settings
+
+
+def project_settings_tool(*, allow_changes: bool) -> Callable[..., ProjectSettingsChanged]:
+    """Return the tool that changes a project's settings, whose client is read-only unless `allow_changes`.
+
+    It has no parameter for a setting of `ProjectSettingsChange.ACCESS`, so that no agent changes who
+    can reach the project: the server refuses a call that names one.
+    """
+
+    def change_project_settings(
+        project: str,
+        *,
+        http_timeout_seconds: int | None = None,
+        cron_timeout_seconds: int | None = None,
+        module_install: odouche.ModuleInstall | None = None,
+        modules: str | None = None,
+        tests: odouche.BuildTests | None = None,
+        test_tags: str | None = None,
+        demo_data: bool | None = None,
+        ai_agent: odouche.AiAgent | None = None,
+    ) -> ProjectSettingsChanged:
+        """Change state on Odoo.sh: change settings of a project, given by its name, sending only those given; the others keep their value. Only an admin of the project changes them.
+        The timeouts are in seconds, a multiple of 60, and change on a dedicated server only. `module_install` to `ai_agent` are the defaults of new development branches: `modules` is module names separated by commas, and an empty `test_tags` clears the tags. The IP allow list, public access and session lifetime are not offered: they change who reaches the project, and only `osh projects settings set` changes them.
+        """
+        try:
+            try:
+                change = odouche.ProjectSettingsChange(
+                    http_timeout_seconds=http_timeout_seconds,
+                    cron_timeout_seconds=cron_timeout_seconds,
+                    module_install=module_install,
+                    modules=_names(modules),
+                    tests=tests,
+                    test_tags=test_tags,
+                    demo_data=demo_data,
+                    ai_agent=ai_agent,
+                )
+            except ValueError as error:
+                raise ToolError(str(error)) from None
+            with open_client(changes=allow_changes) as client:
+                current = client.project_settings(project)
+                narrowed = _refused(partial(client.check_project_settings_change, current, change))
+                outcome = odouche.SettingsOutcome(current, current, ())
+                if narrowed is not None:
+                    # Sent once: an error is reported, never retried.
+                    outcome = _refused(partial(client.change_project_settings, project, narrowed))
+        except Exception as error:
+            _audit("change_project_settings", _target(project), type(error).__name__)
+            raise
+        changed = [] if narrowed is None else list(narrowed.given())
+        unchanged = [name for name in change.given() if name not in changed]
+        # The names alone: a value, such as the tags, is the caller's text.
+        _audit("change_project_settings", _target(project), f"changed {', '.join(changed) or 'nothing'}")
+        return ProjectSettingsChanged(project, changed, unchanged, _moved(outcome), outcome.after)
+
+    return change_project_settings
+
+
+def _names(modules: str | None) -> tuple[str, ...] | None:
+    """Return the module names of a text that separates them by commas."""
+    return None if modules is None else tuple(filter(None, map(str.strip, modules.split(","))))
+
+
+def _moved(outcome: odouche.SettingsOutcome[object]) -> list[MovedSetting]:
+    return [
+        MovedSetting(name, _plain(getattr(outcome.before, name)), _plain(getattr(outcome.after, name)))
+        for name in outcome.moved
+    ]
 
 
 def _plain(value: object) -> SettingValue:
     """Return a setting's value as its JSON has it."""
     if isinstance(value, tuple):
         return [str(name) for name in value]
-    if isinstance(value, bool) or value is None:
+    if isinstance(value, bool | int) or value is None:
         return value
     if isinstance(value, str):
         return str(value)
@@ -145,8 +218,13 @@ def _refused[T](call: Callable[[], T]) -> T:
         raise ToolError(str(error)) from None
 
 
-def _audit(tool: str, project: str, branch: str, outcome: str) -> None:
-    # Not through `logging`, which a level can silence. The names are third-party text, hence `repr`.
+def _target(project: str, branch: str | None = None) -> str:
+    # The names are third-party text, hence `repr`.
+    return f"project={project!r}" if branch is None else f"project={project!r} branch={branch!r}"
+
+
+def _audit(tool: str, target: str, outcome: str) -> None:
+    # Not through `logging`, which a level can silence.
     # A stderr that cannot be written must not make an error of a change that was sent.
     with contextlib.suppress(OSError, ValueError):
-        print(f"odouche-mcp: {tool} project={project!r} branch={branch!r}: {outcome}", file=sys.stderr)  # noqa: T201
+        print(f"odouche-mcp: {tool} {target}: {outcome}", file=sys.stderr)  # noqa: T201

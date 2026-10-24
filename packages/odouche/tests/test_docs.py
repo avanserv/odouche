@@ -44,6 +44,7 @@ SHOWN = [
     ".mail(",
     ".rebuild(",
     ".change_branch_settings(",
+    ".change_project_settings(",
     ".create_backup(",
     ".download(",
     "except odouche.OdoucheError",
@@ -99,6 +100,14 @@ def odoo_sh(upstream, backend, session, monkeypatch, tmp_path):
         return httpx2.Response(200, json=upstream.load("set_settings.json"))
 
     upstream.bodies["/app/branch/51044/set_settings"] = save
+    project = upstream.bodies["/app/project/acme-corp-odoo-addons-4217/get_settings"]["result"]["repository"]
+
+    def save_project(request):
+        # Only the fields of the example: a development default, and the allow list's text.
+        project.update(json.loads(request.content)["params"])
+        return httpx2.Response(200, json=upstream.load("set_project_settings.json"))
+
+    upstream.bodies["/app/project/acme-corp-odoo-addons-4217/set_settings"] = save_project
     # Rebuilt and backed up both.
     upstream.bodies[BUILDS]["result"][0]["branch_info"]["stage"] = "staging"
     backups = upstream.bodies[BACKUPS]["result"]

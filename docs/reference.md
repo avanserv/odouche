@@ -51,6 +51,8 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.ProjectSettings
 
+::: odouche.ProjectSettingsChange
+
 ::: odouche.SessionLifetime
 
 ::: odouche.Submodule

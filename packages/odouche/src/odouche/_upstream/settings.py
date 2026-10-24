@@ -1,7 +1,8 @@
-"""The settings of a branch, and the request that changes them."""
+"""The settings of a branch and the request that changes them, with what a change of a project's shares."""
 
-from collections.abc import Set
-from dataclasses import fields, replace
+from collections.abc import Callable, Iterable, Mapping, Set
+from dataclasses import dataclass, fields, replace
+from typing import Protocol
 
 from odouche._upstream import branches, builds
 from odouche._upstream.reader import Reader
@@ -32,8 +33,6 @@ _PUSH_SENT = {member: wire for wire, member in _PUSH.items()}
 _MODULES_SENT = {member: wire for wire, member in MODULES.items()}
 _TESTS_SENT = {member: wire for wire, member in TESTS.items()}
 _AGENTS_SENT = {member: wire for wire, member in AGENTS.items()}
-# A checkbox, as the form sends it: its hidden `off` input, or the box's own `on`.
-_FLAG = {True: "on", False: "off"}
 
 # What a change can set, in the order of its fields.
 _SETTABLE = tuple(field.name for field in fields(SettingsChange))
@@ -77,7 +76,7 @@ def settings(transport: Transport, branch_id: int) -> BranchSettings:
 
 
 @state_changing
-def change_settings(transport: Transport, branch_id: int, change: SettingsChange) -> SettingsOutcome:
+def change_settings(transport: Transport, branch_id: int, change: SettingsChange) -> SettingsOutcome[BranchSettings]:
     """Send the settings of `change` that differ from the branch's, once, and return them before and after."""
     # The caller's branch may have changed stage since it was read.
     stage = branches.stage(builds.entry(transport, branch_id, 1).child("branch_info").text("stage"))
@@ -90,22 +89,42 @@ def change_settings(transport: Transport, branch_id: int, change: SettingsChange
         after = settings(transport, branch_id)
     except OdoucheError:
         after = None
-    sent = narrowed.given()
+    return confirm(
+        Sent(_OPERATION_CHANGE, f"branch {branch_id}'s settings", narrowed.given()), current, after, _SETTABLE, same
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class Sent:
+    """A change of settings that was sent: what it is called, whose settings, and their values by name."""
+
+    operation: str
+    subject: str
+    values: Mapping[str, object]
+
+
+def confirm[S](
+    sent: Sent, before: S, after: S | None, settable: Iterable[str], same: Callable[[S, str, object], bool]
+) -> SettingsOutcome[S]:
+    """Return the outcome of a change once the settings read back show every value sent.
+
+    `after` is `None` when they could not be read back. A setting of `settable` not sent that
+    moved is in `moved`. Anything else raises `OutcomeUnknownError`, out of any handler.
+    """
     if after is None:
         found = "the settings could not be read back"
     else:
-        unsent = [name for name, value in sent.items() if not _same(after, name, value)]
+        unsent = [name for name, value in sent.values.items() if not same(after, name, value)]
         if not unsent:
             # Odoo.sh may adjust a setting that depends on one sent, as the page does: reported, not refused.
             moved = tuple(
-                name for name in _SETTABLE if name not in sent and not _same(after, name, getattr(current, name))
+                name for name in settable if name not in sent.values and not same(after, name, getattr(before, name))
             )
-            return SettingsOutcome(current, after, moved)
+            return SettingsOutcome(before, after, moved)
         found = f"the settings read back show {', '.join(unsent)} not as sent"
-    # Raised out of the handler, and as unknown: an error that reads as a failure invites a second change.
+    # As unknown: an error that reads as a failure invites a second change.
     raise OutcomeUnknownError(
-        f"The change of branch {branch_id}'s settings was sent, and {found}. Look before trying again.",
-        operation=_OPERATION_CHANGE,
+        f"The change of {sent.subject} was sent, and {found}. Look before trying again.", operation=sent.operation
     )
 
 
@@ -115,7 +134,7 @@ def narrow(stage: Stage, current: BranchSettings, change: SettingsChange) -> Set
     Raises `StageRefusedError` for a setting the tab does not show in that stage, and
     `SettingsConflictError` for one the tab disables, or hides, given the settings after the change.
     """
-    differs = {name: value for name, value in change.given().items() if not _same(current, name, value)}
+    differs = {name: value for name, value in change.given().items() if not same(current, name, value)}
     if not differs:
         return None
     if "push_behavior" in differs and stage is Stage.PRODUCTION:
@@ -131,11 +150,22 @@ def narrow(stage: Stage, current: BranchSettings, change: SettingsChange) -> Set
             "changed: turn `project_defaults` off in the same change."
         )
         raise SettingsConflictError(msg)
-    _check_options(differs.keys(), after)
+    check_options(differs.keys(), after)
     return replace(change, **dict.fromkeys(change.given().keys() - differs.keys()))
 
 
-def _check_options(changed: Set[str], after: BranchSettings) -> None:
+class Options(Protocol):
+    """The new build options a branch's tab and a project's page both hide by the others."""
+
+    @property
+    def module_install(self) -> ModuleInstall: ...
+    @property
+    def modules(self) -> tuple[str, ...]: ...
+    @property
+    def tests(self) -> BuildTests: ...
+
+
+def check_options(changed: Set[str], after: Options) -> None:
     """Raise `SettingsConflictError` for a changed option the tab hides, given the others after the change."""
     if "modules" in changed and after.module_install is not ModuleInstall.LISTED:
         msg = "`modules` applies only while `module_install` is `listed`: give both in one change."
@@ -151,7 +181,8 @@ def _check_options(changed: Set[str], after: BranchSettings) -> None:
         raise SettingsConflictError(msg)
 
 
-def _same(read: BranchSettings, name: str, value: object) -> bool:
+def same(read: object, name: str, value: object) -> bool:
+    """Tell whether the settings `read` hold `value` for the setting `name`."""
     held: object = getattr(read, name)
     if name == "test_tags":
         # Odoo.sh gives no tags as `false`, which the page shows as an empty field.
@@ -163,15 +194,44 @@ def _form(change: SettingsChange) -> dict[str, str]:
     """Return the parameters of a change, one for each setting it gives, as the page's form sends them."""
     sent = {
         "push_behavior": None if change.push_behavior is None else _PUSH_SENT[change.push_behavior],
-        "apply_default_settings": None if change.project_defaults is None else _FLAG[change.project_defaults],
+        "apply_default_settings": None if change.project_defaults is None else flag(change.project_defaults),
+    }
+    return {key: value for key, value in sent.items() if value is not None} | option_params(change)
+
+
+class GivenOptions(Protocol):
+    """The new build options of a change, a branch's or a project's, each `None` when not given."""
+
+    @property
+    def module_install(self) -> ModuleInstall | None: ...
+    @property
+    def modules(self) -> tuple[str, ...] | None: ...
+    @property
+    def tests(self) -> BuildTests | None: ...
+    @property
+    def test_tags(self) -> str | None: ...
+    @property
+    def demo_data(self) -> bool | None: ...
+    @property
+    def ai_agent(self) -> AiAgent | None: ...
+
+
+def option_params(change: GivenOptions) -> dict[str, str]:
+    """Return the parameters of the new build options a change gives, as the form of a branch or a project sends them."""
+    sent = {
         "modules_auto": None if change.module_install is None else _MODULES_SENT[change.module_install],
         "modules": None if change.modules is None else ",".join(change.modules),
         "test_mode": None if change.tests is None else _TESTS_SENT[change.tests],
         "test_tags": change.test_tags,
-        "demo_data": None if change.demo_data is None else _FLAG[change.demo_data],
+        "demo_data": None if change.demo_data is None else flag(change.demo_data),
         "ai_agent": None if change.ai_agent is None else _AGENTS_SENT[change.ai_agent],
     }
     return {key: value for key, value in sent.items() if value is not None}
+
+
+def flag(value: bool) -> str:  # noqa: FBT001
+    """Return a checkbox as a form sends it: its hidden `off` input, or the box's own `on`."""
+    return "on" if value else "off"
 
 
 def choice[E](reader: Reader, key: str, known: dict[str, E]) -> E:

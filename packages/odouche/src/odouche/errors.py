@@ -89,7 +89,7 @@ class StageRefusedError(OdoucheError):
 
 
 class SettingsConflictError(ValueError):
-    """Raised when a change of settings gives one the branch's Settings tab disables or hides, given the others after it.
+    """Raised when a change of settings gives one a Settings tab or page disables, hides or refuses, given the others after it.
 
     Nothing was sent. It is a `ValueError`, as an argument the caller can correct, not an `OdoucheError`.
     """

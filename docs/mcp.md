@@ -222,6 +222,25 @@ such as the tests once every module is installed, with its value before and afte
 does not confirm the change, or a setting sent does not read back as sent, the error tells the
 agent to read the settings before trying again.
 
+### `change_project_settings`
+
+It is listed only when the server is started with [`--allow-changes`](#changing-state), and it
+changes the settings of a project its user is an admin of. It sends only the settings given that
+differ from the project's, in one request, and the others keep their value; with nothing to change
+it sends nothing. It takes the defaults of new development branches, named and valued as
+`get_project_settings` returns them, and on a dedicated server the two timeouts, in seconds.
+
+It takes nothing that changes who can reach the project: the IP allow list, public access and the
+session lifetime are not among its arguments, and only `osh projects settings set` changes them.
+A call that gives an argument the tool does not declare, such as `ip_allow_list` or `public`, is
+refused by the server before the tool runs: nothing is read or sent, and no line is written to
+stderr. Every tool that changes state refuses an undeclared argument the same way, and its schema
+says so with `additionalProperties` false.
+
+The result is shaped as `change_branch_settings`'s, with the project's name for the branch. When
+Odoo.sh does not confirm the change, or a setting sent does not read back as sent, the error tells
+the agent to read the settings before trying again.
+
 ### `rebuild_branch`
 
 It is listed only when the server is started with [`--allow-changes`](#changing-state). Only a
@@ -236,9 +255,12 @@ again, since a second call can start a second build.
 - **By default** the server reads your projects, a project's settings and audit log, their
   branches, a branch's settings, their builds, the builds' logs and the mails a development or
   staging build caught. It changes nothing on Odoo.sh.
-- **With `--allow-changes`** it can also start a rebuild of a development or a staging branch, and
-  change a branch's settings: what a new commit does, and a development branch's new build
-  options.
+- **With `--allow-changes`** it can also start a rebuild of a development or a staging branch,
+  change a branch's settings (what a new commit does, and a development branch's new build
+  options) and change a project's settings: the defaults of new development branches and, on a
+  dedicated server, the timeouts.
+- **No tool** changes who can reach a project: the IP allow list, public access and the session
+  lifetime are changed only from a terminal, with `osh projects settings set`.
 - **It never** logs in, takes a session as an argument, returns the session in a result or writes
   a file.
 
@@ -260,17 +282,19 @@ The tools that change state on Odoo.sh are off until you start the server with `
 
 - The flag is read once, when the server starts. No tool and no argument sets it, so nothing an
   agent does during a session turns it on.
-- Without it, `change_branch_settings` and `rebuild_branch` are not registered, and every tool
-  opens the library's client read-only, which refuses a change before anything is sent.
-- With it, both are listed without the read-only hint and with the destructive one, so a client
+- Without it, `change_branch_settings`, `change_project_settings` and `rebuild_branch` are not
+  registered, and every tool opens the library's client read-only, which refuses a change before
+  anything is sent.
+- With it, they are listed without the read-only hint and with the destructive one, so a client
   that asks before such tools asks before these. The server itself does not ask.
-- Each call writes one line to the server's stderr: the tool, the project, the branch, and the
-  build started, the names of the settings changed, or the kind of error. It never holds the
-  session or a setting's value.
+- They refuse a call with an argument they do not declare, before anything is read or sent.
+- Each call writes one line to the server's stderr: the tool, the project, the branch when there
+  is one, and the build started, the names of the settings changed, or the kind of error. It never
+  holds the session or a setting's value.
 
 ### Asking before a change
 
-The flag decides whether `change_branch_settings` and `rebuild_branch` exist. Whether an agent may call a tool without asking
+The flag decides whether the tools that change state exist. Whether an agent may call a tool without asking
 you is your client's decision. For Claude Code, a hook lets the tools that read pass and leaves
 the rest to the usual prompt:
 [`examples/claude-code/odouche_read_only_hook.py`](https://github.com/avanserv/odouche/blob/main/examples/claude-code/odouche_read_only_hook.py).
@@ -381,6 +405,7 @@ A tool's error says what happened and, when there is one, what the agent or you 
 | An expired session that comes from `ODOUCHE_SESSION` | Restart the server with a current value, or without the variable to use the one `osh auth login` stores. A login is not read while the variable is set. |
 | No usable keyring | Install a [Secret Service provider](security.md#where-the-session-is-stored), or restart the server with `ODOUCHE_SESSION` set. A locked keyring is unlocked in its own dialog. |
 | Odoo.sh changed shape | Odoo.sh has no public API, and an answer no longer has the shape odouche reads. Upgrade to the latest release, and [report it](https://github.com/avanserv/odouche/issues) with the request and the field the error names if it remains. |
-| A tool is missing | `change_branch_settings` and `rebuild_branch` exist only with [`--allow-changes`](#changing-state). |
+| A tool is missing | `change_branch_settings`, `change_project_settings` and `rebuild_branch` exist only with [`--allow-changes`](#changing-state). |
+| `Extra inputs are not permitted` | A tool that changes state was given an argument it does not take, and nothing was sent. `change_project_settings` takes no IP allow list, public access or session lifetime: change those with `osh projects settings set`. |
 
 The server is built on the [`odouche` library](library.md) and never talks to Odoo.sh directly.
