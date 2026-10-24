@@ -8,6 +8,7 @@ from typing import Self
 from odouche._session import SessionStore
 from odouche._upstream import (
     allow_ip,
+    audit,
     backups,
     branches,
     builds,
@@ -26,6 +27,7 @@ from odouche._upstream import (
 )
 from odouche._upstream.transport import Transport
 from odouche.models import (
+    AuditEntry,
     Backup,
     BackupFile,
     BackupRequest,
@@ -117,6 +119,20 @@ class Client:
         can reach, and `PermissionDeniedError` when Odoo.sh refuses its branches or its settings.
         """
         return overview.overview(self._transport, _project_name(project))
+
+    def audit_log(
+        self, project: Project | str, *, limit: int = audit.DEFAULT_LIMIT, timeout: float
+    ) -> Generator[AuditEntry]:
+        """Yield the entries of a project's audit log, given as a `Project` or by its name, newest first.
+
+        At most `limit` entries are yielded. Odoo.sh has no paging: one request answers the last 30
+        days whole, sent at the first read, and an answer over 16 MiB raises `OdoucheError` unread.
+        Odoo.sh shows the log to a project's admins only: anyone else gets `PermissionDeniedError`
+        before it is asked. An action the library does not know is `AuditKind.UNKNOWN`. Only reads.
+        Raises `StreamTimeoutError` when the requests are not answered within `timeout` seconds,
+        and `NotFoundError` when the project is not one the session's user can reach.
+        """
+        return audit.audit_log(self._transport, _project_name(project), limit=limit, timeout=timeout)
 
     def branches(self, project: Project | str) -> list[Branch]:
         """List the branches of a project, given as a `Project` or by its name.

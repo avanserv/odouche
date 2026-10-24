@@ -144,6 +144,9 @@ class StubClient:
     def history(self, branch: Branch, *, limit: int = 20, timeout: float) -> list[odouche.Tracking]:
         return []
 
+    def audit_log(self, project: str, *, limit: int = 25, timeout: float) -> Iterator[odouche.AuditEntry]:
+        return (entry for entry in ())
+
     def branch_settings(self, branch: Branch) -> odouche.BranchSettings:
         return odouche.BranchSettings(
             push_behavior=odouche.PushBehavior.NEW_BUILD,

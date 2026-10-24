@@ -1,6 +1,8 @@
+import gzip
 import inspect
 import json
 import logging
+import time
 import traceback
 from pathlib import Path
 
@@ -283,6 +285,55 @@ def test_an_answer_past_the_limit_is_not_read_further(connect):
     assert (body.read, body.closed) == (2, True)
     # An answer that would not change is not asked again.
     assert len(upstream.requests) == 1
+
+
+def test_a_call_with_a_limit_reads_no_further_than_it(connect):
+    body = Streamed([b'{"result": "' + b"x" * 600, b"x" * 600, b"x" * 600 + b'"}'])
+    transport, upstream = connect(httpx2.Response(200, stream=body))
+
+    with pytest.raises(TooLargeError):
+        transport.call(OPERATION, PATH, retry=True, limit=1000)
+
+    assert (body.read, body.closed) == (2, True)
+    assert len(upstream.requests) == 1
+
+
+def test_a_call_within_its_limit_is_read_whole(connect):
+    transport, _ = connect(httpx2.Response(200, stream=Streamed([b'{"result": ', b'"short"}'])))
+
+    assert transport.call(OPERATION, PATH, limit=1000) == {"result": "short"}
+
+
+class Slow(httpx2.SyncByteStream):
+    """A body that keeps coming, a byte every 50 ms, for 20 seconds."""
+
+    def __iter__(self):
+        yield b'{"result": "'
+        for _ in range(400):
+            time.sleep(0.05)
+            yield b"x"
+        yield b'"}'
+
+
+def test_a_capped_call_stops_reading_when_its_time_left_runs_out(connect):
+    transport, upstream = connect(httpx2.Response(200, stream=Slow()))
+    started = time.monotonic()
+
+    with pytest.raises(UpstreamUnavailableError, match="ReadTimeout"):
+        transport.call(OPERATION, PATH, retry=True, within=0.5, limit=1000)
+
+    # Wide: a slow runner under coverage still ends far before the body would.
+    assert time.monotonic() - started < 10
+    assert len(upstream.requests) == 1
+
+
+def test_a_call_s_limit_counts_the_bytes_once_decompressed(connect):
+    body = gzip.compress(b'{"result": "' + b"x" * 5000 + b'"}')
+    assert len(body) < 1000
+    transport, _ = connect(httpx2.Response(200, headers={"Content-Encoding": "gzip"}, content=body))
+
+    with pytest.raises(TooLargeError):
+        transport.call(OPERATION, PATH, limit=1000)
 
 
 def test_an_answer_within_the_limit_is_read_whole(connect):

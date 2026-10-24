@@ -84,9 +84,9 @@ def region(transport: Transport, name: str) -> str | None:
     return None
 
 
-def info(transport: Transport, name: str) -> Reader:
+def info(transport: Transport, name: str, *, within: float | None = None) -> Reader:
     """Return the reader of a project's info. Its token and its codes are dropped unread."""
-    body = _get_info(transport, name)
+    body = _get_info(transport, name, within)
     _drop(body, ("result",), "access_token")
     return Reader(_INFO, body).child("result")
 
@@ -128,12 +128,13 @@ def hosting(transport: Transport, technical_name: str) -> ProjectHosting:
     )
 
 
-def _get_info(transport: Transport, name: str) -> dict[str, object]:
+def _get_info(transport: Transport, name: str, within: float | None = None) -> dict[str, object]:
     body = transport.call(
         _INFO,
         f"/app/project/{segment(name)}/get_info",
         retry=True,
         not_found=f"The session's user can reach no project named {name!r}.",
+        within=within,
     )
     _drop(body, ("result", "active_repo"), "subscription_code")
     _drop(body, ("result", "active_repo", "production_build_id"), "enterprise_code")

@@ -49,6 +49,10 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.BranchSummary
 
+::: odouche.AuditEntry
+
+::: odouche.AuditKind
+
 ::: odouche.Branch
 
 ::: odouche.Stage

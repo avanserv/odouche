@@ -410,6 +410,54 @@ class ProjectOverview:
     """The branches with their last builds, in the order Odoo.sh answers them."""
 
 
+class AuditKind(StrEnum):
+    """What a project's audit log records someone did."""
+
+    ALLOW_IP = "allow_ip"
+    CONNECT_AS_USER = "connect_as_user"
+    DOWNLOAD_DATABASE = "download_database"
+    MANAGE_COLLABORATORS = "manage_collaborators"
+    OPEN_EDITOR = "open_editor"
+    OPEN_SHELL = "open_shell"
+    OPEN_WEBMAIL = "open_webmail"
+    OPEN_DATABASE_LOGS = "open_database_logs"
+    CHANGE_BRANCH_STAGE = "change_branch_stage"
+    ADD_DOMAIN_NAME = "add_domain_name"
+    MANAGE_SETTINGS = "manage_settings"
+    UNKNOWN = "unknown"
+    """An action the library does not know. The entry's `kind_name` holds what Odoo.sh calls it."""
+
+
+@dataclass(frozen=True, slots=True)
+class AuditEntry:
+    """One entry of a project's audit log: who did what, when, and on which stage."""
+
+    logged_at: datetime
+    """When it was done, in UTC."""
+
+    author: str
+    """Who did it, as a GitHub login. It is another person's personal data, carried as given, which can hold
+    control characters.
+    """
+
+    kind: AuditKind
+    """What was done."""
+
+    kind_name: str
+    """What Odoo.sh calls it, such as `Open Shell`, cut to 64 characters. Text Odoo.sh sends, not checked."""
+
+    stage: Stage | None
+    """The stage of the branch it was done on, or `None` for an action on the project."""
+
+    details: str
+    """What Odoo.sh adds about it, often empty. It holds addresses, logins and what an SSH client says of
+    itself: untrusted text, carried as given, which can hold control characters.
+    """
+
+    succeeded: bool
+    """Whether it succeeded."""
+
+
 class PushBehavior(StrEnum):
     """What a new commit on a branch does."""
 
