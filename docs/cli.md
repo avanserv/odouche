@@ -102,6 +102,30 @@ osh --format json projects show --project acme-shop | jq .hosting
   branches and, for an admin, its settings, and the projects for the region. It changes nothing.
 - A subscription state `osh` does not know is printed as Odoo.sh names it.
 
+## A project's settings
+
+`osh projects settings show` prints the [project](#project-and-branch)'s settings, one per line,
+as its Settings page has them: the `odoo.com` domain block, the session lifetime, public access,
+commit statuses, the deploy key, private submodules, storage, workers, staging branches, dedicated
+hosting and its timeouts, the defaults of new development branches, and the IP allow list.
+
+```bash
+osh projects settings show
+osh --format json projects settings show --project acme-shop | jq .ip_allow_list
+```
+
+- Odoo.sh shows the settings to an admin of the project only. Anyone else exits 5, and the
+  settings are not asked for.
+- The table gives the timeouts in minutes, as the page does, and a submodule as its URL and the
+  fingerprint of its deploy key. The JSON gives the timeouts in seconds and each submodule's
+  public deploy key too.
+- A submodule URL is shown without its query, its fragment and its credentials, or as `none` when
+  it cannot be read safely, as [the library](library.md#project-settings) has it. Every token and code Odoo.sh sends with the
+  settings is dropped unread.
+- An allowed entry is shown as written, an address or a network. A setting whose value `osh` does
+  not know, or an allowed entry that is neither an address nor a network, exits 6.
+- It changes nothing on Odoo.sh.
+
 ## Checking a project
 
 `osh projects check` reads the [project](#project-and-branch)'s overview, as `osh projects show`

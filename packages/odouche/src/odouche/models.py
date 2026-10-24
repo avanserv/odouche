@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass, fields
 from datetime import datetime
 from enum import StrEnum
+from ipaddress import IPv4Address, IPv4Network, IPv6Address, IPv6Network
 
 from odouche.errors import OdoucheError
 
@@ -501,7 +502,7 @@ class BranchSettings:
     """A branch's settings, as its Settings tab shows them.
 
     The new build options, `project_defaults` to `ai_agent`, apply to a development branch only.
-    The project's development defaults are not read here.
+    The project's development defaults are in `ProjectSettings`.
     """
 
     push_behavior: PushBehavior
@@ -644,6 +645,106 @@ def _check_setting(name: str, value: object) -> None:
     if name == "test_tags" and isinstance(value, str) and not _TEST_TAGS.fullmatch(value):
         msg = "Test tags hold only ASCII letters, digits and `_/:.,*+-[]`."
         raise ValueError(msg)
+
+
+class SessionLifetime(StrEnum):
+    """How long a member's session on Odoo.sh can last while working on a project."""
+
+    AUTO = "auto"
+    """As Odoo.sh sees fit, never over 8 days."""
+    FOUR_HOURS = "4h"
+    EIGHT_HOURS = "8h"
+    ONE_DAY = "1d"
+    TWO_DAYS = "2d"
+    FOUR_DAYS = "4d"
+    EIGHT_DAYS = "8d"
+
+
+@dataclass(frozen=True, slots=True)
+class Submodule:
+    """A private Git submodule of a project, with the deploy key Odoo.sh fetches it with."""
+
+    id: int
+    """The number Odoo.sh gives it."""
+
+    url: str
+    """Its repository, such as `git@github.com:owner/name.git`, without a query, a fragment or user
+    information, which ends at the last `@` before the path. A Unix user name that is no token's, such
+    as `git`, is kept in an `ssh` URL or an scp-like `user@host:path`. Empty when what is left of a URL
+    with `//` is not a host and a port, as it could still hold part of a password.
+    """
+
+    fingerprint: str
+    """The fingerprint of the deploy key, such as `SHA256:...`."""
+
+    public_key: str
+    """The public half of the deploy key, as an OpenSSH public key line, which the repository is given."""
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectSettings:
+    """A project's settings, as its Settings page shows them to an admin. No token or code is part of it.
+
+    `module_install` to `ai_agent` are the development defaults: the new build options of a
+    development branch whose own settings say to apply them.
+    """
+
+    name: str
+    """The project's name on Odoo.sh, as in the address of its page."""
+
+    odoo_domain_blocked: bool
+    """Whether the production database is unreachable on its `odoo.com` domain, only on its custom ones."""
+
+    session_lifetime: SessionLifetime
+    """How long a member's session on Odoo.sh can last while working on the project."""
+
+    public: bool
+    """Whether its Builds page is open to visitors, who can then connect to its development builds."""
+
+    commit_statuses_suspended: bool
+    """Whether Odoo.sh stopped sending commit statuses to GitHub, as the check of their token failed."""
+
+    deploy_key_writable: bool
+    """Whether the project's deploy key may push to its repository."""
+
+    submodules: tuple[Submodule, ...]
+    """Its private submodules, in the order Odoo.sh answers them."""
+
+    hosting: ProjectHosting
+    """Its storage, workers and staging branches."""
+
+    dedicated: bool
+    """Whether the project pays for a dedicated server. The two timeouts are changed only on one."""
+
+    http_timeout_seconds: int
+    """How long an HTTP request runs before a worker is stopped."""
+
+    cron_timeout_seconds: int
+    """How long a scheduled action runs before it is stopped."""
+
+    module_install: ModuleInstall
+    """Which modules a new development build installs."""
+
+    modules: tuple[str, ...]
+    """The modules stored for `LISTED`, given whatever `module_install` is. They apply only to `LISTED`."""
+
+    tests: BuildTests
+    """Which tests a new development build runs."""
+
+    test_tags: str | None
+    """The Odoo test tags stored for `TAGS`, given whatever `tests` is. They apply only to `TAGS`."""
+
+    demo_data: bool
+    """Whether a new development build loads demonstration data."""
+
+    ai_agent: AiAgent
+    """The agent the AI tab of a development branch runs."""
+
+    ip_allow_list: tuple[IPv4Address | IPv6Address | IPv4Network | IPv6Network, ...]
+    """The addresses allowed SSH, and PostgreSQL on a dedicated server, to its production and staging
+    builds, in the order the Settings page lists them: an entry with a `/` as a network, any other as
+    an address.
+    """
 
 
 @dataclass(frozen=True, slots=True)

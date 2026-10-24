@@ -11,7 +11,9 @@ design constraint rather than a guideline.
   It is never written to a plain-text file, a configuration file or a cache.
 - In headless use, such as CI, the session is read from the environment and kept in memory only.
 - Some of Odoo.sh's answers carry a token or a code: a project's access token, the GitHub token a
-  project's admin set for commit statuses, the subscription and enterprise codes. odouche drops
+  project's admin set for commit statuses, the subscription and enterprise codes, the
+  subscription-management link that carries the subscription code, and the credentials, query
+  and fragment a submodule URL may hold. odouche drops
   each one as the answer arrives, before reading anything else, and never stores, logs, shows or
   returns it. Two are read, and each is kept in memory for the one call only: the project's
   access token, which opens a build's logs and mails, and the token of the redirect Odoo.sh

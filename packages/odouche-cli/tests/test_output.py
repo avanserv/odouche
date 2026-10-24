@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta, timezone
 from enum import StrEnum
+from ipaddress import ip_address, ip_network
 
 import pytest
 import typer
@@ -171,6 +172,10 @@ def test_a_table_stream_prints_the_line_of_each_row(capsys: pytest.CaptureFixtur
 def test_a_datetime_without_an_offset_is_refused():
     with pytest.raises(ValueError, match="offset"):
         to_json(datetime(2026, 1, 2))  # noqa: DTZ001 - the naive datetime is the case
+
+
+def test_an_address_or_a_network_is_its_text():
+    assert to_json((ip_address("198.51.100.42"), ip_network("2001:db8::/32"))) == ["198.51.100.42", "2001:db8::/32"]
 
 
 def test_an_unknown_type_is_refused_without_its_value():
