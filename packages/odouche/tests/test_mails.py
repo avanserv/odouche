@@ -30,8 +30,9 @@ INFO = "/app/project/acme-shop/get_info"
 FETCH = "/paas/88212/mail/json/fetch"
 MESSAGE = "/paas/88212/mail/json/message"
 FIRST = "1761213600.M1P1Q1.build"
-# The most a parse of a large mail takes, on a shared runner under coverage. Each mail timed against
-# it takes under a second here under coverage, and more than a minute for the code it guards against.
+# The most CPU time a parse of a large mail takes, on a shared runner under coverage: CPU time, since
+# a stalled runner lengthens the wall clock and not it. Each mail timed against it takes under a
+# second here under coverage, and more than a minute for the code it guards against.
 BUDGET = 15
 
 
@@ -332,12 +333,12 @@ def test_a_body_is_cut_at_a_byte_count_and_never_inside_a_character(client, bran
 
 
 def seconds(text):
-    """Return the time of the fastest of three parses: a pause of a shared runner lengthens one, not all."""
+    """Return the CPU time of the fastest of three parses: a noisy neighbour on a shared runner slows one, not all."""
     runs = []
     for _ in range(3):
-        started = time.perf_counter()
+        started = time.process_time()
         _mime.parse(text)
-        runs.append(time.perf_counter() - started)
+        runs.append(time.process_time() - started)
     return min(runs)
 
 
@@ -359,10 +360,10 @@ def test_headers_written_to_be_slow_to_parse_are_read_quickly():
         "AAAA\n--x--\n"
     )
 
-    started = time.perf_counter()
+    started = time.process_time()
     parsed = _mime.parse(text)
 
-    assert time.perf_counter() - started < BUDGET
+    assert time.process_time() - started < BUDGET
     assert (parsed.body, parsed.attachments) == ("Hello", (MailAttachment("a.pdf", 3),))
     assert parsed.cc.startswith("user0 <user0@example.com>, user1")
 
@@ -381,10 +382,10 @@ def test_a_mail_of_many_headers_and_many_parts_is_read_in_a_time_in_line_with_it
 def test_a_header_of_encoded_words_is_decoded_from_its_start_only():
     # Decoding all of it takes this mail more than a minute: its first 65536 characters, a few milliseconds.
     cc = "=?utf-8?b?SsOpcsO0bWU=?= " * 200000
-    started = time.perf_counter()
+    started = time.process_time()
     parsed = _mime.parse(f"From: a@example.com\nCc: {cc}\n\nHello\n")
 
-    assert time.perf_counter() - started < BUDGET
+    assert time.process_time() - started < BUDGET
     assert parsed.cc.startswith("J\u00e9r\u00f4me")
     assert len(parsed.cc) < len(cc)
     assert (parsed.body, parsed.truncated) == ("Hello\n", True)
@@ -392,10 +393,10 @@ def test_a_header_of_encoded_words_is_decoded_from_its_start_only():
 
 def test_the_parts_are_read_up_to_a_cap():
     parts = "".join(f"--x\nContent-Disposition: attachment; filename=f{number}\n\nx\n" for number in range(5000))
-    started = time.perf_counter()
+    started = time.process_time()
     parsed = _mime.parse(f"From: a@example.com\nContent-Type: multipart/mixed; boundary=x\n\n{parts}--x--\n")
 
-    assert time.perf_counter() - started < BUDGET
+    assert time.process_time() - started < BUDGET
     assert 0 < len(parsed.attachments) < 1000
     assert parsed.attachments[0] == MailAttachment("f0", 1)
     assert parsed.truncated
