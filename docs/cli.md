@@ -220,13 +220,13 @@ osh --format json projects audit --project acme-shop | jq '.[] | select(.kind ==
 
 ## A project's members
 
-`osh projects members` lists the [project](#project-and-branch)'s members: each one's GitHub
+`osh projects members list` lists the [project](#project-and-branch)'s members: each one's GitHub
 login, the name Odoo.sh gives them, their role, and whether they have logged in to Odoo.sh yet.
 Admins come first, then testers, then developers, each by login.
 
 ```bash
-osh projects members
-osh --format json projects members | jq '.[] | select(.role == "admin") | .login'
+osh projects members list
+osh --format json projects members list | jq '.[] | select(.role == "admin") | .login'
 ```
 
 - Odoo.sh shows the members to an admin of the project only. Anyone else exits 5, and the
@@ -237,6 +237,41 @@ osh --format json projects members | jq '.[] | select(.role == "admin") | .login
 - A login and a name are printed on one line without control characters. A role `osh` does not
   know exits 6.
 - It changes nothing on Odoo.sh.
+
+## Changing a project's members
+
+`osh projects members add` adds a GitHub user to the project's members, and `osh projects members
+role` gives a member another role, `developer`, `tester` or `admin`:
+
+```bash
+osh projects members add octo-cat --role tester
+osh projects members role jane-doe developer
+```
+
+- An admin reaches production: its database, shell and logs, and the project's settings. A
+  tester reaches staging, not production, and a developer development branches only. Only an admin
+  of the project changes its members: anyone else exits 5.
+- `add` takes `developer` unless `--role` says otherwise, as the page does. Odoo.sh sends the new
+  member no invitation, and push access to the repository is given on GitHub, not by `osh`.
+- `add` takes a login as GitHub takes one for a new account: 1 to 39 letters, digits and single
+  inner hyphens. Any other exits 2 before a request; an older login that breaks the rule is added
+  in the page. The login is looked up on GitHub through Odoo.sh, as the page's search does, and
+  must match exactly: otherwise the command exits 4.
+- The lookup needs Odoo.sh's grant on GitHub to cover private repositories. When it does not, the
+  command exits 5: search a GitHub user once in the Collaborators item of the project's Settings
+  page, which asks GitHub for it, then run it again.
+- `role` takes a login as `list` prints it, in any case. One that is not a member exits 4, and a
+  member who already has the role exits 0 with nothing sent.
+- Both read the members first. Adding someone already a member, by login or by GitHub number under
+  a login since renamed, exits 9 with nothing sent, as does lowering the last admin who has logged
+  in to Odoo.sh: give another member the admin role first.
+- Each first says on stderr the project, the member and the role, from the old one for `role`, and
+  what the role reaches. An admin lowering their own role is told they will not be able to change
+  it back. It asks, and takes `--yes` in a script, as [a rebuild](#rebuilding-a-branch) does.
+- The change is sent once, then the members are read back and the member is shown as `list` shows
+  them. When Odoo.sh does not confirm it, or the member does not read back with the role, the
+  command exits 10: look with `osh projects members list`.
+- No MCP tool adds a member or changes a role, with or without `--allow-changes`.
 
 ## Watching a build
 
@@ -266,7 +301,8 @@ build of the commit you just pushed.
 of the commands that change a project, with
 [`osh branches settings set`](#changing-a-branchs-settings),
 [`osh branches move`](#moving-a-branch-between-stages),
-[`osh projects settings set`](#changing-a-projects-settings), [`osh backups create`](#taking-a-backup),
+[`osh projects settings set`](#changing-a-projects-settings),
+[`osh projects members add` and `role`](#changing-a-projects-members), [`osh backups create`](#taking-a-backup),
 [`osh backups download`](#downloading-a-backup), and [`osh ssh`](#a-shell-on-a-build) and
 [`osh backups pull`](#copying-a-backup-over-ssh) when they allow your address. Every other command
 that opens a client opens it read-only, and it sends no change.
@@ -574,15 +610,15 @@ on stdout. These commands do otherwise:
 | --- | --- | --- |
 | 0 | Success. `osh auth logout` with nothing to log out of is one. | Every command |
 | 1 | Unexpected error, which is a bug to report, or a prompt or a question that was declined. | Every command |
-| 2 | Usage error: an unknown option, a value an option does not take, options that do not go together, no [project or branch](#project-and-branch), a download with neither `--output` nor `--link`, or to a file that exists or a directory you cannot write to, a rebuild, a move, a backup, a download, a change of settings or an IP allow that cannot be confirmed, or a setting a branch's Settings tab or a project's Settings page does not let you change with the others as given. | Every command |
+| 2 | Usage error: an unknown option, a value an option does not take, options that do not go together, no [project or branch](#project-and-branch), a download with neither `--output` nor `--link`, or to a file that exists or a directory you cannot write to, a rebuild, a move, a backup, a download, a change of settings or members or an IP allow that cannot be confirmed, a login GitHub would not take, a role that is not one, or a setting a branch's Settings tab or a project's Settings page does not let you change with the others as given. | Every command |
 | 3 | No session, or an expired one. Run `osh auth login`. | Every command that needs the session |
-| 4 | The project, branch, build, backup or log is not one the logged-in user can reach. A build that is not among the branch's latest ones is not, and neither is the build of a branch that has none, a backup that cannot be downloaded, a build with no panels yet, the monitor of a development branch, a mail the build did not catch, or the mails of a production branch. | Every command that takes a project |
-| 5 | The session is not allowed to do this. | Every command that asks Odoo.sh |
+| 4 | The project, branch, build, backup or log is not one the logged-in user can reach. A build that is not among the branch's latest ones is not, and neither is the build of a branch that has none, a backup that cannot be downloaded, a build with no panels yet, the monitor of a development branch, a mail the build did not catch, or the mails of a production branch. A login that is not a member, or that GitHub does not have, is not either. | Every command that takes a project |
+| 5 | The session is not allowed to do this, or Odoo.sh's grant on GitHub does not cover the search of a user. | Every command that asks Odoo.sh |
 | 6 | Odoo.sh answered in a shape `osh` does not read. Please report it. | Every command that asks Odoo.sh |
 | 7 | Odoo.sh could not be reached, or answered with a server error. | Every command that asks Odoo.sh |
 | 8 | A followed log, a login, a project's audit log, or a backup's or a download's wait reached its timeout, or `ssh` did not get in once the IP was allowed. | `osh logs --follow --timeout`, `osh auth login`, `osh projects audit`, `osh backups create --wait`, `osh backups download`, `osh ssh` |
-| 9 | Refused, and nothing was changed: a read-only run, or a branch in a stage `osh` does not change, or a setting its Settings tab does not offer in that stage, or a move to the stage a branch is in. | `osh builds rebuild`, `osh branches settings set`, `osh branches move`, `osh backups create`, `osh backups download --new` |
-| 10 | A change was sent and Odoo.sh did not confirm it. `osh builds list` shows whether a build was started, `osh backups list` whether a backup was taken, `osh branches settings show` or `osh projects settings show` whether the settings were changed, `osh branches list` whether a branch was moved; `osh ssh`, `osh backups download` and either `settings set` can be run again. | `osh builds rebuild`, `osh branches settings set`, `osh projects settings set`, `osh branches move`, `osh backups create`, `osh backups download`, `osh ssh` |
+| 9 | Refused, and nothing was changed: a read-only run, or a branch in a stage `osh` does not change, or a setting its Settings tab does not offer in that stage, or a move to the stage a branch is in, or a user added who is already a member, or the last admin lowered. | `osh builds rebuild`, `osh branches settings set`, `osh branches move`, `osh projects members add`, `osh projects members role`, `osh backups create`, `osh backups download --new` |
+| 10 | A change was sent and Odoo.sh did not confirm it. `osh builds list` shows whether a build was started, `osh backups list` whether a backup was taken, `osh branches settings show` or `osh projects settings show` whether the settings were changed, `osh branches list` whether a branch was moved, `osh projects members list` whether a member was added or given the role; `osh ssh`, `osh backups download`, either `settings set` and `osh projects members role` can be run again. | `osh builds rebuild`, `osh branches settings set`, `osh projects settings set`, `osh branches move`, `osh projects members add`, `osh projects members role`, `osh backups create`, `osh backups download`, `osh ssh` |
 | 11 | No usable keyring: none to store the session in, or one that stayed locked. | `osh auth login`, `osh auth logout`, every command that reads the stored session |
 | 12 | The login ended without a session. | `osh auth login` |
 | 13 | Any other error from the library. | Every command |

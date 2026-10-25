@@ -88,6 +88,10 @@ class StageRefusedError(OdoucheError):
     """Raised when a branch is in a stage, or is asked into one, the library does not change. Nothing was sent."""
 
 
+class MemberRefusedError(OdoucheError):
+    """Raised for a change of a project's members the library does not send. Nothing was sent."""
+
+
 class SettingsConflictError(ValueError):
     """Raised when a change of settings gives one a Settings tab or page disables, hides or refuses, given the others after it.
 

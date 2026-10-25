@@ -1,7 +1,7 @@
 """The client: the one object a caller asks Odoo.sh through."""
 
 import ipaddress
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Sequence
 from contextlib import AbstractContextManager
 from typing import Self
 
@@ -43,6 +43,7 @@ from odouche.models import (
     LogLine,
     Mail,
     MailContent,
+    MemberRole,
     Panel,
     PreparedDownload,
     Project,
@@ -190,6 +191,58 @@ class Client:
         dropped unread. Raises `NotFoundError` when the project is not one the session's user can reach.
         """
         return members.members(self._transport, _project_name(project))
+
+    def add_member(self, project: Project | str, login: str, role: MemberRole = MemberRole.DEVELOPER) -> ProjectMember:
+        """Change state on Odoo.sh: add the GitHub user `login` to a project as `role`, and return them read back.
+
+        The project is given as a `Project` or by its name. Odoo.sh sends them no invitation. A
+        login that breaks GitHub's rule for a new account, or a role that is not one, raises
+        `ValueError` before any request. The members are read first: a user already among them,
+        by login in any case or by GitHub number under another login, raises `MemberRefusedError`.
+        The login is then looked up as the page does, for an exact match: none raises `NotFoundError`.
+
+        Sent once. Raises `OutcomeUnknownError` when Odoo.sh did not confirm it or the member read
+        back is missing or has another role, `ReadOnlyError` on a read-only client, and
+        `PermissionDeniedError` for a user who is not an admin of the project, or when Odoo.sh's
+        grant on GitHub does not allow the lookup. Asks Odoo.sh five times.
+        """
+        return members.member_addition(self._transport, _project_name(project), login, role)
+
+    @staticmethod
+    def check_add_member(login: str, role: MemberRole, current: Sequence[ProjectMember] | None = None) -> None:
+        """Raise as `add_member` would for `login` and `role`, and with `current`, the members, for a login among them.
+
+        Odoo.sh is not asked and nothing changes. It needs no client: call it on the class before one is opened.
+        """
+        members.allow_addition(login, role, current or ())
+
+    def set_member_role(self, project: Project | str, member: ProjectMember | str, role: MemberRole) -> ProjectMember:
+        """Change state on Odoo.sh: give a member of a project the role `role`, and return them read back.
+
+        The project is given as a `Project` or by its name, the member as a `ProjectMember` or by
+        their login in any case. The members are read first: one not among them raises
+        `NotFoundError`, and one that already has `role` is returned with nothing sent. Lowering an
+        admin when no other admin who has logged in remains raises `MemberRefusedError`. An admin
+        who lowers their own role is read back from the project's info, as the members are then
+        closed to them.
+
+        Sent once. Raises `OutcomeUnknownError` when Odoo.sh did not confirm it or the role read
+        back is another, `ReadOnlyError` on a read-only client, and `PermissionDeniedError` for a
+        user who is not an admin of the project. Asks Odoo.sh four times, twice when nothing changes.
+        """
+        return members.role_change(self._transport, _project_name(project), member, role)
+
+    def check_member_role(
+        self, current: Sequence[ProjectMember], member: ProjectMember | str, role: MemberRole
+    ) -> ProjectMember:
+        """Return the member of `current`, the members, that `member` names, and raise as `set_member_role` would.
+
+        One whose `role` is already `role` is one `set_member_role` sends nothing for. Odoo.sh is not
+        asked and nothing changes, on a read-only client too.
+        """
+        found = members.find(current, member)
+        members.allow_role(current, found, role)
+        return found
 
     def branches(self, project: Project | str) -> list[Branch]:
         """List the branches of a project, given as a `Project` or by its name.

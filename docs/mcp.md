@@ -271,6 +271,9 @@ again, since a second call can start a second build.
   lifetime are changed only from a terminal, with `osh projects settings set`.
 - **No tool** moves a branch between stages, with or without `--allow-changes`: a move to staging
   copies production's data onto the branch, which is `osh branches move`'s, behind its question.
+- **No tool** adds a member to a project or changes a member's role, with or without
+  `--allow-changes`: a role decides who reaches production, which is `osh projects members add`'s
+  and `role`'s, behind their question.
 - **It never** logs in, takes a session as an argument, returns the session in a result or writes
   a file.
 

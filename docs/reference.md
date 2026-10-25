@@ -155,6 +155,8 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.StageRefusedError
 
+::: odouche.MemberRefusedError
+
 ::: odouche.SettingsConflictError
 
 ::: odouche.OutcomeUnknownError

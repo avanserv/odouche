@@ -1,5 +1,5 @@
 """`osh projects`: the Odoo.sh projects the session's user can reach, one's overview, settings, checks, audit log and
-members.
+members, and the changes of its settings and members.
 """
 
 import ipaddress
@@ -18,14 +18,14 @@ from odouche_cli import _settings, _size, _terminal
 from odouche_cli._client import open_client
 from odouche_cli._context import ProjectOption, resolve_project, result_of, status_of
 from odouche_cli._errors import EXIT_CHECK_FAILED, EXIT_CHECK_WARNED, EXIT_DECLINED
-from odouche_cli._output import Column, Output, strip_line_control
+from odouche_cli._output import Column, Output, strip_control, strip_line_control
 from odouche_cli._settings import quoted, shown
 
 
 app = typer.Typer(
     name="projects",
     help="List the Odoo.sh projects you can reach, show one's overview, show and change its settings, check it, "
-    "read its audit log, and list its members.",
+    "read its audit log, and list its members, add one and change one's role.",
     epilog="Example: osh projects list",
     no_args_is_help=True,
 )
@@ -36,6 +36,13 @@ settings_app = typer.Typer(
     no_args_is_help=True,
 )
 app.add_typer(settings_app)
+members_app = typer.Typer(
+    name="members",
+    help="List a project's members, add one, or change one's role.",
+    epilog="Example: osh projects members list --project acme-shop",
+    no_args_is_help=True,
+)
+app.add_typer(members_app)
 
 _COLUMNS = [
     Column[odouche.Project]("Name", lambda project: project.name),
@@ -362,8 +369,28 @@ _MEMBER_COLUMNS = [
 ]
 
 
-@app.command(epilog="Example: osh projects members --project acme-shop")
-def members(ctx: typer.Context, project: ProjectOption = None) -> None:
+LoginArgument = Annotated[
+    str, typer.Argument(metavar="LOGIN", show_default=False, help="The GitHub login of the user.")
+]
+MemberArgument = Annotated[
+    str,
+    typer.Argument(metavar="LOGIN", show_default=False, help="The member's login, as `list` prints it, in any case."),
+]
+RoleArgument = Annotated[
+    odouche.MemberRole, typer.Argument(metavar="ROLE", show_default=False, help="The member's new role.")
+]
+RoleOption = Annotated[odouche.MemberRole, typer.Option("--role", help="The new member's role.")]
+
+# What a role reaches, as the page's add dialog lists it.
+_REACH = {
+    odouche.MemberRole.ADMIN: "An admin reaches production: its database, shell and logs, and the project's settings.",
+    odouche.MemberRole.TESTER: "A tester reaches staging, not production.",
+    odouche.MemberRole.DEVELOPER: "A developer reaches development branches only.",
+}
+
+
+@members_app.command("list", epilog="Example: osh projects members list --project acme-shop")
+def members_list(ctx: typer.Context, project: ProjectOption = None) -> None:
     """List a project's members with their role, highest role first, then by login.
 
     Odoo.sh lists them to an admin of the project only: anyone else gets exit code 5. `Logged in` is `no` for a member invited who has not logged in to Odoo.sh yet. It changes nothing.
@@ -376,6 +403,88 @@ def members(ctx: typer.Context, project: ProjectOption = None) -> None:
 
 def _member_order(member: odouche.ProjectMember) -> tuple[int, str, str]:
     return -member.role.rank, member.login.casefold(), member.login
+
+
+@members_app.command("add", epilog="Example: osh projects members add octo-cat --role tester --project acme-shop")
+def members_add(
+    ctx: typer.Context,
+    login: LoginArgument,
+    role: RoleOption = odouche.MemberRole.DEVELOPER,
+    project: ProjectOption = None,
+    *,
+    yes: _settings.YesOption = False,
+) -> None:
+    """Change state on Odoo.sh: add a GitHub user to a project's members, as a developer unless `--role` says otherwise.
+
+    Odoo.sh sends them no invitation, and push access to the repository is given on GitHub. Only an admin of the project can add one: anyone else gets exit code 5, as does a session whose grant on GitHub does not cover the search of users, until a user is searched once in the Collaborators item of the project's Settings page. A login GitHub does not have exits 4, and a user already a member exits 9, both with nothing sent. It asks first, unless `--yes` is given.
+    """
+    output: Output = ctx.obj
+    try:
+        odouche.Client.check_add_member(login, role)
+    except ValueError as error:
+        raise typer.BadParameter(str(error), ctx=ctx, param_hint="LOGIN") from None
+    _settings.can_ask(ctx, yes=yes)
+    with open_client(writes=True) as client:
+        name = resolve_project(ctx, project, client.projects)
+        client.check_add_member(login, role, client.members(name))
+        for line in (
+            f"Project: {name}",
+            f"Member: {login}",
+            f"Role: {role.value}",
+            _REACH[role],
+            "Odoo.sh sends them no invitation, and push access to the repository is given on GitHub.",
+        ):
+            _settings.say(line)
+        if not yes and not _terminal.confirmed(strip_control(f"Add {login} to {name} as {role.value}?")):
+            typer.echo("Nothing was sent.", err=True)
+            raise typer.Exit(EXIT_DECLINED)
+        # Sent once: an error is reported, never retried.
+        added = client.add_member(name, login, role)
+    _settings.say(f"{added.login} is now a member of {name}, as {added.role.value}.")
+    output.one(added, _MEMBER_COLUMNS)
+
+
+@members_app.command("role", epilog="Example: osh projects members role jane-doe developer --project acme-shop")
+def members_role(
+    ctx: typer.Context,
+    login: MemberArgument,
+    role: RoleArgument,
+    project: ProjectOption = None,
+    *,
+    yes: _settings.YesOption = False,
+) -> None:
+    """Change state on Odoo.sh: give a member of a project another role.
+
+    Only an admin of the project can change one: anyone else gets exit code 5. A login that is not a member exits 4, and lowering the last admin who has logged in to Odoo.sh exits 9, both with nothing sent. A member who already has the role exits 0 with nothing sent. It asks first, unless `--yes` is given.
+    """
+    output: Output = ctx.obj
+    _settings.can_ask(ctx, yes=yes)
+    with open_client(writes=True) as client:
+        name = resolve_project(ctx, project, client.projects)
+        current = client.members(name)
+        found = client.check_member_role(current, login, role)
+        if found.role is role:
+            _settings.say(f"{found.login} is already {role.value} on {name}. Nothing was sent.")
+            output.one(found, _MEMBER_COLUMNS)
+            return
+        lines = [f"Project: {name}", f"Member: {found.login}", f"Role: {found.role.value} → {role.value}", _REACH[role]]
+        # Any other role is lower: `found` does not have `role`.
+        if found.role is odouche.MemberRole.ADMIN and _is_caller(client, found):
+            lines.append("This is you: you will not be able to change it back.")
+        for line in lines:
+            _settings.say(line)
+        question = f"Change {found.login}'s role on {name} to {role.value}?"
+        if not yes and not _terminal.confirmed(strip_control(question)):
+            typer.echo("Nothing was sent.", err=True)
+            raise typer.Exit(EXIT_DECLINED)
+        # Sent once: an error is reported, never retried.
+        changed = client.set_member_role(name, found, role)
+    _settings.say(f"{changed.login} is now {changed.role.value} on {name}.")
+    output.one(changed, _MEMBER_COLUMNS)
+
+
+def _is_caller(client: odouche.Client, member: odouche.ProjectMember) -> bool:
+    return client.identity().username.casefold() == member.login.casefold()
 
 
 class Verdict(StrEnum):

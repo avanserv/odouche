@@ -73,7 +73,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
 
 
 def run(*args: str) -> Result:
-    return runner.invoke(app, [*args, "projects", "members", "--project", "acme"])
+    return runner.invoke(app, [*args, "projects", "members", "list", "--project", "acme"])
 
 
 def rows(result: Result) -> list[list[str]]:
@@ -151,9 +151,9 @@ def test_a_user_who_is_not_an_admin_exits_5_with_the_message(client: type[StubCl
 
 
 def test_help_says_who_may_list_them_and_names_the_example():
-    result = runner.invoke(app, ["projects", "members", "--help"])
+    result = runner.invoke(app, ["projects", "members", "list", "--help"])
 
     shown = " ".join(click.unstyle(result.output).split())
     assert result.exit_code == 0
     assert "admin of the project only" in shown
-    assert "Example: osh projects members --project acme-shop" in shown
+    assert "Example: osh projects members list --project acme-shop" in shown

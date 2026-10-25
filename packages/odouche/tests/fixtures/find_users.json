@@ -1,0 +1,42 @@
+{
+  "jsonrpc": "2.0",
+  "id": 23,
+  "result": [
+    {
+      "login": "octo-cats",
+      "id": 1000005,
+      "node_id": "MDQ6VXNlcjEwMDAwMDU=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1000005?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/octo-cats",
+      "html_url": "https://github.com/octo-cats",
+      "type": "User",
+      "site_admin": false,
+      "score": 1.0
+    },
+    {
+      "login": "Octo-Cat",
+      "id": 1000004,
+      "node_id": "MDQ6VXNlcjEwMDAwMDQ=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1000004?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/Octo-Cat",
+      "html_url": "https://github.com/Octo-Cat",
+      "type": "User",
+      "site_admin": false,
+      "score": 1.0
+    },
+    {
+      "login": "octo-org",
+      "id": 1000007,
+      "node_id": "MDEyOk9yZ2FuaXphdGlvbjEwMDAwMDc=",
+      "avatar_url": "https://avatars.githubusercontent.com/u/1000007?v=4",
+      "gravatar_id": "",
+      "url": "https://api.github.com/users/octo-org",
+      "html_url": "https://github.com/octo-org",
+      "type": "Organization",
+      "site_admin": false,
+      "score": 1.0
+    }
+  ]
+}

@@ -332,6 +332,8 @@ with odouche.Client() as client:
 - A login and a name are another person's personal data, carried as given: strip their control
   characters before a terminal shows them.
 - A project the user cannot reach raises `NotFoundError`.
+- `client.add_member` and `client.set_member_role` change them, as
+  [State-changing operations](#state-changing-operations) has it.
 
 ### Branches
 
@@ -791,6 +793,8 @@ Every other call of the client only reads. These are the calls that change somet
 | `client.change_branch_settings(branch, change)` | Sets the settings a `SettingsChange` gives on the branch. |
 | `client.change_project_settings(project, change)` | Sets the settings a `ProjectSettingsChange` gives on the project, the IP allow list by entry. |
 | `client.move_branch(branch, to)` | Moves the branch between development and staging. |
+| `client.add_member(project, login, role)` | Adds a GitHub user to the project's members with the role given. |
+| `client.set_member_role(project, member, role)` | Gives a member of the project another role. |
 
 ```python
 import odouche
@@ -946,6 +950,48 @@ with odouche.Client() as client:
     print(moved.stage, client.latest_build(moved))
 ```
 
+- `add_member` takes a `Project` or a project's name, a GitHub login and a `MemberRole`,
+  `DEVELOPER` unless given, and returns the `ProjectMember` read back. Odoo.sh sends them no
+  invitation, as the page sends none, and push access to the repository is given on GitHub. A login
+  that breaks GitHub's rule for a new account (1 to 39 ASCII letters, digits and single inner
+  hyphens) raises `ValueError` before any request: an older login that breaks it is added in the
+  page. It asks Odoo.sh five times: for the project's info, the members, a search of GitHub for the
+  login, the addition, then the members again.
+- A user already a member, by login in any case or by GitHub number under a login since renamed,
+  raises `MemberRefusedError` before the addition. The search must find the login exactly, as the
+  page's own Enter does: otherwise `NotFoundError`. The search needs Odoo.sh's grant on GitHub to
+  cover private repositories: when it does not, `PermissionDeniedError` says to search a user once
+  in the Collaborators item of the project's Settings page, which asks GitHub for it.
+- `set_member_role` takes the project, a `ProjectMember` or a login in any case, and a `MemberRole`,
+  and returns the member read back. It asks Odoo.sh four times, twice when the member already has
+  the role, when nothing is sent: for the project's info, the members, the change, then the members
+  again. A member not listed raises `NotFoundError`. Lowering an admin when no other admin who has
+  logged in to Odoo.sh remains raises `MemberRefusedError`: an invitee who never logs in leaves
+  nobody to administer the project. An admin who lowers their own role can no longer read the
+  members, so their role is read back from the project's info.
+- Both read the members in the same call, for an admin of the project only: anyone else gets
+  `PermissionDeniedError` before the members are asked for. When the member read back is missing
+  or has another role, they raise `OutcomeUnknownError`.
+- `client.check_add_member(login, role, current)` and `client.check_member_role(current, member,
+  role)` raise the same refusals, given the members `current`, and ask nothing, on a read-only
+  client too. `check_member_role` returns the member as listed in `current`: when their `role` is
+  already the one asked, `set_member_role` sends nothing.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    current = client.members("acme-shop")
+    client.check_add_member("octo-cat", odouche.MemberRole.TESTER, current)
+    added = client.add_member("acme-shop", "octo-cat", odouche.MemberRole.TESTER)
+    found = client.check_member_role(current, "jane-doe", odouche.MemberRole.DEVELOPER)
+    if found.role is not odouche.MemberRole.DEVELOPER:
+        changed = client.set_member_role("acme-shop", "jane-doe", odouche.MemberRole.DEVELOPER)
+        print(changed.login, changed.role)
+    print(added.login, added.role)
+```
+
 - `prepare_download` takes the project and a `Backup` that is `downloadable`, and
   `neutralized=False` for the exact database or `filestore=False` to leave the filestore out. It
   returns a `PreparedDownload`, whose `link` is the page's link to the file. It is sent on the build
@@ -1010,6 +1056,7 @@ print(names)
 | `UpstreamUnavailableError` | Odoo.sh could not be reached, or answered with a server error. |
 | `ReadOnlyError` | A read-only client was asked to change state. Nothing was sent. |
 | `StageRefusedError` | The branch is in a stage, or is asked into one, the library does not change. Nothing was sent. |
+| `MemberRefusedError` | A change of the members the library does not send: someone already a member added, or the last admin lowered. Nothing was sent. |
 | `OutcomeUnknownError` | A state-changing request was sent and Odoo.sh did not confirm it. Look before trying again. |
 | `StreamTimeoutError` | A build was still being watched, or a log followed, at its timeout. |
 | `KeyringUnavailableError` | No accepted keyring backend is available to store the session. |

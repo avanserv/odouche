@@ -49,6 +49,7 @@ _BUS_MESSAGE = 1048576
 _SESSION_EXPIRED = "odoo.http.SessionExpiredException"
 _ACCESS_DENIED = "odoo.exceptions.AccessError"
 _UNEXPLAINED = "builtins.Exception"
+_INSUFFICIENT_SCOPE = "odoo.addons.paas_master.controllers.controllers.InsufficientScopeError"
 _SESSION_ALPHABET = re.compile(r"[A-Za-z0-9_-]+")
 _WORKER = re.compile(r"https://[a-z0-9-]+\.odoo\.com")
 _CONTENT_RANGE = re.compile(r"bytes (\d+)-\d+/\d+")
@@ -62,6 +63,10 @@ _TRANSIENT = frozenset({502, 503, 504})
 # The failures of a connection that was never opened: the request did not leave.
 _NOT_SENT = frozenset({"ConnectError", "ConnectTimeout", "PoolTimeout"})
 _DENIED = "Odoo.sh does not allow this to the session's user."
+# Its `arguments` hold GitHub's authorize address, unread: where the grant is given depends on the request.
+_NARROW_GRANT = "Odoo.sh's grant on GitHub does not cover this."
+# The errors Odoo.sh names that are a refusal of the session's user, with what to say of each.
+_DENIALS = {_ACCESS_DENIED: _DENIED, _INSUFFICIENT_SCOPE: _NARROW_GRANT}
 _REFUSED: dict[int, tuple[type[OdoucheError], str]] = {
     404: (NotFoundError, "Odoo.sh has nothing at this address."),
     403: (PermissionDeniedError, _DENIED),
@@ -259,9 +264,10 @@ def _error(operation: str, answer: _Answer, not_found: str | None) -> OdoucheErr
     if status in _REFUSED:
         cls, message = _REFUSED[status]
         return cls(message, operation=operation, status=status)
-    if status == httpx2.codes.OK and _error_name(answer.body) == _ACCESS_DENIED:
-        return PermissionDeniedError(_DENIED, operation=operation, status=status)
-    if not_found is not None and status == httpx2.codes.OK and _error_name(answer.body) == _UNEXPLAINED:
+    name = _error_name(answer.body)
+    if status == httpx2.codes.OK and isinstance(name, str) and name in _DENIALS:
+        return PermissionDeniedError(_DENIALS[name], operation=operation, status=status)
+    if not_found is not None and status == httpx2.codes.OK and name == _UNEXPLAINED:
         return NotFoundError(not_found, operation=operation, status=status)
     field = _unexpected(status, answer.body)
     return UpstreamChangedError(operation, field, status=status) if field else None
@@ -324,6 +330,7 @@ class Transport:
         not_found: str | None = None,
         within: float | None = None,
         limit: int | None = None,
+        grant: str | None = None,
     ) -> dict[str, object]:
         """Send one JSON-RPC request and return the answer, which holds no `error`.
 
@@ -334,12 +341,15 @@ class Transport:
 
         `not_found` is the message of the `NotFoundError` raised for the error Odoo.sh gives no
         reason for, which is its answer to a branch that does not exist. Without it that answer
-        is an `UpstreamChangedError`.
+        is an `UpstreamChangedError`. `grant` is added to the message of the `PermissionDeniedError`
+        raised when Odoo.sh's grant on GitHub lacks a scope: where to give it.
         """
         answer = self._attempt(operation, "POST", _url(path), params, retry=retry, within=within, limit=limit)
         if answer.status == httpx2.codes.OK and answer.body is _OVERSIZED:
             raise TooLargeError
         error = _error(operation, answer, not_found)
+        if grant is not None and answer.status == httpx2.codes.OK and _error_name(answer.body) == _INSUFFICIENT_SCOPE:
+            error = PermissionDeniedError(f"{_NARROW_GRANT} {grant}", operation=operation, status=answer.status)
         if error is not None:
             raise error
         return cast("dict[str, object]", answer.body)

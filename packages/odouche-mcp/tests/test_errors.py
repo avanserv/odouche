@@ -20,6 +20,7 @@ CASES: list[tuple[odouche.OdoucheError, str | None]] = [
     (odouche.LoginTimeoutError("Nobody logged in."), None),
     (odouche.ReadOnlyError("Read-only."), None),
     (odouche.StageRefusedError("A production branch."), None),
+    (odouche.MemberRefusedError("Already a member."), None),
     (odouche.OutcomeUnknownError("Not confirmed."), "before trying again"),
     (odouche.KeyringUnavailableError(), odouche.SESSION_ENV),
     (odouche.LoginError("No session captured."), None),

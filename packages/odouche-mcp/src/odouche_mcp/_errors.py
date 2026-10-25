@@ -33,6 +33,7 @@ NEXT_STEPS: tuple[tuple[type[odouche.OdoucheError], str | None], ...] = (
     (odouche.LoginTimeoutError, None),
     (odouche.ReadOnlyError, None),
     (odouche.StageRefusedError, None),
+    (odouche.MemberRefusedError, None),
     (odouche.OutcomeUnknownError, "List the branch's builds to see whether it was carried out before trying again."),
     (odouche.KeyringUnavailableError, LOGIN),
     (odouche.LoginError, None),

@@ -248,12 +248,34 @@ A new member is named by their GitHub login.
 authorize URL asking for `read:user user:email repo`. Following it ran the login's hops again and
 set a new `session_id`.
 
+`Client.add_member` asks `get_info` with the admin test, then `get_settings`, and refuses a login
+already listed, in any case. It then asks `find_users` with `query` set to the login, reading only
+`login`, `id` and `type` of each item. It takes the item whose `login` is the one given in any case
+and is itself a GitHub login, as the page's Enter takes `users[0]` only when its `login` is the
+query, and whose `type` is `User`, as the search finds organisations too. None is `NotFoundError`, and an `id` already a member's `hosting_identifier` is refused. It sends
+`add_collaborator` once with the login as GitHub spells it, the role, and `send_invitation` `false`:
+the page's dialog starts with `false` and has no control for it. It does not read the `result`:
+the new member is the one `get_settings` lists, read again, with that `hosting_identifier` and
+role. `InsufficientScopeError` is `PermissionDeniedError`, which for `find_users` names the page's
+search as where to give the grant; its URL is not read.
+
+`Client.set_member_role` asks `get_info` with the admin test, keeping `user.username`, then
+`get_settings`, and sends `set_access_level` once on the listed `id`, or nothing when the member
+has the role. The page tests nothing before a role change; the library refuses lowering an admin
+when no other `admin` with a `user_id` remains, as an invitee who never logs in administers
+nothing. It reads the role back from `get_settings`, or, when the member is the session's user,
+from `get_info`'s `user.access`, since `get_settings` is an admin's only. The revoke dialog warns
+that a removal fails for the last administrator of a project; what upstream does on a last-admin
+demotion was not seen.
+
 Removing a member: `POST /app/user/<hosting_user_id>/revokable_count` gives how many of the
 user's projects they can be removed from, and `POST /app/user_access/<id>/revoke`, params
 `{"all_projects": <bool>}`, removes them. Its `result` is `true` when the user removed themselves.
 
 ## Not seen
 
-- A settings save, an added or removed member, and their answers.
+- A settings save, an added or removed member, and their answers: `add_collaborator.json` stands
+  for the answer to an addition, built from the script.
+- What upstream answers a change that lowers the last admin of a project.
 - The project Status answer.
 - What a member below `admin` gets from these requests.

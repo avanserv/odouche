@@ -484,6 +484,35 @@ def test_reports_an_answer_the_reference_does_not_describe(connect, answer, fiel
     assert upstream.rejected == 0
 
 
+@pytest.mark.parametrize("send", ["call", "change"])
+def test_a_grant_without_a_scope_is_denied_without_its_address(connect, send):
+    transport, upstream = connect(fixture("insufficient_scope.json"))
+
+    with pytest.raises(PermissionDeniedError) as raised:
+        getattr(transport, send)(OPERATION, PATH)
+
+    assert str(raised.value) == "Odoo.sh's grant on GitHub does not cover this."
+
+    assert (raised.value.operation, raised.value.status) == (OPERATION, 200)
+    assert raised.value.__context__ is None
+    assert "github.com" not in "".join(traceback.format_exception(raised.value))
+    assert len(upstream.requests) == 1
+    assert upstream.rejected == 0
+
+
+def test_a_grant_without_a_scope_says_where_to_give_it_when_the_request_does(connect):
+    transport, _ = connect(fixture("insufficient_scope.json"), fixture("access_error.json"))
+
+    with pytest.raises(PermissionDeniedError) as scope:
+        transport.call(OPERATION, PATH, grant="Grant it in the page.")
+    with pytest.raises(PermissionDeniedError) as access:
+        transport.call(OPERATION, PATH, grant="Grant it in the page.")
+
+    assert str(scope.value) == "Odoo.sh's grant on GitHub does not cover this. Grant it in the page."
+    assert (scope.value.operation, scope.value.status, scope.value.__context__) == (OPERATION, 200, None)
+    assert "Grant it" not in str(access.value)
+
+
 UNEXPLAINED = {"error": {"data": {"name": "builtins.Exception", "message": "error code: SH-5ecr3t"}}}
 
 

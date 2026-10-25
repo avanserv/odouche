@@ -48,6 +48,8 @@ SHOWN = [
     ".change_branch_settings(",
     ".change_project_settings(",
     ".move_branch(",
+    ".add_member(",
+    ".set_member_role(",
     ".create_backup(",
     ".download(",
     "except odouche.OdoucheError",
@@ -90,6 +92,28 @@ def moving_branch(upstream):
         return httpx2.Response(200, json=upstream.load("set_stage.json"))
 
     upstream.bodies["/app/branch/51060/set_stage"] = set_stage
+
+
+def changing_members(upstream):
+    """Answer a search, an addition and a role change as Odoo.sh is taken to: the members read back as sent."""
+    users = upstream.bodies["/app/project/acme-corp-odoo-addons-4217/get_settings"]["result"]["users"]
+    upstream.bodies["/app/github/find_users"] = upstream.load("find_users.json")
+
+    def add(request):
+        body = upstream.load("add_collaborator.json")
+        body["result"]["access_level"] = json.loads(request.content)["params"]["access_level"]
+        users.append(body["result"])
+        return httpx2.Response(200, json=body)
+
+    def give(request):
+        number = int(request.url.path.split("/")[3])
+        for user in users:
+            if user["id"] == number:
+                user["access_level"] = json.loads(request.content)["params"]["access_level"]
+        return httpx2.Response(200, json=upstream.load("set_access_level.json"))
+
+    upstream.bodies["/app/project/acme-corp-odoo-addons-4217/add_collaborator"] = add
+    upstream.bodies["/app/user_access/61002/set_access_level"] = give
 
 
 @pytest.fixture
@@ -144,6 +168,7 @@ def odoo_sh(upstream, backend, session, monkeypatch, tmp_path):
     staging["result"][0]["builds"] = [listed[1] | {"id": 88124, "name": backups[0]["name"]}]
     upstream.bodies["/app/branch/51020/builds"] = staging
     moving_branch(upstream)
+    changing_members(upstream)
     worker, taken = listed[1]["worker_url"], backups[0]["backup_datetime_utc"]
     link = f"{worker}/paas/build/88124/download/dump?{urlencode({'backup_datetime_utc': taken, 'test_dump': 1, 'filestore': 1})}"
     ready = {"id": 9001, "notif_type": "dump", "buttons": [{"type": "download", "url": link}]}
