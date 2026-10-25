@@ -350,13 +350,14 @@ def headers_and_parts(size):
 
 def test_headers_written_to_be_slow_to_parse_are_read_quickly():
     # The default policy of `email` takes this mail more than a minute and a half: its `Cc` and its
-    # parameters are parsed in a time that grows faster than their size.
+    # parameters are parsed in a time that grows faster than their size. Up to Python 3.12.12, so
+    # are the parameters with `compat32`, read again for each part and for the attachment's name.
     cc = ", ".join(f"user{number} <user{number}@example.com>" for number in range(64000))
     parameters = "; ".join(f"p{number}=v{number}" for number in range(160000))
     text = (
-        f"From: a@example.com\nCc: {cc}\nContent-Type: multipart/mixed; boundary=x\n\n--x\n"
+        f"From: a@example.com\nCc: {cc}\nContent-Type: multipart/mixed; boundary=x; {parameters}\n\n--x\n"
         "Content-Type: text/plain\n\nHello\n--x\nContent-Type: application/pdf\n"
-        f"Content-Disposition: attachment; {parameters}; filename=a.pdf\nContent-Transfer-Encoding: base64\n\n"
+        f"Content-Disposition: attachment; filename=a.pdf; {parameters}\nContent-Transfer-Encoding: base64\n\n"
         "AAAA\n--x--\n"
     )
 
@@ -366,6 +367,16 @@ def test_headers_written_to_be_slow_to_parse_are_read_quickly():
     assert time.process_time() - started < BUDGET
     assert (parsed.body, parsed.attachments) == ("Hello", (MailAttachment("a.pdf", 3),))
     assert parsed.cc.startswith("user0 <user0@example.com>, user1")
+
+
+def test_the_parameters_of_a_header_are_read_from_its_start_only():
+    parameters = "; ".join(f"p{number}=v{number}" for number in range(10000))
+    parsed = _mime.parse(
+        "From: a@example.com\nContent-Type: multipart/mixed; boundary=x\n\n--x\n"
+        f"Content-Disposition: attachment; {parameters}; filename=a.pdf\n\nx\n--x--\n"
+    )
+
+    assert (parsed.attachments, parsed.truncated) == ((MailAttachment("", 1),), True)
 
 
 def test_a_mail_of_many_headers_and_many_parts_is_read_in_a_time_in_line_with_its_size():

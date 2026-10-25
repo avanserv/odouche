@@ -1,19 +1,19 @@
 """The text and the attachments of a mail, read from its source. Nothing of it is fetched or rendered.
 
 The source is parsed with `compat32`, whose header parsing takes a time in line with its size: the
-default policy's takes minutes on one long `Cc` the build wrote. Each header is decoded from its
+default policy's takes minutes on one long `Cc` the build wrote. Each header is read from its
 first `_MAX_HEADER` characters only, and the parts from the first `_MAX_PARTS`, for the same reason.
 That count is of every MIME part, containers included.
 """
 
 import email
-import email.policy
 import re
 from contextlib import suppress
 from dataclasses import dataclass
 from email.errors import HeaderParseError
-from email.header import decode_header, make_header
+from email.header import Header, decode_header, make_header
 from email.message import Message
+from email.policy import Compat32
 from html.parser import HTMLParser
 from typing import cast, override
 
@@ -52,9 +52,7 @@ def parse(source: str) -> Parsed:
     """Read a mail's `Cc`, its text and its attachments. A source that cannot be read gives nothing, cut."""
     try:
         # As bytes: each part is then decoded with its own charset, and half of a surrogate pair is replaced.
-        message = email.message_from_bytes(
-            source.encode("utf-8", "replace"), _class=_Part, policy=email.policy.compat32
-        )
+        message = email.message_from_bytes(source.encode("utf-8", "replace"), _class=_Part, policy=_POLICY)
         leaves, cut = _leaves(message)
         texts = [part for part in leaves if not _held(part)]
         body = next(
@@ -94,6 +92,21 @@ def html_text(html: str) -> str:
     return "\n".join(kept).strip("\n")
 
 
+class _Policy(Compat32):
+    """`compat32`, with each header read from its first `_MAX_HEADER` characters.
+
+    Up to Python 3.12.12, `email` splits a header's parameters in a time that grows with the square
+    of their length: a `Content-Disposition` of two megabytes takes it seconds for each read.
+    """
+
+    @override
+    def header_fetch_parse(self, name: str, value: str) -> str | Header:
+        return super().header_fetch_parse(name, value[:_MAX_HEADER])
+
+
+_POLICY = _Policy()
+
+
 class _Part(Message):
     """A part whose content type is read once.
 
@@ -121,25 +134,28 @@ class _Part(Message):
 
 
 def _leaves(message: Message) -> tuple[list[Message], bool]:
-    """Return the parts of a mail that hold content, in order, and whether there were more than `_MAX_PARTS`.
+    """Return the parts of a mail that hold content, in order, and whether anything of them was cut.
 
-    Every part walked counts toward `_MAX_PARTS`, a container included.
+    That is more than `_MAX_PARTS` parts, each one walked counting, a container included, or a
+    header of a part walked longer than `_MAX_HEADER` characters.
 
     An attached part is one, whatever it holds: a forwarded mail's text is not the mail's own.
     """
     leaves: list[Message] = []
     waiting = [message]
+    long = False
     for _ in range(_MAX_PARTS):
         if not waiting:
-            return leaves, False
+            return leaves, long
         part = waiting.pop()
+        long = long or any(len(value) > _MAX_HEADER for _, value in part.raw_items())
         if part is not message and _held(part):
             leaves.append(part)
         elif part.is_multipart():
             waiting.extend(reversed(cast("list[Message]", part.get_payload())))
         else:
             leaves.append(part)
-    return leaves, bool(waiting)
+    return leaves, long or bool(waiting)
 
 
 def _held(part: Message) -> bool:
