@@ -1,5 +1,7 @@
 # Contributing
 
+Everyone taking part is held to the [code of conduct](CODE_OF_CONDUCT.md).
+
 ## Setup
 
 You need [uv](https://docs.astral.sh/uv/) and `make`. uv installs the right Python for you.

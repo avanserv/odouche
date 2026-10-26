@@ -1,0 +1,45 @@
+name: Feature request
+description: Something you do in the Odoo.sh web UI that you want from the library, osh or the MCP server.
+labels: [enhancement]
+body:
+  - type: dropdown
+    id: package
+    attributes:
+      label: Which part
+      multiple: true
+      options:
+        - odouche library
+        - osh command
+        - odouche-mcp server
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What you are trying to do, and what stops you today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: The command or tool you would like
+      description: How you would call it, and what it would return or change.
+    validations:
+      required: true
+  - type: textarea
+    id: web-ui
+    attributes:
+      label: Where the Odoo.sh web UI does it
+      description: |
+        odouche can only do what the web UI does. Name the page and the button, or say that the
+        web UI cannot do it.
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        A feature that changes state on Odoo.sh is held to the constraints in
+        [the security model](https://avanserv.github.io/odouche/security/): from the MCP server
+        it is opt-in, and some changes, such as members, roles and the IP allow list, are never
+        given to an agent.

@@ -90,6 +90,10 @@ repos:
         name: actions  | workflow timeouts
       - id: check-dependabot
         name: actions  | dependabot schema
+      - id: check-github-issue-forms
+        name: actions  | issue form schema
+      - id: check-github-issue-config
+        name: actions  | issue config schema
 
   # ----------------------------------------------------------------------------
   # Python

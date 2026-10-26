@@ -1,0 +1,84 @@
+name: Bug report
+description: Something in the library, osh or the MCP server does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste a session cookie, a token, or the name of a real project, branch, commit or
+        build. Replace each with a placeholder such as `REDACTED` or `my-project`.
+  - type: dropdown
+    id: package
+    attributes:
+      label: Which part
+      options:
+        - odouche library
+        - osh command
+        - odouche-mcp server
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `osh --version`, or of `uv pip show odouche`.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      description: The login and the keyring both depend on it.
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - WSL2
+        - Container or CI
+    validations:
+      required: true
+  - type: input
+    id: python
+    attributes:
+      label: Python version
+      placeholder: "3.12.3"
+  - type: textarea
+    id: command
+    attributes:
+      label: What you ran
+      description: The command, the MCP tool call or the library code.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: The full error message or output.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: live-check
+    attributes:
+      label: Live check report
+      description: |
+        For an "Unexpected answer from Odoo.sh" error: the output of
+        `make live-check PROJECT=<name>` from a clone of this repository. It holds only counts
+        and field names.
+      render: text
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Before you submit
+      options:
+        - label: I removed session values, tokens and real project, branch, commit and build names from everything above.
+          required: true
+        - label: This is not a security vulnerability. Those are reported privately, as SECURITY.md describes.
+          required: true
