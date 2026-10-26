@@ -38,6 +38,15 @@ BranchOption = Annotated[
     str | None,
     typer.Option("--branch", envvar=BRANCH_ENV, help="The branch's name. Default: the git checkout's."),
 ]
+BuildOption = Annotated[
+    int | None,
+    typer.Option(
+        "--build",
+        metavar="BUILD_ID",
+        min=1,
+        help="The build's number, among the branch's latest builds. Default: the latest one.",
+    ),
+]
 
 
 class ContextError(typer.BadParameter):

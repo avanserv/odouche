@@ -124,6 +124,8 @@ class Upstream:
             "/app/branch/51044/builds": self.load("builds.json"),
             "/app/branch/51044/history": self.load("history.json"),
             "/app/branch/51044/get_settings": self.load("branch_settings.json"),
+            "/app/branch/51044/revision": self.load("branch_revision.json"),
+            "/app/revision/2206": self.load("odoo_revision.json"),
             "/app/user/profile": self.load("user_profile.json"),
             "/app/project/acme-shop/get_info": self.load("project_info.json"),
             "/paas/build/88212/logs/list": self.load("build_logs_list.json"),

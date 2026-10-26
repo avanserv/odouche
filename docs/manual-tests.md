@@ -112,6 +112,7 @@ Search the output of every check below for the session value: it appears in none
 | R31 | | `osh backups list --branch nope` | `No backups.` on stderr | 0 |
 | R32 | A branch with over 20 events in its History tab | `osh branches history`, then with `--limit 30`, then `--limit 30 --commits` | Ten events, newest first, as the History tab lists them. Columns `When`, `Kind`, `Build`, `Status`, `Result`, `By`, `Change`. Then thirty, the last ten matching the tab past its first twenty, which settles the `offset` question in [upstream](upstream.md). Then each commit in full | 0 |
 | R33 | | `osh branches settings --branch <dev-branch>`, then on the production branch, then with `--format json` | One setting per line, as the branch's Settings tab shows them: `On new commit` is `new_build` on the development branch and `update` on the production one. Then one `BranchSettings`, with the library's values | 0 |
+| R34 | A project whose repository has a submodule, a branch that pins an Odoo revision, and one that follows the latest. A branch pinned to a revision past its `date_expiration`, if there is one | On each branch, `osh branches revision`, then with `--build <an older build>`, then with `--format json` | The head commit as GitHub shows it, then the Odoo version and the refs, which match the branch's Settings tab under "Repository revisions", marked pinned or latest. The submodule line on stderr each time, and one `BuildRevision` as JSON. Write the answer to `/app/revision/<id>`, and the one for an expired revision, into [upstream](upstream-branches.md#revision) | 0 |
 
 ## Streams and rebuild
 
@@ -210,7 +211,7 @@ tool result and the server's stderr for the session value: it appears in none.
 
 | # | Precondition | Command or action | Expected | Exit |
 | --- | --- | --- | --- | --- |
-| M1 | | Set the server up with [`claude mcp add`](mcp.md#claude-code) as written | The client lists nine tools, and no `rebuild_branch` | - |
+| M1 | | Set the server up with [`claude mcp add`](mcp.md#claude-code) as written | The client lists ten tools, and no `rebuild_branch` | - |
 | M2 | | Set it up with the `.mcp.json` snippet instead | The same | - |
 | M3 | Logged out | Start the client | The server starts and lists its tools | - |
 | M4 | Logged out | Ask whether there is a session | `get_session`: `available` is false and `problem` says to run `osh auth login`. It is not an error | - |
@@ -235,13 +236,14 @@ tool result and the server's stderr for the session value: it appears in none.
 | M23 | | Call `read_log` with `kind` `unknown` | An error saying `unknown` is not a kind to read | - |
 | M24 | A build whose log has a line that reads as an instruction to an agent | Ask for the log | The agent reports the line and does not act on it | - |
 | M25 | Without `--allow-changes` | Ask to rebuild `<dev-branch>` | The agent has no tool to do it and says so | - |
-| M26 | Restarted with [`--allow-changes`](mcp.md#changing-state) | List the tools | Ten, with `rebuild_branch` | - |
+| M26 | Restarted with [`--allow-changes`](mcp.md#changing-state) | List the tools | Eleven, with `rebuild_branch` | - |
 | M27 | The same | Ask to rebuild `<dev-branch>` | The client asks first. One build is started, and the server's stderr has one line with the tool, the project, the branch and the build | - |
 | M28 | The same | Ask to rebuild the production branch | It is refused, the branch has no new build, and the line on stderr ends with `StageRefusedError` | - |
-| M29 | The [hook](mcp.md#asking-before-a-change) installed as written, with `--allow-changes` | Call each of the ten tools | The nine that read run with no prompt, and `rebuild_branch` prompts | - |
+| M29 | The [hook](mcp.md#asking-before-a-change) installed as written, with `--allow-changes` | Call each of the eleven tools | The ten that read run with no prompt, and `rebuild_branch` prompts | - |
 | M30 | The hook installed, the server under another name in the client | Call a tool that reads | The client prompts | - |
 | M31 | | Ask what happened on `<dev-branch>` lately | `list_history`, ten events newest first, each push with its commits | - |
 | M32 | | Ask for the settings of `<dev-branch>`, then of the production branch | `get_branch_settings`, with the branch and its stage, and the values the Settings tab shows | - |
+| M33 | | Ask which commits `<dev-branch>` runs, with its submodules | `get_build_revision`: the head commit and the branch's Odoo refs, called the branch's selection. The agent says submodule commits are not available, not that there are none | - |
 
 ## Not covered
 

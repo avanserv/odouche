@@ -12,7 +12,15 @@ import typer
 
 import odouche
 from odouche_cli._client import open_client
-from odouche_cli._context import BranchOption, ProjectOption, find_build, is_given, project_branch, resolve_branch
+from odouche_cli._context import (
+    BranchOption,
+    BuildOption,
+    ProjectOption,
+    find_build,
+    is_given,
+    project_branch,
+    resolve_branch,
+)
 from odouche_cli._output import Column, Output
 from odouche_cli._time import ago
 
@@ -33,15 +41,6 @@ _PRINTING = {
     "timeout": "--timeout",
 }
 
-BuildOption = Annotated[
-    int | None,
-    typer.Option(
-        "--build",
-        metavar="BUILD_ID",
-        min=1,
-        help="The build's number, among the branch's latest builds. Default: the latest one.",
-    ),
-]
 KindOption = Annotated[
     str | None,
     typer.Option(

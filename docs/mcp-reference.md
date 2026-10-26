@@ -18,6 +18,7 @@ A tool that changes Odoo.sh is registered only when the server is started with
 | [`list_history`](#list_history) | No | reads only |
 | [`get_build`](#get_build) | No | reads only |
 | [`get_branch_settings`](#get_branch_settings) | No | reads only |
+| [`get_build_revision`](#get_build_revision) | No | reads only |
 | [`wait_for_build`](#wait_for_build) | No | reads only |
 | [`read_log`](#read_log) | No | reads only |
 | [`rebuild_branch`](#rebuild_branch) | Yes | starts a new build of the branch, which replaces its latest one. |
@@ -151,6 +152,27 @@ Read the settings of a branch of a project: what a new commit does, which module
 - **Returns**: the branch with its stage, and its settings; the new build options apply to a development branch only.
 - **Touches**: reads only
 - **Bounds**: three requests to Odoo.sh.
+
+| Hint | Value |
+| --- | --- |
+| `readOnlyHint` | true |
+| `destructiveHint` | false |
+| `idempotentHint` | true |
+| `openWorldHint` | true |
+
+## `get_build_revision`
+
+Read what a build of a branch of a project runs: its head commit, its Odoo version, and the Odoo revision its branch has selected, with the commit of each Odoo repository. The build of that number, or the latest one. Odoo.sh ties no Odoo revision to a build, so the branch's may not be the build's. Odoo.sh gives no commit for a submodule, so none is returned, and the result says nothing of whether the repository has any.
+
+| Argument | Type | Default |
+| --- | --- | --- |
+| `project` | string | Required. |
+| `branch` | string | Required. |
+| `build_id` | integer | |
+
+- **Returns**: the build's number, name and branch, its head commit, its Odoo version, and its branch's selected Odoo revision, which may not be the build's. There is no submodule commit, since Odoo.sh does not give one.
+- **Touches**: reads only
+- **Bounds**: six requests to Odoo.sh; a build older than the branch's latest ones is not found.
 
 | Hint | Value |
 | --- | --- |
