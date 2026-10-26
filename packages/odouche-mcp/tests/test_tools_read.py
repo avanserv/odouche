@@ -1,4 +1,5 @@
 import asyncio
+import ipaddress
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
@@ -28,6 +29,7 @@ from odouche_mcp.server import create_server
 READS = [
     "list_projects",
     "get_project_overview",
+    "get_project_settings",
     "list_audit_log",
     "list_branches",
     "list_builds",
@@ -165,6 +167,35 @@ OVERVIEW = odouche.ProjectOverview(
 )
 
 
+PROJECT_SETTINGS = odouche.ProjectSettings(
+    name=ACME.name,
+    odoo_domain_blocked=True,
+    session_lifetime=odouche.SessionLifetime.ONE_DAY,
+    public=False,
+    commit_statuses_suspended=False,
+    deploy_key_writable=False,
+    submodules=(
+        odouche.Submodule(
+            71001,
+            "git@github.com:acme-corp/acme-theme.git",
+            "SHA256:aW52ZW50ZWQgZmluZ2VycHJpbnQgZm9yIHRlc3Rz",
+            "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEFjbWVJbnZlbnRlZEtleUZvclRlc3RzT25seTAwMDA= odoo.sh",
+        ),
+    ),
+    hosting=odouche.ProjectHosting(438272000, 1073741824, 1, 1),
+    dedicated=False,
+    http_timeout_seconds=900,
+    cron_timeout_seconds=900,
+    module_install=odouche.ModuleInstall.REPOSITORY,
+    modules=(),
+    tests=odouche.BuildTests.MODULES,
+    test_tags=None,
+    demo_data=True,
+    ai_agent=odouche.AiAgent.CLAUDE,
+    ip_allow_list=(ipaddress.ip_address("198.51.100.42"), ipaddress.ip_network("2001:db8::/32")),
+)
+
+
 class Upstream:
     """A client over one project, `acme`, with its branches and the builds of `feature-x`."""
 
@@ -194,6 +225,12 @@ class Upstream:
             msg = f"No project {project} among those you can reach."
             raise odouche.NotFoundError(msg)
         return OVERVIEW
+
+    def project_settings(self, project: str) -> odouche.ProjectSettings:
+        if project != ACME.name:
+            msg = f"No project {project} among those you can reach."
+            raise odouche.NotFoundError(msg)
+        return PROJECT_SETTINGS
 
     def branches(self, project: str) -> list[odouche.Branch]:
         if project != ACME.name:
@@ -363,6 +400,54 @@ def test_the_overview_with_as_many_branches_as_the_cap_is_whole(upstream: pytest
     answer = _answer("get_project_overview", project="acme")
 
     assert (len(answer["overview"]["branches"]), answer["truncated"]) == (MAX_LISTED, False)
+
+
+def test_the_project_settings_are_the_library_model_whole_with_the_allow_list_as_text():
+    assert _answer("get_project_settings", project="acme") == {
+        "settings": {
+            "name": "acme",
+            "odoo_domain_blocked": True,
+            "session_lifetime": "1d",
+            "public": False,
+            "commit_statuses_suspended": False,
+            "deploy_key_writable": False,
+            "submodules": [
+                {
+                    "id": 71001,
+                    "url": "git@github.com:acme-corp/acme-theme.git",
+                    "fingerprint": "SHA256:aW52ZW50ZWQgZmluZ2VycHJpbnQgZm9yIHRlc3Rz",
+                    "public_key": PROJECT_SETTINGS.submodules[0].public_key,
+                }
+            ],
+            "hosting": {
+                "storage_used_bytes": 438272000,
+                "storage_quota_bytes": 1073741824,
+                "workers": 1,
+                "staging_branches": 1,
+            },
+            "dedicated": False,
+            "http_timeout_seconds": 900,
+            "cron_timeout_seconds": 900,
+            "module_install": "repository",
+            "modules": [],
+            "tests": "modules",
+            "test_tags": None,
+            "demo_data": True,
+            "ai_agent": "claude",
+            "ip_allow_list": ["198.51.100.42", "2001:db8::/32"],
+        }
+    }
+
+
+def test_denied_project_settings_are_an_error_with_their_message(upstream: pytest.MonkeyPatch):
+    def denied(*_: object) -> odouche.ProjectSettings:
+        raise odouche.PermissionDeniedError("Odoo.sh shows a project's settings to its admins only.")
+
+    upstream.setattr(Upstream, "project_settings", denied)
+
+    assert _error("get_project_settings", project="acme").endswith(
+        ": Odoo.sh shows a project's settings to its admins only."
+    )
 
 
 def test_branches_are_listed():
@@ -650,6 +735,7 @@ def test_a_limit_below_one_is_refused_before_odoo_sh_is_asked(tool: str, argumen
     ("tool", "arguments"),
     [
         ("get_project_overview", {}),
+        ("get_project_settings", {}),
         ("list_audit_log", {}),
         ("list_branches", {}),
         ("list_builds", {"branch": "feature-x"}),
@@ -674,6 +760,7 @@ def test_a_call_without_its_project_or_branch_is_rejected_and_nothing_is_guessed
     ("tool", "arguments", "message"),
     [
         ("get_project_overview", {"project": "other"}, "No project other among those you can reach."),
+        ("get_project_settings", {"project": "other"}, "No project other among those you can reach."),
         ("list_branches", {"project": "other"}, "No project other among those you can reach."),
         ("list_audit_log", {"project": "other"}, "No project other among those you can reach."),
         ("list_builds", {"project": "other", "branch": "main"}, "No project other among those you can reach."),
@@ -705,6 +792,7 @@ def test_what_is_not_found_is_an_error_with_its_message(tool: str, arguments: di
     [
         ("list_projects", {}),
         ("get_project_overview", {"project": "acme"}),
+        ("get_project_settings", {"project": "acme"}),
         ("list_audit_log", {"project": "acme"}),
         ("list_branches", {"project": "acme"}),
         ("list_builds", {"project": "acme", "branch": "feature-x"}),

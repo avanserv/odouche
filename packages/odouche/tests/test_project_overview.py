@@ -33,7 +33,8 @@ SETTINGS = "/app/project/acme-corp-odoo-addons-4217/get_settings"
 TOKEN = "t0k3n-0f-th3-pr0j3ct"
 GITHUB = "ghp_" + "x" * 36
 CODE = "M999999999999999"
-SECRETS = (TOKEN, GITHUB, CODE)
+LINK = f"https://accounts.example.com/my/subscription?contract={CODE}"
+SECRETS = (TOKEN, GITHUB, CODE, LINK)
 
 OVERVIEW = ProjectOverview(
     id=4217,
@@ -105,6 +106,7 @@ def with_secrets(upstream):
     repo(upstream)["production_build_id"]["enterprise_code"] = CODE
     listed(upstream)["subscription_code"] = CODE
     settings(upstream).update(ci_token=GITHUB, subscription_code=CODE, subscription_code_display=CODE)
+    upstream.bodies[SETTINGS]["result"]["upsells"] = {"can_have_worker_upsell_trial": True, "accounts_link": LINK}
 
 
 def test_reads_the_overview_of_a_project_an_admin_reaches(client, upstream):
@@ -167,6 +169,24 @@ def test_the_info_is_read_without_its_token_and_codes(upstream, session):
     assert (result.has("access_token"), active.has("subscription_code")) == (False, False)
     assert active.child("production_build_id").has("enterprise_code") is False
     assert (result.has("user"), active.has("odoo_branch")) == (True, True)
+
+
+def test_the_settings_are_read_without_their_subscription_link(upstream, session):
+    with_secrets(upstream)
+
+    answer = projects.settings_answer(upstream.connect(Secret(session)), "acme-corp-odoo-addons-4217")
+
+    assert (answer.has("upsells"), answer.has("repository")) == (False, True)
+
+
+@pytest.mark.parametrize(
+    ("key", "value"),
+    [("session_lifetime", "12-days"), ("submodules", [{"id": "71001", "deploy_key_public": "-----BEGIN"}])],
+)
+def test_a_setting_the_overview_does_not_read_cannot_break_it(client, upstream, key, value):
+    upstream.bodies[SETTINGS]["result"][key] = value
+
+    assert client.project_overview("acme-shop") == OVERVIEW
 
 
 def test_the_projects_are_read_without_their_codes(upstream, session):

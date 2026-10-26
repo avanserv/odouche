@@ -49,6 +49,12 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.BranchSummary
 
+::: odouche.ProjectSettings
+
+::: odouche.SessionLifetime
+
+::: odouche.Submodule
+
 ::: odouche.AuditEntry
 
 ::: odouche.AuditKind

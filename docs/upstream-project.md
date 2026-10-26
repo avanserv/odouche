@@ -61,8 +61,9 @@ which answers it to every member.
 - `get_info` holds `access_token`, `subscription_code` and the production build's
   `enterprise_code` (only `false` seen). `projects` holds each project's `subscription_code`.
   `get_settings` holds `ci_token`, the GitHub token for commit statuses (only `false` seen; the
-  page tests it for truth only), `subscription_code` and `subscription_code_display`. The library
-  drops them before reading.
+  page tests it for truth only), `subscription_code`, `subscription_code_display` and
+  `upsells.accounts_link`, whose `contract` is the subscription code. The library drops them
+  before reading.
 
 ## Audit log
 
@@ -106,15 +107,46 @@ which leaves out the upsell links and the limits' descriptions.
 | `repository` | The settings, and the [overview](#overview) figures |
 | `users` | The [members](#members) |
 | `production_build` | Its sizes, above |
-| `submodules` | Private submodules: `id`, `deploy_key_public`, `deploy_key_public_fingerprint`. Empty here |
+| `submodules` | Private submodules: `id`, `name`, `deploy_key_public`, `deploy_key_public_fingerprint`. Empty here |
 | `dedicated_limits` | `limit_real_time` and `limit_real_time_cron`, each with `value` in minutes and bounds in seconds |
 | `session_lifetime`, `session_lifetime_map` | `auto`, and the choices from `4-hours` to `8-days` with their `seconds` |
-| `domain_build_production`, `title`, `dedicated`, `upsells` | |
+| `domain_build_production`, `title`, `dedicated` | |
+| `upsells` | `can_have_worker_upsell_trial`, and `accounts_link`, an odoo.com link to manage the subscription whose `contract` query value is the subscription code |
 
 The other settings in `repository` are the development defaults (`modules_auto`, `modules`,
 `test_mode`, `test_tags`, `demo_data`, `ai_agent`, as on a [branch](upstream-branches.md#branch-and-build-settings)),
 `disable_tests`, `private`, `block_odoo_domain`, `deploy_key_writable`, `ip_whitelist`,
 `ci_token`, `ci_suspended` and `project_name`.
+
+- `session_lifetime` and `session_lifetime_map` are keys of `result`, not of `repository`. The
+  page copies them into its settings.
+- A submodule's `name` is the Git URL the user typed, sent back as `submodule_name`. The page
+  shows `deploy_key_public` in a read-only input with a copy button.
+- No template or script reads `disable_tests`.
+- `private` is the opposite of the page's "Allow public access", which it sends as `public`.
+- `ci_suspended` is also set by the page from `check_ci_token`: true when the token's check failed.
+- The Workers Settings inputs, the two `dedicated_limits`, are disabled unless `pays_dedicated`.
+
+`Client.project_settings` asks `get_info`, applies the page's admin test to it, then asks
+`get_settings`, the request the [overview](#overview) shares. It drops `ci_token`,
+`subscription_code`, `subscription_code_display` and `upsells` whole, and a submodule URL's query,
+fragment and user information but a lone SSH user name, or the whole URL when it cannot be read
+safely, before reading.
+
+| Field | Read from |
+| --- | --- |
+| `name` | `repository.project_name`, which must be the name asked |
+| `odoo_domain_blocked` | `repository.block_odoo_domain` |
+| `session_lifetime` | `session_lifetime`, one of the seven keys of `session_lifetime_map` seen; the map is not read |
+| `public` | Not `repository.private` |
+| `commit_statuses_suspended` | `repository.ci_suspended` |
+| `deploy_key_writable` | `repository.deploy_key_writable` |
+| `submodules` | `submodules`: `id`, `name`, `deploy_key_public_fingerprint` and `deploy_key_public`, which must be an OpenSSH public key line, a trailing line break removed. Never seen filled |
+| `hosting` | `repository`, as in the overview |
+| `dedicated` | `repository.pays_dedicated` |
+| `http_timeout_seconds`, `cron_timeout_seconds` | `value` × `unit_conversion` of `dedicated_limits.limit_real_time` and `limit_real_time_cron` |
+| `module_install` to `ai_agent` | `repository.modules_auto`, `modules`, `test_mode`, `test_tags`, `demo_data`, `ai_agent`, as on a branch |
+| `ip_allow_list` | `repository.ip_whitelist`, split into lines, blank ones skipped, each a network when it holds a `/` and an address otherwise: what `set_settings` accepts beyond the IPv4s the page asks for is unseen |
 
 `POST /app/project/<technical_name>/set_settings`, read from the script. As on a branch, its
 params are one section of the page as form values, and its `result` is the new `repository`.

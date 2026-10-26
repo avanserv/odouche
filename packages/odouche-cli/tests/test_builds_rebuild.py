@@ -196,6 +196,28 @@ class StubClient:
             ),
         )
 
+    def project_settings(self, project: str) -> odouche.ProjectSettings:
+        return odouche.ProjectSettings(
+            name=project,
+            odoo_domain_blocked=False,
+            session_lifetime=odouche.SessionLifetime.AUTO,
+            public=False,
+            commit_statuses_suspended=False,
+            deploy_key_writable=False,
+            submodules=(),
+            hosting=odouche.ProjectHosting(0, 0, 1, 1),
+            dedicated=False,
+            http_timeout_seconds=900,
+            cron_timeout_seconds=900,
+            module_install=odouche.ModuleInstall.REPOSITORY,
+            modules=(),
+            tests=odouche.BuildTests.MODULES,
+            test_tags=None,
+            demo_data=True,
+            ai_agent=odouche.AiAgent.CLAUDE,
+            ip_allow_list=(),
+        )
+
     # The library's own, which asks nothing.
     check_rebuild = odouche.Client.check_rebuild
     check_settings_change = odouche.Client.check_settings_change

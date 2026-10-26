@@ -1,4 +1,4 @@
-"""`osh projects`: the Odoo.sh projects the session's user can reach, one's overview, its checks and its audit log."""
+"""`osh projects`: the Odoo.sh projects the session's user can reach, one's overview, settings, checks and audit log."""
 
 from collections.abc import Callable, Iterable
 from contextlib import closing
@@ -16,14 +16,22 @@ from odouche_cli._client import open_client
 from odouche_cli._context import ProjectOption, resolve_project, result_of, status_of
 from odouche_cli._errors import EXIT_CHECK_FAILED, EXIT_CHECK_WARNED
 from odouche_cli._output import Column, Output, strip_line_control
+from odouche_cli._settings import shown
 
 
 app = typer.Typer(
     name="projects",
-    help="List the Odoo.sh projects you can reach, show one's overview, check it, and read its audit log.",
+    help="List the Odoo.sh projects you can reach, show one's overview and settings, check it, and read its audit log.",
     epilog="Example: osh projects list",
     no_args_is_help=True,
 )
+settings_app = typer.Typer(
+    name="settings",
+    help="Show a project's settings.",
+    epilog="Example: osh projects settings show --project acme-shop",
+    no_args_is_help=True,
+)
+app.add_typer(settings_app)
 
 _COLUMNS = [
     Column[odouche.Project]("Name", lambda project: project.name),
@@ -70,6 +78,18 @@ def show(ctx: typer.Context, project: ProjectOption = None) -> None:
     with open_client() as client:
         read = client.project_overview(resolve_project(ctx, project, client.projects))
     output.one(read, _OVERVIEW)
+
+
+@settings_app.command("show", epilog="Example: osh projects settings show --project acme-shop")
+def settings_show(ctx: typer.Context, project: ProjectOption = None) -> None:
+    """Show a project's settings, one per line, as its Settings page has them.
+
+    Odoo.sh shows them to an admin of the project only: anyone else gets exit code 5. The rows from `Dev install` to `Dev AI agent` are the defaults of new development branches. A submodule's public deploy key is in `--format json` only.
+    """
+    output: Output = ctx.obj
+    with open_client() as client:
+        read = client.project_settings(resolve_project(ctx, project, client.projects))
+    output.one(read, _SETTINGS)
 
 
 _AUDIT_LIMIT = 20
@@ -325,4 +345,40 @@ _OVERVIEW = [
     ),
     Column[odouche.ProjectOverview]("Branches", _stages),
     Column[odouche.ProjectOverview]("Your access", lambda read: read.access_level),
+]
+
+
+def _minutes(seconds: int) -> str:
+    # In minutes, as the Settings page shows them.
+    minutes = seconds / 60
+    return f"{minutes:g} minute{'' if minutes == 1 else 's'}"
+
+
+def _submodules(read: odouche.ProjectSettings) -> str:
+    # An empty URL is one the library could not read without what may be part of a password.
+    listed = (f"{shown(_untrusted(sub.url))} ({_untrusted(sub.fingerprint)})" for sub in read.submodules)
+    return ", ".join(listed) or "none"
+
+
+_SETTINGS = [
+    Column[odouche.ProjectSettings]("Name", lambda read: read.name),
+    Column[odouche.ProjectSettings]("odoo.com domain blocked", lambda read: shown(read.odoo_domain_blocked)),
+    Column[odouche.ProjectSettings]("Session lifetime", lambda read: shown(read.session_lifetime)),
+    Column[odouche.ProjectSettings]("Public access", lambda read: shown(read.public)),
+    Column[odouche.ProjectSettings]("Commit statuses suspended", lambda read: shown(read.commit_statuses_suspended)),
+    Column[odouche.ProjectSettings]("Writable deploy key", lambda read: shown(read.deploy_key_writable)),
+    Column[odouche.ProjectSettings]("Submodules", _submodules),
+    Column[odouche.ProjectSettings]("Storage", lambda read: _storage(read.hosting)),
+    Column[odouche.ProjectSettings]("Workers", lambda read: read.hosting.workers),
+    Column[odouche.ProjectSettings]("Staging branches", lambda read: read.hosting.staging_branches),
+    Column[odouche.ProjectSettings]("Dedicated", lambda read: shown(read.dedicated)),
+    Column[odouche.ProjectSettings]("HTTP timeout", lambda read: _minutes(read.http_timeout_seconds)),
+    Column[odouche.ProjectSettings]("Scheduled actions timeout", lambda read: _minutes(read.cron_timeout_seconds)),
+    Column[odouche.ProjectSettings]("Dev install", lambda read: shown(read.module_install)),
+    Column[odouche.ProjectSettings]("Dev modules", lambda read: shown(read.modules)),
+    Column[odouche.ProjectSettings]("Dev tests", lambda read: shown(read.tests)),
+    Column[odouche.ProjectSettings]("Dev test tags", lambda read: shown(read.test_tags)),
+    Column[odouche.ProjectSettings]("Dev demo data", lambda read: shown(read.demo_data)),
+    Column[odouche.ProjectSettings]("Dev AI agent", lambda read: shown(read.ai_agent)),
+    Column[odouche.ProjectSettings]("IP allow list", lambda read: shown(read.ip_allow_list)),
 ]

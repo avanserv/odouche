@@ -194,9 +194,9 @@ with odouche.Client() as client:
   else and the settings are not asked.
 - Sizes are in bytes. The storage used is what Odoo.sh accounts the project for.
 - A subscription state the library does not know is `Subscription.UNKNOWN`, not an error.
-- The project's access token, the GitHub token set for commit statuses, the subscription code and
-  the enterprise code are in Odoo.sh's answers. They are dropped before anything is read, and none
-  is in the model.
+- The project's access token, the GitHub token set for commit statuses, the subscription code, the
+  subscription-management link that carries it and the enterprise code are in Odoo.sh's answers.
+  They are dropped before anything is read, and none is in the model.
 - A project the user cannot reach raises `NotFoundError`. Branches or settings Odoo.sh refuses
   raise `PermissionDeniedError`.
 
@@ -235,6 +235,64 @@ with odouche.Client() as client:
   `kind_name`. Any other field not as seen raises `UpstreamChangedError` naming it.
 - `author`, `details` and `kind_name` are as Odoo.sh sends them, control characters included:
   strip them before a terminal shows them.
+
+### Project settings
+
+`client.project_settings(project)` returns a project's settings, as its Settings page shows them,
+as `ProjectSettings`. `project` is a `Project` or a project's name.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    settings = client.project_settings("acme-shop")
+    print(settings.session_lifetime, settings.public, settings.http_timeout_seconds)
+    for address in settings.ip_allow_list:
+        print(address)
+```
+
+| Field | Meaning |
+| --- | --- |
+| `name` | The project's name on Odoo.sh. |
+| `odoo_domain_blocked` | Whether the production database is unreachable on its `odoo.com` domain. |
+| `session_lifetime` | A `SessionLifetime`, how long a member's session lasts on the project: `AUTO`, or `FOUR_HOURS` to `EIGHT_DAYS`. |
+| `public` | Whether the Builds page is open to visitors, who can then connect to the development builds. |
+| `commit_statuses_suspended` | Whether Odoo.sh stopped sending commit statuses, as the check of their token failed. |
+| `deploy_key_writable` | Whether the project's deploy key may push to its repository. |
+| `submodules` | A `Submodule` for each private submodule. |
+| `hosting` | A `ProjectHosting`, as in the [overview](#project-overview). |
+| `dedicated` | Whether the project pays for a dedicated server, the only one whose timeouts can be changed. |
+| `http_timeout_seconds`, `cron_timeout_seconds` | How long an HTTP request and a scheduled action run before they are stopped. |
+| `module_install` to `ai_agent` | The development defaults, as the fields of the same names in [`BranchSettings`](#branch-settings). |
+| `ip_allow_list` | The entries allowed SSH, and PostgreSQL on a dedicated server, to production and staging, in the page's order: an `IPv4Network` or `IPv6Network` for an entry with a `/`, an `IPv4Address` or `IPv6Address` for any other, so each reads back as written. |
+
+| Model | Fields |
+| --- | --- |
+| `Submodule` | `id`, `url`, `fingerprint` and `public_key`, the public half of the deploy key as one OpenSSH line, without the line break it may end with. |
+| `SessionLifetime` | `AUTO`, which Odoo.sh sets as it sees fit up to 8 days, `FOUR_HOURS`, `EIGHT_HOURS`, `ONE_DAY`, `TWO_DAYS`, `FOUR_DAYS` and `EIGHT_DAYS`. |
+
+- It asks Odoo.sh for the project's info, then its settings, and only reads. The settings request
+  is the one the [overview](#project-overview) sends for `hosting`.
+- Odoo.sh shows the Settings page to an admin of the project only. The library makes the page's
+  own test on the project's info and raises `PermissionDeniedError` for anyone else, without
+  asking for the settings.
+- A value the library does not know, in any of the enumerations, raises `UpstreamChangedError`
+  naming the field, as for a branch's settings. So does an allowed entry that is neither an
+  address nor a network, or a deploy key that is not an OpenSSH public key line, neither of which
+  the error quotes.
+- The GitHub token set for commit statuses, the subscription code and the subscription-management
+  link that carries it are dropped before anything is read.
+- A submodule's `url` is normalised before anything is read: it is the URL without its query, its
+  fragment and its user information, which ends at the last `@` before the first `/` (after `//`
+  in a URL that has one). A Unix user name that does not start as a GitHub or GitLab token does,
+  such as `git`, is kept in an `ssh` URL or an scp-like `user@host:path`.
+- `url` is empty when a URL with `//` cannot be read safely: what is left before its path is not a
+  host and a port, its scheme is not one, or a password came with an `@` in the path, which a
+  password holding a `/` would also give.
+- A project the user cannot reach raises `NotFoundError`.
+- The submodule URLs, modules and test tags come from what the project's admins typed: strip their
+  control characters before a terminal shows them.
 
 ### Branches
 
@@ -441,8 +499,8 @@ with odouche.Client() as client:
   `UpstreamChangedError` naming the field, unlike a `Stage` that becomes `UNKNOWN`: a setting is
   never passed through unchecked.
 - The new build options, `project_defaults` to `ai_agent`, apply to a development branch only.
-  While `project_defaults` is true the project's development defaults apply instead, and those are
-  not read.
+  While `project_defaults` is true the project's development defaults apply instead, which
+  [Project settings](#project-settings) reads.
 - Odoo.sh has no settings request for a build, as `Client.build` says.
 - `client.change_branch_settings` changes them, as
   [State-changing operations](#state-changing-operations) has it.

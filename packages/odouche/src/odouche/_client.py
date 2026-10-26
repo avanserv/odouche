@@ -17,6 +17,7 @@ from odouche._upstream import (
     mails,
     overview,
     panels,
+    project_settings,
     projects,
     rebuild,
     revision,
@@ -45,6 +46,7 @@ from odouche.models import (
     PreparedDownload,
     Project,
     ProjectOverview,
+    ProjectSettings,
     SessionInfo,
     SettingsChange,
     SettingsOutcome,
@@ -119,6 +121,18 @@ class Client:
         can reach, and `PermissionDeniedError` when Odoo.sh refuses its branches or its settings.
         """
         return overview.overview(self._transport, _project_name(project))
+
+    def project_settings(self, project: Project | str) -> ProjectSettings:
+        """Return a project's settings, as its Settings page shows them, given as a `Project` or by its name.
+
+        Asks Odoo.sh twice, for the project's info then its settings, and only reads. Odoo.sh shows
+        the settings to a project's admins only: anyone else gets `PermissionDeniedError` before
+        the second request. A setting whose value the library does not know, or an allowed entry
+        that is neither an address nor a network, raises `UpstreamChangedError` naming the field.
+        Every token and code in the answers, and a submodule URL's credentials, are dropped unread. Raises
+        `NotFoundError` when the project is not one the session's user can reach.
+        """
+        return project_settings.project_settings(self._transport, _project_name(project))
 
     def audit_log(
         self, project: Project | str, *, limit: int = audit.DEFAULT_LIMIT, timeout: float
