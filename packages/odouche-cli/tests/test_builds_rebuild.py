@@ -39,8 +39,10 @@ OPEN = ("builds", "open")
 SETTINGS = ("branches", "settings", "set")
 PROJECT_SETTINGS = ("projects", "settings", "set")
 MOVE = ("branches", "move")
+MEMBER_ADD = ("projects", "members", "add")
+MEMBER_ROLE = ("projects", "members", "role")
 # The commands that open a client that writes.
-WRITERS = {REBUILD, BACKUP, DOWNLOAD, SETTINGS, PROJECT_SETTINGS, MOVE}
+WRITERS = {REBUILD, BACKUP, DOWNLOAD, SETTINGS, PROJECT_SETTINGS, MOVE, MEMBER_ADD, MEMBER_ROLE}
 
 
 def build(number: int, **changes: object) -> Build:
@@ -238,6 +240,8 @@ class StubClient:
     check_project_settings_change = odouche.Client.check_project_settings_change
     check_backup = odouche.Client.check_backup
     check_move = odouche.Client.check_move
+    check_add_member = staticmethod(odouche.Client.check_add_member)
+    check_member_role = odouche.Client.check_member_role
     ssh_target = odouche.Client.ssh_target
     panel_url = odouche.Client.panel_url
 
@@ -261,6 +265,10 @@ class StubClient:
     def move_branch(self, branch: Branch, to: Stage) -> Branch:
         self.calls.append(f"move {branch.name}")
         return replace(branch, stage=to, stage_name=to.value)
+
+    def add_member(self, project: str, login: str, role: odouche.MemberRole) -> odouche.ProjectMember:
+        self.calls.append(f"add {login}")
+        return replace(self.members(project)[0], id=61004, login=login, name=login, role=role, github_id=1000004)
 
     def change_project_settings(
         self, project: str, change: odouche.ProjectSettingsChange
@@ -690,6 +698,9 @@ ARGUMENTS: dict[tuple[str, ...], tuple[str, ...]] = {
     SETTINGS: ("--yes", "push_behavior=update"),
     PROJECT_SETTINGS: ("--yes", "public=yes"),
     MOVE: ("--yes", "--to", "development"),
+    MEMBER_ADD: ("--yes", "octo-cat"),
+    # The role the member already has: nothing is sent.
+    MEMBER_ROLE: ("--yes", "octo-dev", "admin"),
 }
 # The commands that build no client.
 CLIENTLESS = {("auth", "logout")}

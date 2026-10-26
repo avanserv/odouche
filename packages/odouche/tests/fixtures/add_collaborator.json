@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "id": 24,
+  "result": {
+    "id": 61004,
+    "avatar_url": "https://avatars.githubusercontent.com/u/1000004?v=4",
+    "username": "Octo-Cat",
+    "name": "Octo-Cat",
+    "hosting_identifier": "1000004",
+    "access_level": "developer",
+    "user_id": false,
+    "hosting_user_id": [7304, "Octo-Cat"]
+  }
+}

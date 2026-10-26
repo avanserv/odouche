@@ -158,6 +158,12 @@ These calls change something on Odoo.sh. Every other call only reads.
   the same call: the request can carry no other stage than staging or development. A branch made
   production in the page between that read and the move, one request apart, is not caught; only
   Odoo.sh could close that window.
+- An addition makes a GitHub user a member of a project with the role given, and a role change
+  gives a member another one, for an admin of the project. An admin reaches production, its
+  database and shell, and the project's settings. Both read the members in the same call first,
+  and refuse before anything is sent an addition of someone already a member, by login or by
+  GitHub number, and a change that lowers the last admin who has logged in to Odoo.sh. Odoo.sh
+  sends the new member no invitation, and odouche gives no access to the repository on GitHub.
 - A backup is taken of a staging or a production branch's latest build, and Odoo.sh keeps it for
   three days.
 - Allowing an IP lets the address of the machine that sends it connect to the builds with `ssh`
@@ -186,6 +192,8 @@ a project's settings, are registered only when the server is started with
 stderr, with the names of the settings changed but never their values.
 No tool moves a branch between stages, with or without `--allow-changes`: a move to staging copies
 production's data onto the branch, which only `osh branches move` does, behind its question.
+No tool adds a member or changes a role, with or without `--allow-changes`: a role decides who
+reaches production, which only `osh projects members add` and `role` change, behind their question.
 
 The tools that read a build's log and the mails it caught put text the build wrote into an agent's
 context: `read_log`, `list_mails` and `read_mail`. It is

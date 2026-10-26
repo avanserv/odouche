@@ -31,7 +31,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project, a branch's history, show and change its settings, the revision a build runs, and move a branch between development and staging. |
 | [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, start a new one, open its panels and read the mails it caught. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
-| [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach, show one's overview, show and change its settings, check it, read its audit log, and list its members. |
+| [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach, show one's overview, show and change its settings, check it, read its audit log, and list its members, add one and change one's role. |
 | [`osh ssh`](#osh-ssh) | Open a shell on the branch's latest build, with your own `ssh`, its configuration and its keys. |
 
 ## `osh auth`
@@ -576,7 +576,7 @@ osh logs --follow
 
 ## `osh projects`
 
-List the Odoo.sh projects you can reach, show one's overview, show and change its settings, check it, read its audit log, and list its members.
+List the Odoo.sh projects you can reach, show one's overview, show and change its settings, check it, read its audit log, and list its members, add one and change one's role.
 
 ```text
 osh projects [OPTIONS] COMMAND [ARGS]...
@@ -587,9 +587,9 @@ osh projects [OPTIONS] COMMAND [ARGS]...
 | [`osh projects list`](#osh-projects-list) | List the projects you can reach, with their repository and address. |
 | [`osh projects show`](#osh-projects-show) | Show a project's overview, one fact per line: its subscription, Odoo version, hosting, production build and branches by stage. |
 | [`osh projects audit`](#osh-projects-audit) | List a project's audit log, newest first: who did what, when, on which stage, and what Odoo.sh adds about it. |
-| [`osh projects members`](#osh-projects-members) | List a project's members with their role, highest role first, then by login. |
 | [`osh projects check`](#osh-projects-check) | Check a project's subscription, production build, storage and branches, and exit 30 when one fails, 31 when one warns. |
 | [`osh projects settings`](#osh-projects-settings) | Show a project's settings, or change them. |
+| [`osh projects members`](#osh-projects-members) | List a project's members, add one, or change one's role. |
 
 ### `osh projects list`
 
@@ -645,26 +645,6 @@ Example:
 
 ```bash
 osh projects audit --limit 10
-```
-
-### `osh projects members`
-
-List a project's members with their role, highest role first, then by login.
-
-Odoo.sh lists them to an admin of the project only: anyone else gets exit code 5. `Logged in` is `no` for a member invited who has not logged in to Odoo.sh yet. It changes nothing.
-
-```text
-osh projects members [OPTIONS]
-```
-
-| Option | Description | Environment |
-| --- | --- | --- |
-| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
-
-Example:
-
-```bash
-osh projects members --project acme-shop
 ```
 
 ### `osh projects check`
@@ -746,6 +726,92 @@ Example:
 
 ```bash
 osh projects settings set --project acme-shop --add-ip 203.0.113.7
+```
+
+### `osh projects members`
+
+List a project's members, add one, or change one's role.
+
+```text
+osh projects members [OPTIONS] COMMAND [ARGS]...
+```
+
+| Command | Description |
+| --- | --- |
+| [`osh projects members list`](#osh-projects-members-list) | List a project's members with their role, highest role first, then by login. |
+| [`osh projects members add`](#osh-projects-members-add) | Change state on Odoo.sh: add a GitHub user to a project's members, as a developer unless `--role` says otherwise. |
+| [`osh projects members role`](#osh-projects-members-role) | Change state on Odoo.sh: give a member of a project another role. |
+
+#### `osh projects members list`
+
+List a project's members with their role, highest role first, then by login.
+
+Odoo.sh lists them to an admin of the project only: anyone else gets exit code 5. `Logged in` is `no` for a member invited who has not logged in to Odoo.sh yet. It changes nothing.
+
+```text
+osh projects members list [OPTIONS]
+```
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+
+Example:
+
+```bash
+osh projects members list --project acme-shop
+```
+
+#### `osh projects members add`
+
+Change state on Odoo.sh: add a GitHub user to a project's members, as a developer unless `--role` says otherwise.
+
+Odoo.sh sends them no invitation, and push access to the repository is given on GitHub. Only an admin of the project can add one: anyone else gets exit code 5, as does a session whose grant on GitHub does not cover the search of users, until a user is searched once in the Collaborators item of the project's Settings page. A login GitHub does not have exits 4, and a user already a member exits 9, both with nothing sent. It asks first, unless `--yes` is given.
+
+```text
+osh projects members add [OPTIONS] {LOGIN}
+```
+
+| Argument | Description |
+| --- | --- |
+| `LOGIN` | The GitHub login of the user. Required. |
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--role ROLE` | The new member's role. One of `developer`, `tester`, `admin`. Default: `developer`. | |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--yes`, `-y` | Change without asking. Needed when stdin or stderr is not a terminal. | |
+
+Example:
+
+```bash
+osh projects members add octo-cat --role tester --project acme-shop
+```
+
+#### `osh projects members role`
+
+Change state on Odoo.sh: give a member of a project another role.
+
+Only an admin of the project can change one: anyone else gets exit code 5. A login that is not a member exits 4, and lowering the last admin who has logged in to Odoo.sh exits 9, both with nothing sent. A member who already has the role exits 0 with nothing sent. It asks first, unless `--yes` is given.
+
+```text
+osh projects members role [OPTIONS] {LOGIN} {ROLE}
+```
+
+| Argument | Description |
+| --- | --- |
+| `LOGIN` | The member's login, as `list` prints it, in any case. Required. |
+| `ROLE` | The member's new role. Required. One of `developer`, `tester`, `admin`. |
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--yes`, `-y` | Change without asking. Needed when stdin or stderr is not a terminal. | |
+
+Example:
+
+```bash
+osh projects members role jane-doe developer --project acme-shop
 ```
 
 ## `osh ssh`

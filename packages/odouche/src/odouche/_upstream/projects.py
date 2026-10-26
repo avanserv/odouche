@@ -127,6 +127,11 @@ def is_admin(info: Reader) -> bool:
 
 def admin(transport: Transport, name: str, operation: str, refusal: str) -> str:
     """Return the name a project's requests address it by, once its info shows the session's user is an admin of it."""
+    return admin_info(transport, name, operation, refusal)[0]
+
+
+def admin_info(transport: Transport, name: str, operation: str, refusal: str) -> tuple[str, Reader]:
+    """Return what `admin` does, with the reader of the project's info it was read from."""
     read = info(transport, name)
     active = read.child("active_repo")
     if active.text("project_name") != name:
@@ -134,7 +139,7 @@ def admin(transport: Transport, name: str, operation: str, refusal: str) -> str:
     # The page's own test: what Odoo.sh answers anyone else was never seen.
     if not is_admin(read):
         raise PermissionDeniedError(refusal, operation=operation)
-    return active.text("technical_name")
+    return active.text("technical_name"), read
 
 
 def settings_answer(transport: Transport, technical_name: str) -> Reader:

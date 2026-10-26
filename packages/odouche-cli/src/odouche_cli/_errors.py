@@ -66,6 +66,7 @@ EXIT_CODES: tuple[tuple[type[odouche.OdoucheError], int, str | None], ...] = (
     (odouche.LoginTimeoutError, EXIT_TIMEOUT, _LOGIN_AGAIN),
     (odouche.ReadOnlyError, 9, None),
     (odouche.StageRefusedError, 9, None),
+    (odouche.MemberRefusedError, 9, None),
     (odouche.OutcomeUnknownError, EXIT_OUTCOME_UNKNOWN, "`osh builds list` shows whether the build was started."),
     (odouche.KeyringUnavailableError, 11, None),
     (odouche.LoginError, 12, _LOGIN_AGAIN),
@@ -81,6 +82,9 @@ _OUTCOME_HINTS = {
     "same change again does no harm.",
     "branch stage move": "`osh branches list` shows the branch's stage. Running the move again is refused once the "
     "branch is there.",
+    "member addition": "`osh projects members list` shows whether they were added. Adding them again is refused "
+    "once they are a member.",
+    "member role change": "`osh projects members list` shows their role. Setting the same role again sends nothing.",
     "download preparation": "Preparing the file again does no harm: run the command again, naming the backup rather "
     "than giving --new.",
 }
