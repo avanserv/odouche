@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/avanserv/odouche/compare/v0.7.0...v0.8.0) (2026-10-26)
+
+
+### Features
+
+* Find a branch by name and strip control characters in the library, gated by pyscn ([#88](https://github.com/avanserv/odouche/issues/88)) ([52ec8c0](https://github.com/avanserv/odouche/commit/52ec8c088aeb7844da9efea739fbb06cf79126c7))
+
 ## [0.7.0](https://github.com/avanserv/odouche/compare/v0.6.0...v0.7.0) (2026-10-26)
 
 
