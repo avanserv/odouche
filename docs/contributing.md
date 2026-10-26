@@ -17,3 +17,5 @@ make check     # every gate CI runs
   changelog are written by Release Please from them.
 - Tests never contact the real Odoo.sh, and fixtures are scrubbed of session values and real
   project data before they are committed.
+- Everyone taking part is held to the
+  [code of conduct](https://github.com/avanserv/odouche/blob/main/CODE_OF_CONDUCT.md).

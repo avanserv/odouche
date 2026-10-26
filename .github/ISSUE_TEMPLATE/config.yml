@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability in odouche
+    url: https://github.com/avanserv/odouche/security/advisories/new
+    about: Report it privately, never in a public issue.
+  - name: Weakness in Odoo.sh itself
+    url: https://www.odoo.com/security-report
+    about: Report it to Odoo through their responsible disclosure process.
