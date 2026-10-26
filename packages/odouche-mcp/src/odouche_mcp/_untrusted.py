@@ -16,6 +16,7 @@ def one_line(text: str, size: int) -> tuple[str, bool]:
     """
     line = odouche.strip_line_control(_SPACE.sub(" ", text))
     kept = prefix(line, size)
+
     return kept, kept != line
 
 
@@ -27,10 +28,13 @@ def encoded_size(line: str) -> int:
 def prefix(line: str, size: int) -> str:
     """Return the longest start of a line that takes no more than `size` bytes."""
     kept, over = 0, len(line)
+
     while kept < over:
         middle = (kept + over + 1) // 2
+
         if encoded_size(line[:middle]) <= size:
             kept = middle
         else:
             over = middle - 1
+
     return line[:kept]

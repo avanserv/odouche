@@ -76,16 +76,20 @@ class StubClient:
 
     def ssh_target(self, build: Build) -> SshTarget:
         assert build == BUILD
+
         if self.refused is not None:
             raise self.refused
+
         return SshTarget(user=str(build.id), host=HOST)
 
     def allow_ip(self, branch: Branch) -> ipaddress.IPv4Address:
         assert branch == FEATURE
         assert self.modes[-1] is False
         self.events.append("allowed")
+
         if self.denied is not None:
             raise self.denied
+
         return ADDRESS
 
 
@@ -93,6 +97,7 @@ class StubClient:
 def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     made = type("Made", (StubClient,), {"modes": [], "events": []})
     monkeypatch.setattr(odouche, "Client", made)
+
     return made
 
 
@@ -118,6 +123,7 @@ class Ssh:
         assert (options["stderr"], options["text"]) == (subprocess.PIPE, True)
         self.events.append(("tried", os.environ.get(odouche.SESSION_ENV)))
         said = self.outcomes.pop(0) if len(self.outcomes) > 1 else self.outcomes[0]
+
         return subprocess.CompletedProcess(command, 255 if said is not None else 0, stderr=said or "")
 
     def sleep(self, seconds: float) -> None:
@@ -130,6 +136,7 @@ def tries(monkeypatch: pytest.MonkeyPatch, client: type[StubClient]) -> Ssh:
     monkeypatch.setattr(ssh, "_run", tries.run)
     monkeypatch.setattr(ssh, "_monotonic", lambda: tries.now)
     monkeypatch.setattr(ssh, "_sleep", tries.sleep)
+
     return tries
 
 
@@ -147,6 +154,7 @@ def executed(monkeypatch: pytest.MonkeyPatch, client: type[StubClient], tries: S
 
     monkeypatch.setattr(ssh, "_exec", record)
     monkeypatch.setattr(shutil, "which", lambda name: PROGRAM if name == "ssh" else None)
+
     return client.events
 
 
@@ -172,7 +180,6 @@ def test_the_users_ssh_is_executed_with_the_user_and_the_host_of_the_build_and_n
 
 def test_a_target_odoo_sh_gives_that_is_no_host_executes_nothing(client: type[StubClient], executed: list[object]):
     client.refused = odouche.UpstreamChangedError("ssh target", "url")
-
     result = run()
 
     assert result.exit_code == 6
@@ -192,7 +199,6 @@ def test_a_target_odoo_sh_gives_that_is_no_host_executes_nothing(client: type[St
 )
 def test_the_arguments_are_given_to_ssh_after_the_host_as_they_are(executed: list[object], args: list[str]):
     result = run(*args)
-
     given = args[1:] if args[0] == "--" else args
     assert result.exit_code == 0
     assert executed[-1] == (PROGRAM, ["ssh", "-l", "104", HOST, *given], None)
@@ -226,7 +232,6 @@ def test_the_branch_is_the_one_of_the_checkout_when_none_is_given(checkout, exec
 
 def test_a_branch_with_no_build_executes_nothing(client: type[StubClient], executed: list[object]):
     client.latest = None
-
     result = run()
 
     assert result.exit_code == 4
@@ -264,12 +269,12 @@ def blocked(tries: Ssh, monkeypatch: pytest.MonkeyPatch) -> Ssh:
     tries.outcomes = [REFUSED, REFUSED, REFUSED, None]
     monkeypatch.setattr(_terminal, "stdin_is_terminal", lambda: True)
     monkeypatch.setattr(_terminal, "stderr_is_terminal", lambda: True)
+
     return tries
 
 
 def test_the_session_is_not_in_the_environment_of_a_try(monkeypatch: pytest.MonkeyPatch, executed: list[object]):
     monkeypatch.setenv(odouche.SESSION_ENV, SESSION)
-
     run()
 
     assert TRIED in executed
@@ -324,7 +329,6 @@ def test_with_no_terminal_and_no_yes_nothing_is_sent_or_executed(
     monkeypatch.setattr(_terminal, stream, lambda: False)
 
     result = run()
-
     said = unboxed(result.stderr)
     assert result.exit_code == 2
     assert "Give --yes" in said
@@ -346,7 +350,6 @@ def test_ssh_the_address_keeps_out_to_the_end_exits_with_the_timeout_and_execute
     executed: list[object], tries: Ssh
 ):
     tries.outcomes = [REFUSED, CLOSED]
-
     result = run("--yes")
 
     assert result.exit_code == 8
@@ -416,7 +419,6 @@ def test_an_allowing_odoo_sh_refuses_or_does_not_confirm_executes_nothing(
     client: type[StubClient], executed: list[object], error: odouche.OdoucheError, code: int
 ):
     client.denied = error
-
     result = run("--yes")
 
     assert result.exit_code == code
@@ -435,7 +437,6 @@ def test_ssh_the_build_refuses_the_keys_of_is_executed_with_no_change(
     client: type[StubClient], executed: list[object], tries: Ssh, said: str
 ):
     tries.outcomes = [said]
-
     result = run()
 
     assert result.exit_code == 0
@@ -447,7 +448,6 @@ def test_ssh_the_build_refuses_the_keys_of_is_executed_with_no_change(
 @pytest.mark.usefixtures("blocked")
 def test_a_wait_ends_once_only_the_keys_keep_ssh_out(executed: list[object], tries: Ssh):
     tries.outcomes = [REFUSED, REFUSED, "104@host: Permission denied (publickey).\n"]
-
     result = run("--yes")
 
     assert result.exit_code == 0
@@ -458,7 +458,6 @@ def test_a_wait_ends_once_only_the_keys_keep_ssh_out(executed: list[object], tri
 @pytest.mark.usefixtures("blocked")
 def test_a_failed_try_that_says_nothing_is_named_by_its_exit_code(tries: Ssh):
     tries.outcomes = [""]
-
     result = run(input="n\n")
 
     assert "address: `ssh` exited with 255" in result.stderr
@@ -466,7 +465,6 @@ def test_a_failed_try_that_says_nothing_is_named_by_its_exit_code(tries: Ssh):
 
 def test_a_key_warning_before_the_gateway_closes_is_the_address(client: type[StubClient], tries: Ssh):
     tries.outcomes = ['Load key "/home/ann/.ssh/id_x": Permission denied\n' + CLOSED]
-
     result = run()
 
     assert result.exit_code == 2

@@ -36,8 +36,11 @@ def get_session() -> SessionStatus:
         client = open_client()
     except (odouche.NoSessionError, odouche.SessionExpiredError, odouche.KeyringUnavailableError) as error:
         return SessionStatus(available=False, identity=None, seconds_left=None, problem=f"{error} {login_step()}")
+
     with client:
         identity = client.identity()
+
     expires_at = identity.session.expires_at
     left = None if expires_at is None else max(0, int((expires_at - datetime.now(UTC)).total_seconds()))
+
     return SessionStatus(available=True, identity=identity, seconds_left=left, problem=None)

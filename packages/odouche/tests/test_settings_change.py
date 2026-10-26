@@ -56,6 +56,7 @@ def saves(upstream):
     def answer(request):
         for key, value in json.loads(request.content)["params"].items():
             stored(upstream)[key] = value == "on" if key in FLAGS else value or False
+
         return httpx2.Response(200, json=upstream.load("set_settings.json"))
 
     upstream.bodies[SET] = answer
@@ -231,12 +232,13 @@ def test_a_setting_odoo_sh_moves_along_is_reported_and_the_change_succeeds(clien
 
     def tests_off(request):
         answer = keep(request)
+
         if stored(upstream)["modules_auto"] == "all":
             stored(upstream)["test_mode"] = "off"
+
         return answer
 
     upstream.bodies[SET] = tests_off
-
     outcome = client.change_branch_settings(BRANCH, SettingsChange(module_install=ModuleInstall.ALL))
 
     assert outcome.moved == ("tests",)
@@ -287,6 +289,7 @@ def test_settings_that_cannot_be_read_back_are_unknown(client, upstream, read_ba
             upstream.failures[GET] = read_back
         else:
             upstream.bodies[GET] = upstream.load(read_back) if isinstance(read_back, str) else read_back
+
         return httpx2.Response(200, json=upstream.load("set_settings.json"))
 
     upstream.bodies[SET] = answer
@@ -392,8 +395,10 @@ def test_a_check_narrows_as_the_change_does_and_asks_nothing(upstream, session):
         DEVELOPMENT, current, SettingsChange(push_behavior=PushBehavior.UPDATE, ai_agent=AiAgent.CLAUDE)
     )
     unchanged = client.check_settings_change(DEVELOPMENT, current, SettingsChange(ai_agent=AiAgent.CLAUDE))
+
     with pytest.raises(StageRefusedError):
         client.check_settings_change(production, current, SettingsChange(push_behavior=PushBehavior.UPDATE))
+
     with pytest.raises(SettingsConflictError, match="project_defaults"):
         client.check_settings_change(DEVELOPMENT, current, SettingsChange(ai_agent=AiAgent.OPENCODE))
 

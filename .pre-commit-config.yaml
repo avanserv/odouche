@@ -107,6 +107,14 @@ repos:
         types_or: [python, pyi]
         require_serial: true
 
+      # After ruff-format, so it spaces the lines ruff wrapped.
+      - id: spacify
+        name: python   | blank lines (spacify)
+        entry: uv run spacify --force-exclude
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+
       - id: ruff
         name: python   | lint (ruff)
         entry: uv run ruff check --fix --force-exclude

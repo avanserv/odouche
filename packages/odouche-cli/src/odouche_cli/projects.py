@@ -74,8 +74,10 @@ StorageMarginOption = Annotated[
 def list_(ctx: typer.Context) -> None:
     """List the projects you can reach, with their repository and address."""
     output: Output = ctx.obj
+
     with open_client() as client:
         found = client.projects()
+
     output.rows(found, _COLUMNS, empty="No projects.")
 
 
@@ -86,8 +88,10 @@ def show(ctx: typer.Context, project: ProjectOption = None) -> None:
     Storage, workers and staging branches are on the project's Settings page, which Odoo.sh shows to an admin of the project only: anyone else gets `admins only`.
     """
     output: Output = ctx.obj
+
     with open_client() as client:
         read = client.project_overview(resolve_project(ctx, project, client.projects))
+
     output.one(read, _OVERVIEW)
 
 
@@ -98,8 +102,10 @@ def settings_show(ctx: typer.Context, project: ProjectOption = None) -> None:
     Odoo.sh shows them to an admin of the project only: anyone else gets exit code 5. The rows from `Dev install` to `Dev AI agent` are the defaults of new development branches. A submodule's public deploy key is in `--format json` only.
     """
     output: Output = ctx.obj
+
     with open_client() as client:
         read = client.project_settings(resolve_project(ctx, project, client.projects))
+
     output.one(read, _SETTINGS)
 
 
@@ -164,30 +170,39 @@ def settings_set(
     output: Output = ctx.obj
     change = _project_change(ctx, settings or [], add_ip or [], remove_ip or [])
     _settings.can_ask(ctx, yes=yes)
+
     with open_client(writes=True) as client:
         name = resolve_project(ctx, project, client.projects)
         current = client.project_settings(name)
         narrowed = _settings.checked(ctx, lambda: client.check_project_settings_change(current, change))
+
         for line in _changing(name, current, change, narrowed):
             _settings.say(line)
+
         if narrowed is None:
             typer.echo("Nothing was sent: every setting already has that value.", err=True)
             output.one(current, _SETTINGS)
+
             return
+
         for line in _access(current, narrowed):
             _settings.say(line)
+
         question = (
             "Change these settings of this project, including access?"
             if narrowed.access()
             else ("Change these settings of this project?")
         )
+
         if not yes and not _terminal.confirmed(question):
             typer.echo("Nothing was sent.", err=True)
             raise typer.Exit(EXIT_DECLINED)
+
         # Sent once: an error is reported, never retried.
         outcome = _settings.checked(ctx, lambda: client.change_project_settings(name, narrowed))
         typer.echo("The settings were changed.", err=True)
         _settings.say_moved(outcome)
+
     output.one(outcome.after, _SETTINGS)
 
 
@@ -198,13 +213,17 @@ def _project_change(
     values = _settings.given(ctx, pairs, _READS, _REFUSED)
     allow = tuple(_address(ctx, text) for text in added)
     disallow = tuple(_entry(ctx, text) for text in removed)
+
     # Each part on its own first, so that an error names the option or the argument at fault.
     if allow:
         _settings.built(ctx, lambda: odouche.ProjectSettingsChange(allow_ips=allow), "--add-ip")
+
     if disallow:
         _settings.built(ctx, lambda: odouche.ProjectSettingsChange(disallow_ips=disallow), "--remove-ip")
+
     if values:
         _settings.built(ctx, lambda: odouche.ProjectSettingsChange(**values))  # pyright: ignore[reportArgumentType]
+
     return _settings.built(
         ctx,
         lambda: odouche.ProjectSettingsChange(
@@ -222,9 +241,11 @@ def _address(ctx: typer.Context, text: str) -> ipaddress.IPv4Address:
     except ValueError:
         msg = f"{text!r} is not an IP address."
         raise typer.BadParameter(msg, ctx=ctx, param_hint="--add-ip") from None
+
     if not isinstance(address, ipaddress.IPv4Address):
         msg = f"{text} is not an IPv4 address: the allow list takes those one by one, as its page does."
         raise typer.BadParameter(msg, ctx=ctx, param_hint="--add-ip")
+
     return address
 
 
@@ -252,10 +273,12 @@ def _changing(
     """
     sent = {} if narrowed is None else narrowed.given()
     lines = [f"Project: {project}"]
+
     for name, value in change.given().items():
         if name not in _ENTRIES:
             before, after = quoted(getattr(current, name)), quoted(value)
             lines.append(f"{name}: {before} → {after}" if name in sent else f"{name} is already {after}.")
+
     return lines + _allow_list_changing(current, change, narrowed)
 
 
@@ -268,28 +291,36 @@ def _allow_list_changing(
     allowed = () if narrowed is None else narrowed.allow_ips or ()
     removed = () if narrowed is None else narrowed.disallow_ips or ()
     lines: list[str] = []
+
     if allowed or removed:
         lines.append(f"{_ALLOW_LIST}: {shown(current.ip_allow_list)} → {shown(_listed(current, allowed, removed))}")
+
     lines.extend(f"{address} is already allowed." for address in change.allow_ips or () if address not in allowed)
     lines.extend(f"{entry} is not in the list." for entry in change.disallow_ips or () if entry not in removed)
+
     return lines
 
 
 def _access(current: odouche.ProjectSettings, narrowed: odouche.ProjectSettingsChange) -> list[str]:
     """Say what a change does to who can reach the project, before the question."""
     access = narrowed.access()
+
     if not access:
         return []
+
     named = dict.fromkeys(_ALLOW_LIST if name in _ENTRIES else name for name in access)
     lines = [f"This changes who can reach the project: {', '.join(named)}."]
     removed = narrowed.disallow_ips or ()
+
     if removed:
         lines.append(
             f"SSH to production and staging from {shown(removed)} then needs the one-hour rule `osh ssh` asks for. "
             f"PostgreSQL on a dedicated server is then closed to {shown(removed)}."
         )
+
     if (removed or narrowed.allow_ips) and not _listed(current, narrowed.allow_ips or (), removed):
         lines.append("The allow list will be empty: no address keeps a permanent rule.")
+
     return lines
 
 
@@ -356,12 +387,16 @@ def audit(
     start = None if since is None else since.replace(tzinfo=UTC)
     # With `--since`, one more tells whether the limit left out entries the date asked for.
     asked = limit if start is None else limit + 1
+
     with open_client() as client:
         name = resolve_project(ctx, project, client.projects)
+
         # Closed on leaving, so the first entry older than `start` is the last one read.
         with closing(client.audit_log(name, limit=asked, timeout=_AUDIT_TIMEOUT)) as read:
             found = list(read if start is None else takewhile(lambda entry: entry.logged_at >= start, read))
+
     output.rows(found[:limit], _AUDIT_COLUMNS, empty="No audit log entries.")
+
     if start is not None and len(found) > limit:
         more = f"raise --limit, up to {_MAX_AUDIT_LIMIT}" if limit < _MAX_AUDIT_LIMIT else "give a later --since"
         typer.echo(
@@ -406,8 +441,10 @@ def members_list(ctx: typer.Context, project: ProjectOption = None) -> None:
     Odoo.sh lists them to an admin of the project only: anyone else gets exit code 5. `Logged in` is `no` for a member invited who has not logged in to Odoo.sh yet. It changes nothing.
     """
     output: Output = ctx.obj
+
     with open_client() as client:
         found = client.members(resolve_project(ctx, project, client.projects))
+
     output.rows(sorted(found, key=_member_order), _MEMBER_COLUMNS, empty="No members.")
 
 
@@ -429,14 +466,18 @@ def members_add(
     Odoo.sh sends them no invitation, and push access to the repository is given on GitHub. Only an admin of the project can add one: anyone else gets exit code 5, as does a session whose grant on GitHub does not cover the search of users, until a user is searched once in the Collaborators item of the project's Settings page. A login GitHub does not have exits 4, and a user already a member exits 9, both with nothing sent. It asks first, unless `--yes` is given.
     """
     output: Output = ctx.obj
+
     try:
         odouche.Client.check_add_member(login, role)
     except ValueError as error:
         raise typer.BadParameter(str(error), ctx=ctx, param_hint="LOGIN") from None
+
     _settings.can_ask(ctx, yes=yes)
+
     with open_client(writes=True) as client:
         name = resolve_project(ctx, project, client.projects)
         client.check_add_member(login, role, client.members(name))
+
         for line in (
             f"Project: {name}",
             f"Member: {login}",
@@ -445,11 +486,14 @@ def members_add(
             "Odoo.sh sends them no invitation, and push access to the repository is given on GitHub.",
         ):
             _settings.say(line)
+
         if not yes and not _terminal.confirmed(strip_control(f"Add {login} to {name} as {role.value}?")):
             typer.echo("Nothing was sent.", err=True)
             raise typer.Exit(EXIT_DECLINED)
+
         # Sent once: an error is reported, never retried.
         added = client.add_member(name, login, role)
+
     _settings.say(f"{added.login} is now a member of {name}, as {added.role.value}.")
     output.one(added, _MEMBER_COLUMNS)
 
@@ -469,26 +513,36 @@ def members_role(
     """
     output: Output = ctx.obj
     _settings.can_ask(ctx, yes=yes)
+
     with open_client(writes=True) as client:
         name = resolve_project(ctx, project, client.projects)
         current = client.members(name)
         found = client.check_member_role(current, login, role)
+
         if found.role is role:
             _settings.say(f"{found.login} is already {role.value} on {name}. Nothing was sent.")
             output.one(found, _MEMBER_COLUMNS)
+
             return
+
         lines = [f"Project: {name}", f"Member: {found.login}", f"Role: {found.role.value} → {role.value}", _REACH[role]]
+
         # Any other role is lower: `found` does not have `role`.
         if found.role is odouche.MemberRole.ADMIN and _is_caller(client, found):
             lines.append("This is you: you will not be able to change it back.")
+
         for line in lines:
             _settings.say(line)
+
         question = f"Change {found.login}'s role on {name} to {role.value}?"
+
         if not yes and not _terminal.confirmed(strip_control(question)):
             typer.echo("Nothing was sent.", err=True)
             raise typer.Exit(EXIT_DECLINED)
+
         # Sent once: an error is reported, never retried.
         changed = client.set_member_role(name, found, role)
+
     _settings.say(f"{changed.login} is now {changed.role.value} on {name}.")
     output.one(changed, _MEMBER_COLUMNS)
 
@@ -533,11 +587,14 @@ def check(ctx: typer.Context, project: ProjectOption = None, storage_margin: Sto
     Each check is a row: its name, `pass`, `warn`, `fail` or `skip`, and the fact it was judged on. Storage is on the project's Settings page, which Odoo.sh shows to an admin of the project only: anyone else gets `skip`, which does not count in the exit code.
     """
     output: Output = ctx.obj
+
     with open_client() as client:
         read = client.project_overview(resolve_project(ctx, project, client.projects))
+
     checks = _checks(read, margin=storage_margin)
     output.rows(checks, _CHECK_COLUMNS, empty="")
     code = _exit_code(checks)
+
     if code:
         raise typer.Exit(code)
 
@@ -569,13 +626,16 @@ def _check_subscription(read: odouche.ProjectOverview) -> Check:
         result = Verdict.PASSED
     else:
         result = Verdict.WARNED
+
     return Check("subscription", result, _subscription(read))
 
 
 def _check_production(read: odouche.ProjectOverview) -> Check:
     judged = [_last_build(summary) for summary in read.branches if summary.branch.stage is odouche.Stage.PRODUCTION]
+
     if not judged:
         return Check("production", Verdict.WARNED, "no production branch")
+
     return Check("production", _worst(result for result, _ in judged), "; ".join(fact for _, fact in judged))
 
 
@@ -590,22 +650,28 @@ _RUNNING = frozenset({odouche.BuildStatus.PROGRESS, odouche.BuildStatus.UPDATING
 def _last_build(summary: odouche.BranchSummary) -> tuple[Verdict, str]:
     """Judge a branch's last build by its result, so a build dropped for a newer one counts as it ended."""
     build = summary.last_build
+
     if build is None:
         return Verdict.WARNED, f"{summary.branch.name} has no build"
+
     if build.result is None and build.status in _RUNNING:
         result, said = Verdict.WARNED, f"has no result yet ({status_of(build)})"
     elif build.result is None:
         result, said = Verdict.WARNED, f"ended without a result ({status_of(build)})"
     else:
         result, said = _SAID.get(build.result) or (Verdict.WARNED, f"ended {result_of(build)}")
+
     return result, f"build {build.id} on {summary.branch.name} {said}"
 
 
 def _check_storage(read: odouche.ProjectOverview, margin: int) -> Check:
     hosting = read.hosting
+
     if hosting is None:
         return Check("storage", Verdict.SKIPPED, _ADMINS_ONLY)
+
     used, quota = hosting.storage_used_bytes, hosting.storage_quota_bytes
+
     if not quota:
         result = Verdict.SKIPPED
     elif used >= quota:
@@ -615,6 +681,7 @@ def _check_storage(read: odouche.ProjectOverview, margin: int) -> Check:
         result = Verdict.WARNED
     else:
         result = Verdict.PASSED
+
     return Check("storage", result, _storage(hosting))
 
 
@@ -626,15 +693,19 @@ def _check_branches(read: odouche.ProjectOverview) -> Check:
         if summary.last_build is not None
         and summary.last_build.result in {odouche.BuildResult.FAILED, odouche.BuildResult.UNKNOWN}
     ]
+
     if flagged:
         return Check("branches", _worst(result for result, _ in flagged), ", ".join(fact for _, fact in flagged))
+
     count = len(read.branches)
+
     return Check("branches", Verdict.PASSED, f"{count} branch{'' if count == 1 else 'es'}, none failed")
 
 
 def _subscription(read: odouche.ProjectOverview) -> str:
     named = read.subscription_name if read.subscription is odouche.Subscription.UNKNOWN else read.subscription.value
     days = read.trial_days_left
+
     return named if days is None else f"{named}, {days} day{'' if days == 1 else 's'} left"
 
 
@@ -644,8 +715,10 @@ def _hosting(value: Callable[[odouche.ProjectHosting], object]) -> Callable[[odo
 
 def _storage(hosting: odouche.ProjectHosting) -> str:
     shown = f"{_size.size(hosting.storage_used_bytes)} of {_size.size(hosting.storage_quota_bytes)}"
+
     if not hosting.storage_quota_bytes:
         return shown
+
     return f"{shown}, {hosting.storage_used_bytes * 100 / hosting.storage_quota_bytes:.0f}%"
 
 

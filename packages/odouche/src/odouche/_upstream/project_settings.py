@@ -69,6 +69,7 @@ class _Page:
 def project_settings(transport: Transport, name: str) -> ProjectSettings:
     """Return the settings of the project named `name`. A value the library does not know is a changed shape."""
     technical = projects.admin(transport, name, _OPERATION, "Odoo.sh shows a project's settings to its admins only.")
+
     return _read(name, projects.settings_answer(transport, technical))
 
 
@@ -81,15 +82,20 @@ def change_settings(transport: Transport, name: str, change: ProjectSettingsChan
     answer = projects.settings_answer(transport, technical)
     current = _read(name, answer)
     narrowed = narrow(current, change)
+
     if narrowed is None:
         return SettingsOutcome(current, current, ())
+
     form = _form(narrowed, _page(answer))
     transport.change(_OPERATION_CHANGE, f"/app/project/{projects.segment(technical)}/set_settings", form)
+
     try:
         after = _read(name, projects.settings_answer(transport, technical))
     except OdoucheError:
         after = None
+
     sent = settings.Sent(_OPERATION_CHANGE, f"project {name}'s settings", _expected(current, narrowed))
+
     return settings.confirm(sent, current, after, _COMPARED, _same)
 
 
@@ -107,13 +113,17 @@ def narrow(current: ProjectSettings, change: ProjectSettingsChange) -> ProjectSe
     }
     allowed = tuple(address for address in change.allow_ips or () if address not in current.ip_allow_list)
     removed = tuple(entry for entry in change.disallow_ips or () if entry in current.ip_allow_list)
+
     if not differs and not allowed and not removed:
         return None
+
     if differs.keys() & _LIMITS.keys() and not current.dedicated:
         msg = "The timeouts are changed on a dedicated server only, and this project has none: its Settings page disables them."
         raise SettingsConflictError(msg)
+
     settings.check_options(differs.keys(), replace(current, **differs))  # pyright: ignore[reportArgumentType]
     _check_allow_list(current, allowed, removed)
+
     return replace(
         change,
         **dict.fromkeys(given.keys() - differs.keys() - _ENTRIES),
@@ -129,6 +139,7 @@ def _check_allow_list(
 ) -> None:
     """Raise `SettingsConflictError` when entries are allowed and the list would then hold more than the page takes."""
     kept = [entry for entry in current.ip_allow_list if entry not in removed]
+
     if allowed and len(kept) + len(allowed) > _MAX_ENTRIES:
         msg = f"The allow list holds {_MAX_ENTRIES} entries at most, as its page says: remove some in the same change."
         raise SettingsConflictError(msg)
@@ -136,9 +147,12 @@ def _check_allow_list(
 
 def _read(name: str, answer: Reader) -> ProjectSettings:
     repo = answer.child("repository")
+
     if repo.text("project_name") != name:
         raise repo.changed("project_name")
+
     limits = answer.child("dedicated_limits")
+
     return ProjectSettings(
         name=name,
         odoo_domain_blocked=repo.boolean("block_odoo_domain"),
@@ -164,10 +178,13 @@ def _read(name: str, answer: Reader) -> ProjectSettings:
 def _page(answer: Reader) -> _Page:
     lifetimes = answer.child("session_lifetime_map")
     keys = tuple(lifetimes.keys())
+
     # An index into another set of keys would set another lifetime than asked.
     if set(keys) != _LIFETIMES.keys():
         raise answer.changed("session_lifetime_map")
+
     limits = answer.child("dedicated_limits")
+
     return _Page(
         lifetimes=keys,
         limits={key: _limit(limits.child(key)) for key in _LIMITS.values()},
@@ -180,49 +197,60 @@ def _limit(limit: Reader) -> _Limit:
     # The read of the settings has refused a `unit_conversion` under 1.
     unit = limit.integer("unit_conversion")
     low, high = limit.integer("min"), limit.integer("max")
+
     if not 0 <= low <= high:
         raise limit.changed("max")
+
     return _Limit(unit, low // unit, high // unit, limit.number("value"))
 
 
 def _form(change: ProjectSettingsChange, page: _Page) -> dict[str, str]:
     """Return the parameters of a change, one for each setting it gives, as the page's sections send them."""
     sent = settings.option_params(change)
+
     if change.session_lifetime is not None:
         sent["session_lifetime"] = str(page.lifetimes.index(_LIFETIMES_SENT[change.session_lifetime]))
+
     if change.public is not None:
         sent["public"] = settings.flag(change.public)
+
     # The page sends its workers section whole: a limit not given goes with its value as read.
     if any(getattr(change, name) is not None for name in _LIMITS):
         for name, key in _LIMITS.items():
             seconds: int | None = getattr(change, name)
             limit = page.limits[key]
             sent[key] = format(limit.value, "g") if seconds is None else str(_units(name, seconds, limit))
+
     if change.allow_ips is not None or change.disallow_ips is not None:
         removed = change.disallow_ips or ()
         kept = [line for line in page.lines if line.strip() and _entry(line.strip()) not in removed]
         sent["ip_whitelist"] = "\n".join([*kept, *map(str, change.allow_ips or ())])
+
     return sent
 
 
 def _units(name: str, seconds: int, limit: _Limit) -> int:
     units, rest = divmod(seconds, limit.unit)
+
     if rest or not limit.low <= units <= limit.high:
         msg = (
             f"`{name}` is a multiple of {limit.unit} seconds from {limit.low * limit.unit} to "
             f"{limit.high * limit.unit} on this project, as its Settings page takes it."
         )
         raise SettingsConflictError(msg)
+
     return units
 
 
 def _expected(current: ProjectSettings, change: ProjectSettingsChange) -> dict[str, object]:
     """Return the settings a change is to show once read back, by their name in `ProjectSettings`."""
     expected = {name: value for name, value in change.given().items() if name not in _ENTRIES}
+
     if change.allow_ips is not None or change.disallow_ips is not None:
         removed = change.disallow_ips or ()
         kept = tuple(entry for entry in current.ip_allow_list if entry not in removed)
         expected[_ALLOW_LIST] = kept + (change.allow_ips or ())
+
     return expected
 
 
@@ -230,14 +258,17 @@ def _same(read: ProjectSettings, name: str, value: object) -> bool:
     if name == _ALLOW_LIST:
         # Whatever order Odoo.sh keeps them in.
         return Counter(read.ip_allow_list) == Counter(value) if isinstance(value, tuple) else False
+
     return settings.same(read, name, value)
 
 
 def _submodule(item: Reader) -> Submodule:
     # No local of this frame holds a key that failed the test.
     public_key = _public_key(item.text("deploy_key_public"))
+
     if public_key is None:
         raise item.changed("deploy_key_public")
+
     return Submodule(
         id=item.integer("id"),
         url=item.text("name"),
@@ -255,11 +286,15 @@ def _public_key(text: str) -> str | None:
 def _seconds(limit: Reader) -> int:
     # The value is in the page's unit, minutes in the capture, which `unit_conversion` turns into seconds.
     value = limit.number("value")
+
     if not 0 <= value < math.inf:
         raise limit.changed("value")
+
     conversion = limit.integer("unit_conversion")
+
     if conversion < 1:
         raise limit.changed("unit_conversion")
+
     return round(value * conversion)
 
 

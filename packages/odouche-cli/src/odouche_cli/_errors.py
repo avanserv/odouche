@@ -17,11 +17,9 @@ from odouche_cli._output import strip_control
 
 
 ISSUES_URL = "https://github.com/avanserv/odouche/issues"
-
 EXIT_UNEXPECTED = 1
 # What click exits with when a prompt is aborted.
 EXIT_DECLINED = 1
-
 _LOGIN = "Run `osh auth login`."
 _LOGIN_AGAIN = "Run `osh auth login` again."
 
@@ -116,8 +114,10 @@ class OshGroup(TyperGroup):
             ctx.exit(EXIT_CLOSED_PIPE)
         except Exception as error:  # noqa: BLE001 - the root reports every failure
             debug = bool(ctx.params.get("debug"))
+
             if debug:
                 _print_traceback(error)
+
             ctx.exit(_report(error, debug=debug))
 
 
@@ -138,8 +138,10 @@ def _print_traceback(error: Exception) -> None:
     """
     text = "".join(traceback.format_exception(error))
     text = "\n".join(strip_control(line) for line in text.split("\n"))
+
     if session := os.environ.get(odouche.SESSION_ENV):
         text = text.replace(session, str(odouche.Secret(session)))
+
     typer.echo(text, err=True, nl=False)
 
 
@@ -147,13 +149,20 @@ def _report(error: Exception, *, debug: bool) -> int:
     """Print what happened and what to do on stderr, and return the exit code."""
     if not isinstance(error, odouche.OdoucheError):
         typer.echo(f"Unexpected error ({type(error).__name__}). Please report it at {ISSUES_URL}", err=True)
+
         if not debug:
             typer.echo("Run again with --debug for the traceback.", err=True)
+
         return EXIT_UNEXPECTED
+
     code, hint = next((code, hint) for kind, code, hint in EXIT_CODES if isinstance(error, kind))
+
     if isinstance(error, odouche.OutcomeUnknownError):
         hint = _OUTCOME_HINTS.get(error.operation or "", hint)
+
     typer.echo(strip_control(str(error)), err=True)
+
     if hint:
         typer.echo(hint, err=True)
+
     return code

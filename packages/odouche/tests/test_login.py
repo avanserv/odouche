@@ -45,6 +45,7 @@ class Upstream:
         self.requests.append(request)
         signed_in = request.headers["Cookie"] == f"session_id={SESSION}"
         name = "projects.json" if signed_in else "unauthenticated.json"
+
         return httpx2.Response(self.status, content=(FIXTURES / name).read_bytes())
 
     def connect(self, session):
@@ -70,13 +71,16 @@ class Browser:
 
     def __exit__(self, *_):
         self.closed += 1
+
         if self.cleanup is not None:
             raise self.cleanup
 
     def cookie(self):
         value = self.cookies.pop(0) if len(self.cookies) > 1 else self.cookies[0]
+
         if isinstance(value, BaseException):
             raise value
+
         return None if value is None else Secret(value)
 
 
@@ -97,6 +101,7 @@ class Frontend:
 def upstream(monkeypatch):
     upstream = Upstream()
     monkeypatch.setattr(_login, "_transport", upstream.connect)
+
     return upstream
 
 
@@ -107,6 +112,7 @@ def browser(monkeypatch):
     monkeypatch.setattr(_login, "_capture", browser)
     monkeypatch.setattr(_login, "_monotonic", lambda: browser.elapsed)
     monkeypatch.setattr(_login, "_sleep", lambda seconds: setattr(browser, "elapsed", browser.elapsed + seconds))
+
     return browser
 
 
@@ -136,6 +142,7 @@ def shown(error):
     frames = [frame for frame, _ in traceback.walk_tb(error.__traceback__)]
     local = [repr(frame.f_locals) for frame in frames if frame.f_code.co_filename == _login.__file__]
     assert local
+
     return [str(error), repr(error), "".join(traceback.format_exception(error)), *local]
 
 
@@ -326,6 +333,7 @@ def test_a_login_waits_for_the_keyring_to_be_unlocked(backend, upstream, browser
 
     def notify(step):
         frontend.steps.append(step)
+
         if step is LoginStep.KEYRING:
             backend.dialog.set()
 

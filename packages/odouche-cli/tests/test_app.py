@@ -40,7 +40,6 @@ def test_no_arguments_shows_help():
 def test_main_runs_the_application(monkeypatch: pytest.MonkeyPatch):
     calls: list[str] = []
     monkeypatch.setattr(app_module, "app", lambda: calls.append("run"))
-
     main()
 
     assert calls == ["run"]

@@ -33,15 +33,19 @@ class Reader:
     def number(self, key: str) -> float:
         """Return a numeric field, given as an integer or not. A boolean is not one."""
         value = self._fields.get(key)
+
         if type(value) is int:
             return float(value)
+
         return self._read(key, float)
 
     def identifier(self, key: str) -> int | str:
         """Return a field that names something, given as an integer or as a string that is not empty."""
         value = self._fields.get(key)
+
         if type(value) is int or (type(value) is str and value):
             return cast("int | str", value)
+
         raise UpstreamChangedError(self._operation, self._path(key))
 
     def optional_text(self, key: str) -> str | None:
@@ -56,9 +60,11 @@ class Reader:
         """Return a field that is a list of strings."""
         at = self._path(key)
         values = self._read(key, list)
+
         for index, value in enumerate(values):
             if type(value) is not str:
                 raise UpstreamChangedError(self._operation, f"{at}[{index}]")
+
         return cast("list[str]", values)
 
     def keys(self) -> list[str]:
@@ -72,8 +78,10 @@ class Reader:
     def pair(self, key: str) -> tuple[int, str]:
         """Return a many-to-one field, which is a list of an id and a name."""
         value = self._read(key, list)
+
         if len(value) != 2 or type(value[0]) is not int or type(value[1]) is not str:  # noqa: PLR2004
             raise UpstreamChangedError(self._operation, self._path(key))
+
         return value[0], value[1]
 
     def optional_pair(self, key: str) -> tuple[int, str] | None:
@@ -83,8 +91,10 @@ class Reader:
     def label(self, key: str) -> str:
         """Return the value of a selection field given with its label, as `["dropped", "Dropped"]`."""
         value = self._read(key, list)
+
         if len(value) != 2 or type(value[0]) is not str or type(value[1]) is not str:  # noqa: PLR2004
             raise UpstreamChangedError(self._operation, self._path(key))
+
         return value[0]
 
     def optional_label(self, key: str) -> str | None:
@@ -106,6 +116,7 @@ class Reader:
     def items(self, key: str) -> list[Self]:
         """Return the readers of a field that is a list of objects."""
         at = self._path(key)
+
         return [self._object(f"{at}[{index}]", item) for index, item in enumerate(self._read(key, list))]
 
     def _absent(self, key: str) -> bool:
@@ -116,11 +127,14 @@ class Reader:
 
     def _read[T](self, key: str, kind: type[T]) -> T:
         value = self._fields.get(key)
+
         if type(value) is not kind:
             raise UpstreamChangedError(self._operation, self._path(key))
+
         return cast("T", value)
 
     def _object(self, at: str, value: object) -> Self:
         if not isinstance(value, dict):
             raise UpstreamChangedError(self._operation, at)
+
         return type(self)(self._operation, cast("dict[str, object]", value), at)

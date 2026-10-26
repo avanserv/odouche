@@ -160,6 +160,7 @@ def test_a_rebuild_whose_build_cannot_be_read_is_unknown(client, upstream, build
             upstream.failures[BUILDS] = builds
         else:
             upstream.bodies[BUILDS] = upstream.load(builds) if isinstance(builds, str) else builds
+
         return httpx2.Response(200, json=upstream.load("rebuild.json"))
 
     upstream.bodies[PATH] = answer
@@ -186,10 +187,11 @@ def test_a_production_branch_is_refused_before_any_request(client, upstream):
 def test_a_check_refuses_the_stage_a_rebuild_refuses_and_asks_nothing(client, upstream):
     production, development = client.branches("acme-shop")[:2]
     upstream.requests.clear()
-
     client.check_rebuild(development)
+
     with pytest.raises(StageRefusedError) as checked:
         client.check_rebuild(production)
+
     with pytest.raises(StageRefusedError) as rebuilt:
         client.rebuild(production)
 
@@ -202,8 +204,8 @@ def test_a_read_only_client_checks_too(upstream, session):
     client = Client(Secret(session), read_only=True)
     production, development = client.branches("acme-shop")[:2]
     upstream.requests.clear()
-
     client.check_rebuild(development)
+
     with pytest.raises(StageRefusedError):
         client.check_rebuild(production)
 

@@ -22,7 +22,6 @@ from odouche_cli.app import app
 
 
 NOW = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
-
 ACME = odouche.Project(id=1, name="acme", repository="acme/odoo", url="https://www.odoo.sh/project/acme")
 FEATURE = Branch(id=4, name="feature-x", stage=Stage.DEVELOPMENT, stage_name="dev")
 ON_FEATURE = ("--project", "acme", "--branch", "feature-x")
@@ -53,7 +52,6 @@ def build(number: int) -> Build:
 
 LATEST = build(104)
 OLDER = build(103)
-
 INSTALL = tuple(f"install {number}" for number in range(1, 121))
 PIP = ("Collecting acme-reports", "Successfully installed acme-reports-1.0")
 SHELL = ("shell 1", "shell 2")
@@ -81,9 +79,11 @@ runner = CliRunner()
 def log_lines(texts: tuple[str, ...]) -> list[LogLine]:
     made: list[LogLine] = []
     offset = 0
+
     for text in texts:
         offset += len(text.encode()) + 1
         made.append(LogLine(text=text, offset=offset, truncated=False))
+
     return made
 
 
@@ -108,6 +108,7 @@ class StubClient:
 
     def __init__(self, *, read_only: bool = False) -> None:
         self.modes.append(read_only)
+
         if self.error is not None:
             raise self.error
 
@@ -144,10 +145,13 @@ class StubClient:
         self, project: str, build: Build, kind: LogKind | str, *, tail: int | None = None
     ) -> Iterator[LogLine]:
         self.calls.append(f"read {project} {build.id} {kind} {tail}")
+
         if tail is not None and tail < 1:
             msg = "A tail is at least 1"
             raise ValueError(msg)
+
         lines = self._content(build, kind)
+
         return self._stream("read", lines if tail is None else lines[-tail:], None)
 
     def follow_log(
@@ -161,38 +165,47 @@ class StubClient:
         offset: int | None = None,
     ) -> Iterator[LogLine]:
         self.calls.append(f"follow {project} {build.id} {kind} {timeout:g} {tail} {offset}")
+
         if timeout <= 0:
             msg = "A timeout is more than 0"
             raise ValueError(msg)
+
         if tail < 0 or (offset is not None and offset < 0):
             msg = "A tail and an offset are at least 0"
             raise ValueError(msg)
+
         lines = log_lines(self.content[str(kind)] + self.written) if str(kind) in self.content else []
         held = len(self._content(build, kind))
+
         if offset is None:
             first = held - tail if tail else held
             lines = lines[max(first, 0) :]
         else:
             lines = [line for line in lines if line.offset > offset]
+
         return self._stream("follow", lines, self.ending or (TIMEOUT if timeout < math.inf else KeyboardInterrupt()))
 
     def _content(self, build: Build, kind: LogKind | str) -> list[LogLine]:
         if str(kind) not in self.content:
             msg = f"Build {build.id} has no log named {str(kind)!r}."
             raise odouche.NotFoundError(msg)
+
         return log_lines(self.content[str(kind)])
 
     def _stream(self, name: str, lines: list[LogLine], ending: BaseException | None) -> Iterator[LogLine]:
         stream = self._lines(name, lines, ending)
         self.streams.append(stream)
+
         return stream
 
     def _lines(self, name: str, lines: list[LogLine], ending: BaseException | None) -> Iterator[LogLine]:
         try:
             for at, line in enumerate(lines):
                 yield line
+
                 if at == 0:
                     self.pause()
+
             if ending is not None:
                 raise ending
         finally:
@@ -228,10 +241,13 @@ class Stdout(io.TextIOBase):
     @override
     def flush(self) -> None:
         pending, self._pending = self._pending, ""
+
         if not pending:
             return
+
         if self._fails_at is not None and len(self.flushed) >= self._fails_at:
             raise self._error
+
         self.flushed.append(pending)
 
 
@@ -240,6 +256,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     made = fresh()
     monkeypatch.setattr(odouche, "Client", made)
     monkeypatch.setattr(_time, "_now", lambda: NOW)
+
     return made
 
 
@@ -250,6 +267,7 @@ def stdout(monkeypatch: pytest.MonkeyPatch) -> Callable[..., Stdout]:
     def stdout(fails_at: int | None = None, error: type[BaseException] = BrokenPipeError) -> Stdout:
         made = Stdout(fails_at, error)
         monkeypatch.setattr(_output, "_stdout", lambda: made)
+
         return made
 
     return stdout
@@ -282,7 +300,6 @@ def test_a_build_with_no_install_log_prints_its_odoo_log(client: type[StubClient
     client.listed = STAGING
     client.content = {"odoo": ("odoo 1", "odoo 2"), "update": ("update 1",)}
     client.written = ()
-
     result = run("logs", *ON_FEATURE, *mode)
 
     assert result.stdout == printed("odoo 1", "odoo 2")
@@ -292,7 +309,6 @@ def test_a_build_with_no_install_log_prints_its_odoo_log(client: type[StubClient
 def test_a_build_with_neither_default_log_exits_4_and_names_both_and_the_logs_it_has(client: type[StubClient]):
     client.listed = LISTED[1:]
     client.content = {"pip": PIP, "shell": SHELL}
-
     result = run("logs", *ON_FEATURE)
 
     assert result.exit_code == 4
@@ -306,7 +322,6 @@ def test_a_build_with_neither_default_log_exits_4_and_names_both_and_the_logs_it
 def test_a_build_with_no_log_exits_4_and_says_so(client: type[StubClient], kind: tuple[str, ...]):
     client.listed = ()
     client.content = {}
-
     result = run("logs", *ON_FEATURE, *kind)
 
     assert result.exit_code == 4
@@ -316,7 +331,6 @@ def test_a_build_with_no_log_exits_4_and_says_so(client: type[StubClient], kind:
 
 def test_a_log_that_is_empty_prints_nothing(client: type[StubClient]):
     client.content = {"install": ()}
-
     result = run("logs", *ON_FEATURE)
 
     assert result.exit_code == 0
@@ -326,7 +340,6 @@ def test_a_log_that_is_empty_prints_nothing(client: type[StubClient]):
 def test_following_a_log_that_stays_empty_prints_nothing_until_the_timeout(client: type[StubClient]):
     client.content = {"install": ()}
     client.written = ()
-
     result = run("logs", *ON_FEATURE, "--follow", "--timeout", "60")
 
     assert result.exit_code == 8
@@ -428,7 +441,6 @@ def test_kinds_as_json_is_the_log_models():
 
 def test_kinds_of_a_build_with_no_log_says_so_and_exits_0(client: type[StubClient]):
     client.listed = ()
-
     result = run("logs", *ON_FEATURE, "--kinds")
 
     assert result.exit_code == 0
@@ -493,7 +505,6 @@ def test_options_that_do_not_go_together_are_a_usage_error_before_the_session_is
     client: type[StubClient], arguments: tuple[str, ...], named: str
 ):
     client.error = odouche.NoSessionError("Not logged in.")
-
     result = run("logs", *ON_FEATURE, *arguments)
 
     assert result.exit_code == 2
@@ -504,7 +515,6 @@ def test_options_that_do_not_go_together_are_a_usage_error_before_the_session_is
 @pytest.mark.usefixtures("terminal")
 def test_on_a_terminal_the_control_characters_are_stripped_and_the_tab_kept(client: type[StubClient]):
     client.content = {"install": (HOSTILE, "plain")}
-
     result = run("logs", *ON_FEATURE)
 
     assert result.exit_code == 0
@@ -513,7 +523,6 @@ def test_on_a_terminal_the_control_characters_are_stripped_and_the_tab_kept(clie
 
 def test_on_a_pipe_a_line_is_unchanged(client: type[StubClient]):
     client.content = {"install": (HOSTILE, "plain")}
-
     result = run("logs", *ON_FEATURE)
 
     assert result.exit_code == 0
@@ -523,7 +532,6 @@ def test_on_a_pipe_a_line_is_unchanged(client: type[StubClient]):
 @pytest.mark.usefixtures("terminal")
 def test_a_followed_line_is_stripped_on_a_terminal_too(client: type[StubClient]):
     client.written = (HOSTILE,)
-
     result = run("logs", *ON_FEATURE, "--follow", "--tail", "1")
 
     assert result.stdout == printed("install 120", STRIPPED)
@@ -558,7 +566,6 @@ def test_a_line_that_was_cut_is_printed_as_it_came(client: type[StubClient], mon
 @pytest.mark.parametrize("forced", [(), ("--strip",)], ids=["default", "strip"])
 def test_as_json_each_line_is_one_object_escaped_and_never_stripped(client: type[StubClient], forced: tuple[str, ...]):
     client.content = {"install": ("first", HOSTILE)}
-
     result = run("--format", "json", "logs", *ON_FEATURE, *forced)
 
     assert result.exit_code == 0
@@ -581,7 +588,6 @@ def test_a_closed_pipe_ends_in_silence_and_closes_the_log(
     client: type[StubClient], stdout: Callable[..., Stdout], mode: tuple[str, ...]
 ):
     sent = stdout(fails_at=2)
-
     result = run("logs", *ON_FEATURE, *mode)
 
     assert result.exit_code == 141
@@ -592,7 +598,6 @@ def test_a_closed_pipe_ends_in_silence_and_closes_the_log(
 
 def test_an_interrupt_exits_130_in_silence_and_closes_the_log(client: type[StubClient], stdout: Callable[..., Stdout]):
     sent = stdout(fails_at=3, error=KeyboardInterrupt)
-
     result = run("logs", *ON_FEATURE, "--follow", "--tail", "2")
 
     assert result.exit_code == 130
@@ -649,6 +654,7 @@ def test_a_real_pipe_gets_each_line_at_once_and_closing_it_prints_nothing(argume
     assert child.stdin is not None
     assert child.stdout is not None
     assert child.stderr is not None
+
     try:
         # The child holds the second line until its stdin closes.
         assert select.select([child.stdout], [], [], 10)[0]
@@ -658,6 +664,7 @@ def test_a_real_pipe_gets_each_line_at_once_and_closing_it_prints_nothing(argume
     finally:
         child.kill()
         child.wait()
+
         for pipe in (child.stdin, child.stdout, child.stderr):
             pipe.close()
 
@@ -675,7 +682,6 @@ def test_debug_output_holds_nothing_of_the_log(client: type[StubClient], ending:
     client.content = {"install": (f"{MARKER} 1", f"{MARKER} 2")}
     client.written = (f"{MARKER} 3",)
     client.ending = ending
-
     result = run("--debug", "logs", *ON_FEATURE, "--follow")
 
     assert result.exit_code != 0
@@ -687,7 +693,6 @@ def test_debug_output_holds_nothing_of_the_log(client: type[StubClient], ending:
 
 def test_a_character_stdout_cannot_encode_is_escaped_not_quoted_in_an_error(client: type[StubClient]):
     client.content = {"install": ("café → done",)}
-
     result = CliRunner(charset="cp1252").invoke(app, ["--debug", "logs", *ON_FEATURE])
 
     assert result.exit_code == 0
@@ -697,7 +702,6 @@ def test_a_character_stdout_cannot_encode_is_escaped_not_quoted_in_an_error(clie
 
 def test_as_json_a_character_stdout_cannot_encode_is_escaped(client: type[StubClient]):
     client.content = {"install": ("café → done",)}
-
     result = CliRunner(charset="cp1252").invoke(app, ["--debug", "--format", "json", "logs", *ON_FEATURE])
 
     assert result.exit_code == 0
@@ -708,7 +712,6 @@ def test_as_json_a_character_stdout_cannot_encode_is_escaped(client: type[StubCl
 
 def test_logged_out_exits_3_and_names_the_login(client: type[StubClient]):
     client.error = odouche.NoSessionError("Not logged in.")
-
     result = run("logs", *ON_FEATURE)
 
     assert result.exit_code == 3
@@ -718,7 +721,6 @@ def test_logged_out_exits_3_and_names_the_login(client: type[StubClient]):
 
 def test_a_missing_branch_while_logged_out_is_a_usage_error(client: type[StubClient]):
     client.error = odouche.NoSessionError("Not logged in.")
-
     result = run("logs", "--project", "acme")
 
     assert result.exit_code == 2
@@ -727,7 +729,6 @@ def test_a_missing_branch_while_logged_out_is_a_usage_error(client: type[StubCli
 
 def test_help_opens_neither_the_keyring_nor_the_network(client: type[StubClient]):
     client.error = odouche.KeyringUnavailableError()
-
     result = run("logs", "--help")
 
     assert result.exit_code == 0
@@ -736,6 +737,5 @@ def test_help_opens_neither_the_keyring_nor_the_network(client: type[StubClient]
 
 def test_the_root_lists_its_commands_by_name():
     listed = click.unstyle(run("--help").output)
-
     names = ["auth", "branches", "builds", "logs", "projects"]
     assert re.findall(rf"^\W*({'|'.join(names)})\s", listed, re.MULTILINE) == names

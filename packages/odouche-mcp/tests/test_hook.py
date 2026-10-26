@@ -26,6 +26,7 @@ def _load() -> Any:
     assert spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+
     return module
 
 
@@ -35,6 +36,7 @@ hook = _load()
 def run(text: str) -> str:
     stdout = io.StringIO()
     hook.main(io.StringIO(text), stdout)
+
     return stdout.getvalue()
 
 
@@ -128,6 +130,7 @@ def test_the_guide_sends_every_tool_of_the_server_to_the_hook():
 
     for tool in asyncio.run(create_server(allow_changes=True).list_tools()):
         assert re.fullmatch(rule["matcher"], f"mcp__odouche__{tool.name}")
+
     assert not re.fullmatch(rule["matcher"], "mcp__other__list_builds")
     assert SCRIPT.name in rule["hooks"][0]["command"]
     assert SCRIPT.relative_to(ROOT).as_posix() in section

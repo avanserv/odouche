@@ -25,24 +25,30 @@ def revision(transport: Transport, project: str, build: Build) -> BuildRevision:
     """
     entry = builds.entry(transport, build.branch_id, builds.DEFAULT_LIMIT)
     listed = next((item for item in entry.items("builds") if item.integer("id") == build.id), None)
+
     if listed is None:
         raise builds.not_listed(build.branch_id, build.id)
+
     version = listed.text("odoo_branch")
     branch = entry.child("branch_info")
     pinned = branch.optional_integer("odoo_revision_id")
+
     if pinned is None:
         selected = _latest(
             transport, build.branch_id, branch.optional_text("odoo_branch") or _version(transport, project)
         )
     else:
         selected = _read(transport.call(_OPERATION, f"/app/revision/{pinned}", retry=True), pinned=pinned)
+
     return BuildRevision(build.id, build.name, build.branch_name, build.commit, version, selected)
 
 
 def _version(transport: Transport, project: str) -> str:
     version = projects.odoo_version(transport, project)
+
     if version is None:
         raise NotFoundError(f"The session's user can reach no project named {project!r}.", operation=_OPERATION)
+
     return version
 
 
@@ -61,28 +67,42 @@ def _read(answer: dict[str, object], *, pinned: int | None = None, version: str 
     """Read a revision, which is `pinned` when it was asked by its number and of `version` when it is the latest."""
     # What a version past its end of life answers is not known: the page does not ask.
     result = Reader(_OPERATION, answer).optional_child("result")
+
     if result is None:
         return None
+
     number = result.integer("id")
+
     if pinned is not None and number != pinned:
         raise result.changed("id")
+
     named = result.text("branch")
+
     if version is not None and named != version:
         raise result.changed("branch")
+
     refs = result.items("refs")
+
     if not refs:
         raise result.changed("refs")
+
     return OdooRevision(id=number, version=named, pinned=pinned is not None, refs=tuple(_ref(ref) for ref in refs))
 
 
 def _ref(ref: Reader) -> OdooRef:
     repository = ref.text("repository")
+
     if not repository:
         raise ref.changed("repository")
+
     commit_hash = ref.text("ref")
+
     if not _HASH.fullmatch(commit_hash):
         raise ref.changed("ref")
+
     url = ref.text("url")
+
     if not _URL.fullmatch(url):
         raise ref.changed("url")
+
     return OdooRef(repository=repository, commit_hash=commit_hash, url=url)

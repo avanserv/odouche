@@ -34,7 +34,6 @@ _INTERVAL = 5.0
 # What the tests replace: the clock and the wait between two requests.
 _monotonic: Callable[[], float] = time.monotonic
 _sleep: Callable[[float], None] = time.sleep
-
 _logger = logging.getLogger("odouche")
 
 
@@ -48,18 +47,23 @@ def backup(transport: Transport, project: str, branch_id: int, stage: Stage | No
     """Ask for a manual backup of a branch's latest build. `stage` is the one the caller holds, if any."""
     if stage is not None:
         allow(stage)
+
     entry = builds.entry(transport, branch_id, 1)
     # The caller's branch may have changed stage since it was read.
     allow(branches.stage(entry.child("branch_info").text("stage")))
     latest = max(entry.items("builds"), key=lambda build: build.integer("id"), default=None)
+
     if latest is None:
         raise NotFoundError(f"Branch {branch_id} has no build to back up.", operation=_CREATE)
+
     # The wait looks among this project's backups: a branch of another would never be found there.
     if branch_id not in {branch.id for branch in branches.branches(transport, project)}:
         raise NotFoundError(f"Project {project!r} has no branch numbered {branch_id}.", operation=_CREATE)
+
     build = builds.whole(latest)
     previous = _manual(_listed(transport, _technical_name(transport, project)), build.name)
     transport.change(_CREATE, f"/app/build/{build.id}/dump", {"backup_only": True, "comment": comment})
+
     return BackupRequest(build=build, previous=previous[0].taken_at if previous else None)
 
 
@@ -76,7 +80,9 @@ def wait(transport: Transport, project: str, request: BackupRequest, *, timeout:
     """Yield `None` after each look that does not find the backup asked for finished, then the backup."""
     if timeout <= 0:
         raise ValueError("A timeout is more than 0")
+
     deadline = _monotonic() + timeout
+
     return _wait(transport, project, _technical_name(transport, project), request, deadline)
 
 
@@ -85,6 +91,7 @@ def _wait(
 ) -> Generator[Backup | None]:
     while True:
         found = _manual(_listed(transport, technical_name), request.build.name)
+
         # Listed some 20 seconds before it is finished, and Odoo.sh refuses a file of it until then.
         if (
             found
@@ -93,12 +100,15 @@ def _wait(
         ):
             yield found[0]
             return
+
         yield None
         remaining = deadline - _monotonic()
+
         if remaining <= 0:
             raise StreamTimeoutError(
                 f"The backup of build {request.build.id} was not finished at the timeout.", operation=_OPERATION
             )
+
         _sleep(min(_INTERVAL, remaining))
 
 
@@ -109,8 +119,10 @@ def _manual(listed: list[Backup], build_name: str) -> list[Backup]:
 
 def _technical_name(transport: Transport, project: str) -> str:
     technical_name = projects.technical_name(transport, project)
+
     if technical_name is None:
         raise NotFoundError(f"The session's user can reach no project named {project!r}.", operation=_OPERATION)
+
     return technical_name
 
 
@@ -118,6 +130,7 @@ def _listed(transport: Transport, technical_name: str) -> list[Backup]:
     path = f"/app/project/{projects.segment(technical_name)}/backups"
     answer = Reader(_OPERATION, transport.call(_OPERATION, path, retry=True))
     listed = [_backup(backup) for backup in answer.items("result")]
+
     return sorted(listed, key=lambda backup: backup.taken_at, reverse=True)
 
 
@@ -138,16 +151,20 @@ def _backup(backup: Reader) -> Backup:
 
 def _kind(name: str) -> BackupKind:
     known = _KINDS.get(name)
+
     if known is None:
         _logger.debug("Unknown backup kind: %r", name)
         return BackupKind.UNKNOWN
+
     return known
 
 
 def _size(backup: Reader) -> int:
     size = backup.number("size_sql_gz")
+
     if size < 0 or not size.is_integer():
         raise backup.changed("size_sql_gz")
+
     return int(size)
 
 
@@ -163,6 +180,7 @@ def prepare(
         f"/app/build/{build.id}/dump",
         {"test_dump": neutralized, "filestore": filestore, "backup_datetime_utc": backup.taken_at.strftime(_TAKEN)},
     )
+
     return _prepared(backup, build, worker, neutralized=neutralized, filestore=filestore, previous=previous)
 
 
@@ -173,14 +191,17 @@ def find(
     build, worker = _located(transport, project, backup, _FIND)
     candidate = _prepared(backup, build, worker, neutralized=neutralized, filestore=filestore, previous=0)
     announced = [item.integer("id") for item in _notifications(transport, project) if _announces(item, candidate)]
+
     if not announced:
         return None
+
     # Only the worker tells whether the file outlived the notification.
     try:
         with download(transport, candidate):
             pass
     except NotFoundError:
         return None
+
     return replace(candidate, previous=max(announced))
 
 
@@ -188,20 +209,27 @@ def _located(transport: Transport, project: str, backup: Backup, operation: str)
     """Return the build a backup was taken from, and the address of the worker that holds it."""
     if not backup.downloadable:
         raise ValueError(f"Odoo.sh does not let a {backup.kind_name} backup be downloaded")
+
     branch = next((found for found in branches.branches(transport, project) if found.name == backup.branch_name), None)
+
     if branch is None:
         raise NotFoundError(f"Project {project!r} has no branch named {backup.branch_name!r}.", operation=operation)
+
     entry = builds.entry(transport, branch.id, builds.DEFAULT_LIMIT)
     listed = next((found for found in entry.items("builds") if found.text("name") == backup.build_name), None)
+
     if listed is None:
         raise NotFoundError(
             f"Build {backup.build_name} is no longer among the latest builds of branch {branch.name}, "
             "so its backups cannot be downloaded.",
             operation=operation,
         )
+
     worker = listed.optional_text("worker_url")
+
     if worker is None:
         raise NotFoundError(f"Build {backup.build_name} has no worker to hold the file.", operation=operation)
+
     return builds.whole(listed), worker
 
 
@@ -224,7 +252,9 @@ def wait_download(transport: Transport, project: str, prepared: PreparedDownload
     """Yield `None` after each look that does not find the file ready, and end once it is."""
     if timeout <= 0:
         raise ValueError("A timeout is more than 0")
+
     deadline = _monotonic() + timeout
+
     return _wait_download(transport, project, prepared, deadline)
 
 
@@ -232,13 +262,16 @@ def _wait_download(transport: Transport, project: str, prepared: PreparedDownloa
     while True:
         if any(_announces(item, prepared) for item in _notifications(transport, project)):
             return
+
         yield None
         remaining = deadline - _monotonic()
+
         if remaining <= 0:
             raise StreamTimeoutError(
                 f"The file of backup {prepared.backup.taken_at:{_TAKEN}} was not ready at the timeout.",
                 operation=_PREPARE,
             )
+
         _sleep(min(_INTERVAL, remaining))
 
 
@@ -247,6 +280,7 @@ def download(transport: Transport, prepared: PreparedDownload) -> Generator[Back
     """Open the prepared file, which Odoo.sh hands over a token for."""
     build_id = builds.number("build", prepared.build.id)
     query = _query(prepared.backup, neutralized=prepared.neutralized, filestore=prepared.filestore)
+
     with ExitStack() as stack:
         try:
             body = stack.enter_context(
@@ -256,20 +290,24 @@ def download(transport: Transport, prepared: PreparedDownload) -> Generator[Back
             )
         except NotFoundError:
             body = None
+
         # Raised out of the handler, as the transport's are.
         if body is None:
             raise NotFoundError(
                 f"The file of backup {prepared.backup.taken_at:{_TAKEN}} is not ready, or Odoo.sh no longer keeps it.",
                 operation=_DOWNLOAD,
             )
+
         yield BackupFile(size=body.size, chunks=_whole(body.size, body.chunks))
 
 
 def _whole(size: int | None, chunks: Iterator[bytes]) -> Iterator[bytes]:
     received = 0
+
     for chunk in chunks:
         received += len(chunk)
         yield chunk
+
     if size is not None and received != size:
         raise UpstreamUnavailableError(f"The file ended after {received} of its {size} bytes.", operation=_DOWNLOAD)
 
@@ -291,6 +329,7 @@ def _announces(item: Reader, prepared: PreparedDownload) -> bool:
     """Tell whether a notification says the file is ready: its button is the page's link to it."""
     if item.integer("id") <= prepared.previous or item.text("notif_type") != _READY:
         return False
+
     return any(
         button.text("type") == _LINK and button.has("url") and _same(button.text("url"), prepared.link)
         for button in item.items("buttons")
@@ -314,6 +353,7 @@ def _notifications(transport: Transport, project: str) -> list[Reader]:
     result = _info(transport, project)
     key = str(result.child("active_repo").integer("id"))
     notifications = result.child("notifications")
+
     return notifications.child(key).items("items") if notifications.has(key) else []
 
 

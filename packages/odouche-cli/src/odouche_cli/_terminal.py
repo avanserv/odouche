@@ -10,6 +10,7 @@ from rich.console import Console
 def confirmed(question: str) -> bool:
     """Ask on stderr and read the answer from stdin: only `y` or `yes` is a yes. Nothing goes to stdout."""
     typer.echo(f"{question} [y/N]: ", nl=False, err=True)
+
     return sys.stdin.readline().strip().lower() in {"y", "yes"}
 
 

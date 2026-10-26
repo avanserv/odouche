@@ -27,7 +27,6 @@ OPERATION = "projects"
 PATH = "/app/projects"
 FIXTURES = Path(__file__).parent / "fixtures"
 SOURCES = Path(__file__).parents[1] / "src" / "odouche"
-
 UNAUTHENTICATED = json.loads((FIXTURES / "unauthenticated.json").read_text())
 LOGIN = "/web/login?redirect=%2Fproject%3F"
 LOGOUT = "/web/session/logout"
@@ -46,8 +45,10 @@ class Upstream:
     def __call__(self, request):
         self.requests.append(request)
         answer = self.answers.pop(0) if len(self.answers) > 1 else self.answers[0]
+
         if isinstance(answer, type):
             raise answer(f"failed, Cookie: {request.headers['Cookie']}", request=request)
+
         return answer
 
     def reject(self):
@@ -76,18 +77,18 @@ def connect():
                 sleep=upstream.sleeps.append,
             )
         )
+
         return transports[-1], upstream
 
     yield connect
+
     for transport in transports:
         transport.close()
 
 
 def test_sends_the_json_rpc_request_with_the_session(connect):
     transport, upstream = connect(fixture("projects.json"))
-
     answer = transport.call(OPERATION, PATH, {"build_limit": 4})
-
     (request,) = upstream.requests
     assert request.method == "POST"
     assert str(request.url) == f"https://{HOST}{PATH}"
@@ -221,6 +222,7 @@ def test_refuses_a_path_that_could_leave_the_worker(connect, path):
 
     with pytest.raises(ValueError, match="worker"):
         transport.worker_call("logs", WORKER, path, Secret("t0k3n"))
+
     with (
         pytest.raises(ValueError, match="worker"),
         transport.worker_read("logs", WORKER, path, Secret("t0k3n"), "bytes=0-"),
@@ -309,9 +311,11 @@ class Slow(httpx2.SyncByteStream):
 
     def __iter__(self):
         yield b'{"result": "'
+
         for _ in range(400):
             time.sleep(0.05)
             yield b"x"
+
         yield b'"}'
 
 
@@ -339,7 +343,6 @@ def test_a_call_s_limit_counts_the_bytes_once_decompressed(connect):
 def test_an_answer_within_the_limit_is_read_whole(connect):
     body = Streamed([b'{"result": ', b'"short"}'])
     transport, _ = connect(httpx2.Response(200, stream=body))
-
     answer = transport.worker_call("mails", WORKER, "/paas/1/mail/json/message", Secret("t0k3n"), limit=1000)
 
     assert answer == {"result": "short"}
@@ -492,7 +495,6 @@ def test_a_grant_without_a_scope_is_denied_without_its_address(connect, send):
         getattr(transport, send)(OPERATION, PATH)
 
     assert str(raised.value) == "Odoo.sh's grant on GitHub does not cover this."
-
     assert (raised.value.operation, raised.value.status) == (OPERATION, 200)
     assert raised.value.__context__ is None
     assert "github.com" not in "".join(traceback.format_exception(raised.value))
@@ -505,6 +507,7 @@ def test_a_grant_without_a_scope_says_where_to_give_it_when_the_request_does(con
 
     with pytest.raises(PermissionDeniedError) as scope:
         transport.call(OPERATION, PATH, grant="Grant it in the page.")
+
     with pytest.raises(PermissionDeniedError) as access:
         transport.call(OPERATION, PATH, grant="Grant it in the page.")
 
@@ -569,6 +572,7 @@ def test_an_error_carries_nothing_of_the_request(connect, answer):
 
     assert raised.value.__context__ is None
     assert raised.value.__cause__ is None
+
     for text in (str(raised.value), repr(raised.value), "".join(traceback.format_exception(raised.value))):
         assert SESSION not in text
         assert "Cookie" not in text
@@ -581,6 +585,7 @@ def test_logs_the_request_without_the_session(connect, caplog):
 
     with caplog.at_level(logging.DEBUG, logger="odouche"):
         transport.call(OPERATION, f"{PATH}?token=t0k3n")
+
         for _ in range(2):
             with pytest.raises(UpstreamUnavailableError):
                 transport.call(OPERATION, PATH)
@@ -592,6 +597,7 @@ def test_logs_the_request_without_the_session(connect, caplog):
         f"POST {PATH}: 502",
         f"POST {PATH}: ReadTimeout",
     ]
+
     for record in caplog.records:
         assert SESSION not in f"{record.getMessage()} {record.args}"
         assert "t0k3n" not in record.getMessage()
@@ -694,7 +700,6 @@ def test_a_call_sent_again_has_what_the_wait_left(connect):
 
 def test_bounds_every_phase_of_a_request_and_takes_no_option_to_change_it(connect):
     transport, _ = connect(fixture("projects.json"))
-
     timeout = transport._client.timeout
     assert None not in (timeout.connect, timeout.read, timeout.write, timeout.pool)
     assert not transport._client.follow_redirects

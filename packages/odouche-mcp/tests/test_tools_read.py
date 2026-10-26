@@ -245,12 +245,14 @@ class Upstream:
         if project != ACME.name:
             msg = f"No project {project} among those you can reach."
             raise odouche.NotFoundError(msg)
+
         return OVERVIEW
 
     def project_settings(self, project: str) -> odouche.ProjectSettings:
         if project != ACME.name:
             msg = f"No project {project} among those you can reach."
             raise odouche.NotFoundError(msg)
+
         return PROJECT_SETTINGS
 
     # The library's own, over `branches`.
@@ -260,6 +262,7 @@ class Upstream:
         if project != ACME.name:
             msg = f"No project {project} among those you can reach."
             raise odouche.NotFoundError(msg)
+
         return list(self.branched)
 
     def builds(self, branch: odouche.Branch, *, limit: int = 4) -> list[odouche.Build]:
@@ -268,16 +271,20 @@ class Upstream:
     def history(self, branch: odouche.Branch, *, limit: int = 20, timeout: float) -> Iterator[odouche.Tracking]:
         assert timeout > 0
         self.read.append(0)
+
         for event in (self.tracked if branch == FEATURE else [])[:limit]:
             self.read[-1] += 1
             yield event
 
     def audit_log(self, project: str, *, limit: int = 25, timeout: float) -> Iterator[odouche.AuditEntry]:
         assert timeout > 0
+
         if project != ACME.name:
             msg = f"No project {project} among those you can reach."
             raise odouche.NotFoundError(msg)
+
         self.read.append(0)
+
         for entry in self.audited[:limit]:
             self.read[-1] += 1
             yield entry
@@ -286,13 +293,16 @@ class Upstream:
         if project != ACME.name:
             msg = f"No project {project} among those you can reach."
             raise odouche.NotFoundError(msg)
+
         return list(self.joined)
 
     def build(self, branch: odouche.Branch, build_id: int) -> odouche.Build:
         for build in self.builds(branch):
             if build.id == build_id:
                 return build
+
         msg = f"Build {build_id} is not among the latest builds of branch {branch.id}."
+
         raise odouche.NotFoundError(msg)
 
     def latest_build(self, branch: odouche.Branch) -> odouche.Build | None:
@@ -311,6 +321,7 @@ def upstream(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
     monkeypatch.setattr(odouche, "Client", Upstream)
     monkeypatch.setattr(Upstream, "modes", [])
     monkeypatch.setattr(Upstream, "read", [])
+
     return monkeypatch
 
 
@@ -326,12 +337,14 @@ def _answer(tool: str, **arguments: Any) -> dict[str, Any]:
     result = _call(tool, **arguments)
     assert not result.is_error
     assert result.structured_content is not None
+
     return result.structured_content
 
 
 def _error(tool: str, **arguments: Any) -> str:
     result = _call(tool, **arguments)
     assert result.is_error
+
     return result.model_dump()["content"][0]["text"]
 
 
@@ -517,7 +530,6 @@ def test_the_history_is_listed_newest_first_with_each_event_whole():
 
 def test_the_history_reads_one_event_past_the_limit_and_no_more(upstream: pytest.MonkeyPatch):
     upstream.setattr(Upstream, "tracked", _history(MAX_HISTORY + 50))
-
     _answer("list_history", project="acme", branch="feature-x", limit=MAX_HISTORY + 10)
 
     assert Upstream.read == [MAX_HISTORY + 1]
@@ -553,7 +565,6 @@ def test_the_audit_log_is_listed_newest_first_in_its_untrusted_field():
 
 def test_the_audit_log_reads_one_entry_past_the_limit_and_no_more(upstream: pytest.MonkeyPatch):
     upstream.setattr(Upstream, "audited", _audit(MAX_AUDIT + 50))
-
     _answer("list_audit_log", project="acme", limit=MAX_AUDIT + 10)
 
     assert Upstream.read == [MAX_AUDIT + 1]
@@ -590,7 +601,6 @@ def test_audit_text_over_its_size_is_cut_to_it_as_json_and_says_so(
     upstream.setattr(Upstream, "audited", [_entry(1, **{field: unit * MAX_DETAILS})])
 
     answer = _answer("list_audit_log", project="acme")
-
     cut = answer["untrusted_entries"][0][field]
     assert "\n" not in cut
     assert cap - 2 <= encoded_size(cut) <= cap
@@ -751,7 +761,6 @@ def test_a_member_over_its_size_is_cut_to_it_as_json_and_says_so(upstream: pytes
     upstream.setattr(Upstream, "joined", [replace(_member(1), **{field: unit * MAX_NAME})])
 
     answer = _answer("list_members", project="acme")
-
     cut = answer["untrusted_members"][0][field]
     assert "\n" not in cut
     assert MAX_NAME - 2 <= encoded_size(cut) <= MAX_NAME

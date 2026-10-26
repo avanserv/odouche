@@ -39,6 +39,7 @@ class StubClient:
 
     def __init__(self, *, read_only: bool = False) -> None:
         self.modes.append(read_only)
+
         if self.error is not None:
             raise self.error
 
@@ -67,6 +68,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
         calls: list[str] = []
 
     monkeypatch.setattr(odouche, "Client", Client)
+
     return Client
 
 
@@ -176,7 +178,6 @@ def test_an_invalid_stage_is_a_usage_error_and_not_an_empty_list(client: type[St
 
 def test_an_unknown_stage_shows_what_odoo_sh_calls_it_and_sorts_last(client: type[StubClient]):
     client.found = (Branch(id=9, name="archive", stage=Stage.UNKNOWN, stage_name="archived"), *BRANCHES)
-
     table = run("branches", "list", "--project", "acme")
     as_json = run("--format", "json", "branches", "list", "--project", "acme")
     filtered = run("branches", "list", "--project", "acme", "--stage", "unknown")
@@ -188,7 +189,6 @@ def test_an_unknown_stage_shows_what_odoo_sh_calls_it_and_sorts_last(client: typ
 
 def test_the_listing_is_asked_once_whatever_the_number_of_branches(client: type[StubClient]):
     client.found = tuple(Branch(id=n, name=f"dev-{n}", stage=Stage.DEVELOPMENT, stage_name="dev") for n in range(10))
-
     result = run("branches", "list", "--project", "acme")
 
     assert len(rows(result)) == 11
@@ -197,7 +197,6 @@ def test_the_listing_is_asked_once_whatever_the_number_of_branches(client: type[
 
 def test_no_branches_is_a_line_on_stderr(client: type[StubClient]):
     client.found = ()
-
     result = run("branches", "list", "--project", "acme")
 
     assert result.exit_code == 0
@@ -207,7 +206,6 @@ def test_no_branches_is_a_line_on_stderr(client: type[StubClient]):
 
 def test_a_filter_that_matches_nothing_as_json_is_an_empty_list(client: type[StubClient]):
     client.found = BRANCHES[:1]
-
     result = run("--format", "json", "branches", "list", "--project", "acme", "--stage", "production")
 
     assert result.exit_code == 0
@@ -216,7 +214,6 @@ def test_a_filter_that_matches_nothing_as_json_is_an_empty_list(client: type[Stu
 
 def test_logged_out_exits_3_and_names_the_login(client: type[StubClient]):
     client.error = odouche.NoSessionError("Not logged in.")
-
     result = run("branches", "list", "--project", "acme")
 
     assert result.exit_code == 3
@@ -227,7 +224,6 @@ def test_logged_out_exits_3_and_names_the_login(client: type[StubClient]):
 @pytest.mark.parametrize("command", [("branches", "--help"), ("branches", "list", "--help")])
 def test_help_opens_neither_the_keyring_nor_the_network(client: type[StubClient], command: tuple[str, ...]):
     client.error = odouche.KeyringUnavailableError()
-
     result = run(*command)
 
     assert result.exit_code == 0

@@ -43,6 +43,7 @@ def test_a_project_is_immutable_and_holds_no_payload(client):
     project = client.projects()[0]
 
     assert [field.name for field in dataclasses.fields(project)] == ["id", "name", "repository", "url"]
+
     with pytest.raises(dataclasses.FrozenInstanceError):
         project.name = "other"
 
@@ -64,6 +65,7 @@ def test_asks_again_on_every_call(client, upstream):
 def test_ignores_a_field_it_does_not_read(client, upstream):
     expected = client.projects()
     upstream.bodies[PATH]["result"]["added"] = {"later": True}
+
     for repo in upstream.bodies[PATH]["result"]["repos"]:
         repo["added"] = "later"
 
@@ -74,6 +76,7 @@ def test_ignores_a_field_it_does_not_read(client, upstream):
 @pytest.mark.parametrize("change", ["missing", "false", "true", "list"])
 def test_names_the_field_that_changed_shape(client, upstream, field, change):
     repo = upstream.bodies[PATH]["result"]["repos"][1]
+
     if change == "missing":
         del repo[field]
     else:
@@ -112,6 +115,7 @@ def test_a_changed_shape_error_shows_nothing_of_the_answer(client, upstream, ses
         client.projects()
 
     text = "".join(traceback.format_exception(raised.value))
+
     for value in ("acme-shop", "Acme-Corp", "octo-dev", session):
         assert value not in text
 
@@ -133,6 +137,7 @@ def test_uses_the_stored_session_and_deletes_it_once_rejected(upstream, backend,
     assert upstream.requests[0].headers["Cookie"] == f"session_id={session}"
 
     upstream.bodies[PATH] = upstream.load("unauthenticated.json")
+
     with pytest.raises(SessionExpiredError):
         client.projects()
 
@@ -141,7 +146,6 @@ def test_uses_the_stored_session_and_deletes_it_once_rejected(upstream, backend,
 
 def test_uses_the_session_in_the_environment(upstream, backend, monkeypatch, session):
     monkeypatch.setenv(SESSION_ENV, session)
-
     Client().projects()
 
     assert upstream.requests[0].headers["Cookie"] == f"session_id={session}"

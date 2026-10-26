@@ -65,8 +65,10 @@ def create_server(*, allow_changes: bool = False) -> MCPServer:
     _add_project_tools(server)
     _add_branch_tools(server)
     _add_build_tools(server)
+
     if allow_changes:
         _add_change_tools(server)
+
     return server
 
 

@@ -31,5 +31,6 @@ def strip_line_control(text: str) -> str:
 def _unsequenced(found: re.Match[str]) -> str:
     """Return what a sequence leaves: nothing, or the text after a bare 8-bit introducer."""
     bare = found["bare"]
+
     # No string starts in it: each would end where this one does not.
     return _BARE_SEQUENCE.sub("", bare) if bare else ""

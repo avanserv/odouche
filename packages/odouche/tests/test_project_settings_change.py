@@ -141,7 +141,6 @@ def test_a_timeout_is_sent_in_the_unit_of_its_page(client, upstream):
 @pytest.mark.usefixtures("dedicated")
 def test_one_timeout_is_sent_with_the_other_at_its_value_as_read(client, upstream):
     answer(upstream)["dedicated_limits"]["limit_real_time_cron"]["value"] = 2.5
-
     outcome = client.change_project_settings("acme-shop", ProjectSettingsChange(http_timeout_seconds=1800))
 
     assert params(upstream) == [{"limit_real_time": "30", "limit_real_time_cron": "2.5"}]
@@ -162,10 +161,10 @@ def test_a_setting_the_change_cannot_send_that_moves_is_reported(client, upstrea
     def resets(request):
         store(upstream, json.loads(request.content)["params"])
         repo(upstream)[key] = False
+
         return httpx2.Response(200, json=upstream.load("set_project_settings.json"))
 
     upstream.bodies[SET] = resets
-
     outcome = client.change_project_settings("acme-shop", ProjectSettingsChange(ai_agent=AiAgent.OPENCODE))
 
     assert outcome.moved == (name,)
@@ -184,8 +183,8 @@ def test_a_timeout_off_its_unit_or_bounds_is_refused_before_the_request(client, 
 @pytest.mark.usefixtures("dedicated")
 def test_the_bounds_are_the_page_s_input_rounded_down_to_the_unit(client, upstream):
     answer(upstream)["dedicated_limits"]["limit_real_time"].update(min=90, max=7230)
-
     client.change_project_settings("acme-shop", ProjectSettingsChange(http_timeout_seconds=7200))
+
     with pytest.raises(SettingsConflictError, match="from 60 to 7200"):
         client.change_project_settings("acme-shop", ProjectSettingsChange(http_timeout_seconds=7260))
 
@@ -250,6 +249,7 @@ def test_an_allow_list_over_ten_entries_is_refused(client, upstream):
 
     with pytest.raises(SettingsConflictError, match="10 entries at most"):
         client.change_project_settings("acme-shop", ProjectSettingsChange(allow_ips=added))
+
     client.change_project_settings("acme-shop", ProjectSettingsChange(allow_ips=added, disallow_ips=(HOME,)))
 
     assert len(params(upstream)) == 1
@@ -383,6 +383,7 @@ def test_a_list_read_back_in_another_order_is_as_sent(client, upstream):
     def sorts(request):
         sent = json.loads(request.content)["params"]["ip_whitelist"]
         repo(upstream)["ip_whitelist"] = "\n".join(sorted(line.strip() for line in sent.splitlines()))
+
         return httpx2.Response(200, json=upstream.load("set_project_settings.json"))
 
     upstream.bodies[SET] = sorts
@@ -401,6 +402,7 @@ def test_settings_that_cannot_be_read_back_are_unknown(client, upstream, read_ba
             upstream.failures[GET] = read_back
         else:
             upstream.bodies[GET] = upstream.load(read_back) if isinstance(read_back, str) else read_back
+
         return httpx2.Response(200, json=upstream.load("set_project_settings.json"))
 
     upstream.bodies[SET] = save
@@ -416,10 +418,10 @@ def test_a_setting_odoo_sh_moves_along_is_reported_and_the_change_succeeds(clien
     def tests_off(request):
         store(upstream, json.loads(request.content)["params"])
         repo(upstream)["test_mode"] = "off"
+
         return httpx2.Response(200, json=upstream.load("set_project_settings.json"))
 
     upstream.bodies[SET] = tests_off
-
     outcome = client.change_project_settings("acme-shop", ProjectSettingsChange(module_install=ModuleInstall.ALL))
 
     assert outcome.moved == ("tests",)
@@ -471,6 +473,7 @@ def test_a_check_narrows_as_the_change_does_and_asks_nothing(upstream, session, 
         current, ProjectSettingsChange(public=True, ai_agent=AiAgent.CLAUDE, allow_ips=(OFFICE, VPN))
     )
     unchanged = client.check_project_settings_change(current, ProjectSettingsChange(ai_agent=AiAgent.CLAUDE))
+
     with pytest.raises(SettingsConflictError, match="dedicated"):
         client.check_project_settings_change(current, ProjectSettingsChange(http_timeout_seconds=600))
 

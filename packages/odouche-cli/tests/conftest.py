@@ -34,13 +34,16 @@ def unreached(monkeypatch: pytest.MonkeyPatch) -> Iterator[Callable[..., object]
         def refused(*_: object, **__: object) -> object:
             reached.append(name)
             msg = f"odouche.{name} has no stand-in."
+
             raise AssertionError(msg)
 
         return refused
 
     refusals = {name: refuse(name) for name in ("Client", "login", "logout")}
+
     for name, refused in refusals.items():
         monkeypatch.setattr(odouche, name, refused)
+
     yield refusals["Client"]
     # The command reports the error as its own, with an exit code a test may expect.
     assert reached == [], "A command reached the library with no stand-in."
@@ -61,8 +64,10 @@ def no_browser(monkeypatch: pytest.MonkeyPatch) -> None:
 def read_only_clients(unreached: Callable[..., object]) -> Iterator[None]:
     """Fail a test whose command built a client that writes. Test files of the commands that may write replace it."""
     yield
+
     if odouche.Client is unreached:
         return
+
     # `unreached` is asked for so that the test's stand-in is still in place here.
     modes: list[bool] | None = getattr(odouche.Client, "modes", None)
     assert modes is not None, "The stand-in for `odouche.Client` has to record each `read_only` in `modes`."
@@ -95,6 +100,7 @@ def checkout() -> Callable[..., None]:
     def checkout(branch: str = "feature-x", **remotes: str) -> None:
         _git("init", "--quiet", "--initial-branch", branch)
         _git("commit", "--quiet", "--allow-empty", "--message", "first")
+
         for name, url in remotes.items():
             _git("remote", "add", name, url)
 

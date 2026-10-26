@@ -99,13 +99,17 @@ class StubClient:
 
     def create_backup(self, project: str, branch: Branch, *, comment: str = "") -> BackupRequest:
         self.calls.append(f"create {project} {branch.name} {comment!r}")
+
         if self.lost is not None:
             raise self.lost
+
         return BackupRequest(build=LATEST, previous=None)
 
     def wait_for_backup(self, project: str, request: BackupRequest, *, timeout: float) -> Iterator[Backup | None]:
         self.calls.append(f"wait {project} {request.build.id} {timeout:g}")
+
         yield from self.looks
+
         if self.late is not None:
             raise self.late
 
@@ -124,6 +128,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     monkeypatch.setattr(odouche, "Client", Client)
     monkeypatch.setattr(_terminal, "stdin_is_terminal", lambda: True)
     monkeypatch.setattr(_terminal, "stderr_is_terminal", lambda: True)
+
     return Client
 
 
@@ -202,7 +207,6 @@ def test_a_run_nobody_attends_is_refused_before_a_client_is_opened(
 @pytest.mark.parametrize("arguments", [(), ("--yes",)], ids=["asked", "yes"])
 def test_a_development_branch_is_refused_before_anything_is_sent(client: type[StubClient], arguments: tuple[str, ...]):
     client.on_branch = FEATURE
-
     result = run(*CREATE, "--project", "acme", "--branch", "feature-x", *arguments, stdin="y\n")
 
     assert result.exit_code == 9
@@ -214,7 +218,6 @@ def test_a_development_branch_is_refused_before_anything_is_sent(client: type[St
 
 def test_a_branch_with_no_build_exits_4_before_the_question(client: type[StubClient]):
     client.latest = None
-
     result = run(*CREATE, *ON_STAGING, stdin="y\n")
 
     assert result.exit_code == 4
@@ -225,7 +228,6 @@ def test_a_branch_with_no_build_exits_4_before_the_question(client: type[StubCli
 
 def test_an_escape_sequence_in_a_name_is_not_emitted(client: type[StubClient]):
     client.latest = replace(LATEST, name=f"acme{ESCAPE}-staging\x9b31m")
-
     result = run(*CREATE, *ON_STAGING, stdin="n\n")
 
     assert not re.search(r"[\x00-\x09\x0b-\x1f\x7f-\x9f]", result.output)
@@ -234,7 +236,6 @@ def test_an_escape_sequence_in_a_name_is_not_emitted(client: type[StubClient]):
 
 def test_a_production_branch_is_backed_up(client: type[StubClient]):
     client.on_branch = replace(STAGING, name="main", stage=Stage.PRODUCTION, stage_name="production")
-
     result = run(*CREATE, "--project", "acme", "--branch", "main", "--yes")
 
     assert result.exit_code == 0
@@ -262,7 +263,6 @@ def test_wait_as_json_is_the_backup(client: type[StubClient]):
 def test_a_wait_that_times_out_exits_8_and_says_where_to_look(client: type[StubClient]):
     client.looks = (None,)
     client.late = odouche.StreamTimeoutError("The backup of build 124 was not finished at the timeout.")
-
     result = run(*CREATE, *ON_STAGING, "--yes", "--wait")
 
     assert result.exit_code == 8
@@ -295,7 +295,6 @@ def test_an_unknown_outcome_exits_10_and_names_the_backups_to_check(client: type
 
 def test_the_help_says_it_changes_state(client: type[StubClient]):
     result = run("backups", "--help")
-
     listed = [line for line in click.unstyle(result.output).splitlines() if " create " in line]
     assert len(listed) == 1
     assert "Change state on Odoo.sh" in listed[0]

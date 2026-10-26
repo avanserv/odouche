@@ -16,7 +16,6 @@ GUIDE = ROOT / "docs" / "mcp.md"
 README = ROOT / "packages" / "odouche-mcp" / "README.md"
 RELEASE = ROOT / "release-please-config.json"
 PINNED = [GUIDE, README]
-
 _SECTION = re.compile(r"^### `(\w+)`\n(.*?)(?=^##)", re.MULTILINE | re.DOTALL)
 _COMMAND = re.compile(r"odouche-mcp(?![\w-])(==[\w.]+)?")
 # What Release Please rewrites a version between.

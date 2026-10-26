@@ -24,7 +24,6 @@ from odouche_mcp.server import create_server
 
 
 SENTINEL = "sentinel-session-value"
-
 PROJECT = odouche.Project(id=1, name="acme", repository="acme/odoo", url="https://www.odoo.sh/project/acme")
 
 IDENTITY = odouche.Identity(
@@ -255,6 +254,7 @@ class StandIn:
         def answer(*_: object, **__: object) -> object:
             if self.failure:
                 raise self.failure
+
             return RESULTS[name]
 
         return answer
@@ -268,38 +268,48 @@ async def _tools(server: MCPServer[Any]) -> list[Tool]:
 def violations(server: MCPServer[Any]) -> list[str]:
     """Return what each registered tool lacks of the contract, each line starting with the tool's name."""
     found: list[str] = []
+
     for tool in asyncio.run(_tools(server)):
         lines = dict(line.split(": ", 1) for line in (tool.description or "").splitlines() if ": " in line)
         hints = tool.annotations or ToolAnnotations()
+
         if not NAME.fullmatch(tool.name):
             found.append(f"{tool.name}: not named verb then noun")
+
         found.extend(
             f"{tool.name}: no `{label}:` line"
             for label in (RETURNS, TOUCHES, BOUNDS)
             if not lines.get(label, "").strip()
         )
+
         if None in {hints.read_only_hint, hints.destructive_hint, hints.idempotent_hint, hints.open_world_hint}:
             found.append(f"{tool.name}: a hint is not set")
+
         if bool(hints.read_only_hint) != (lines.get(TOUCHES) == READS_ONLY):
             found.append(f"{tool.name}: the read-only hint and the `{TOUCHES}:` line disagree")
+
         if (tool.output_schema or {}).get("type") != "object":
             found.append(f"{tool.name}: no structured result")
+
         found.extend(
             f"{tool.name}: takes `{name}`, and a session is never an argument"
             for name in tool.input_schema.get("properties", {})
             if any(word in name.lower() for word in ("session", "cookie"))
         )
+
     return found
 
 
 def _arguments(tool: Tool) -> dict[str, object]:
     properties: dict[str, dict[str, Any]] = tool.input_schema.get("properties", {})
     required = {name: SAMPLES[properties[name]["type"]] for name in tool.input_schema.get("required", [])}
+
     return required | OPTIONAL.get(tool.name, {})
 
 
 async def _leaks(server: MCPServer[Any]) -> list[str]:
     found: list[str] = []
+
     async with Client(server) as client:
         for tool in (await client.list_tools()).tools:
             for failure in (None, *FAILURES):
@@ -307,14 +317,19 @@ async def _leaks(server: MCPServer[Any]) -> list[str]:
                 case = f"{tool.name}, {type(failure).__name__ if failure else 'answered'}"
                 result = await client.call_tool(tool.name, _arguments(tool))
                 dumped = result.model_dump_json()
+
                 if SENTINEL in dumped:
                     found.append(f"{case}: the session is in the result")
+
                 if "Traceback" in dumped:
                     found.append(f"{case}: a traceback is in the result")
+
                 if result.is_error != bool(failure):
                     found.append(f"{case}: {'no error' if failure else 'an error'}")
+
                 if failure and str(failure) not in result.model_dump()["content"][0]["text"]:
                     found.append(f"{case}: the error is not the library's message")
+
     return found
 
 
@@ -324,6 +339,7 @@ def leaks(server: MCPServer[Any]) -> list[str]:
         patch.setenv(odouche.SESSION_ENV, SENTINEL)
         patch.setattr(odouche, "Client", StandIn)
         patch.setattr(StandIn, "failure", None)
+
         return asyncio.run(_leaks(server))
 
 
@@ -444,6 +460,7 @@ def test_a_tool_that_takes_a_session_is_caught():
     def list_builds(session_id: str) -> Projects:
         """List the builds."""
         del session_id
+
         return Projects([])
 
     add(server, list_builds)
@@ -484,6 +501,7 @@ def test_a_tool_that_returns_the_session_is_caught():
         with odouche.Client() as client:
             client.projects()
             secret: odouche.Secret = client.secret  # pyright: ignore[reportAttributeAccessIssue]
+
             return Leak(secret.expose_secret())
 
     add(server, get_session)
@@ -513,6 +531,7 @@ def test_a_tool_with_no_stand_in_answer_is_caught():
         """Follow what the stand-in does not answer."""
         with odouche.Client() as client:
             client.follow_log("acme", BUILD, odouche.LogKind.ODOO, timeout=1)
+
         return Projects([])
 
     add(server, follow_log)
@@ -606,6 +625,7 @@ def test_an_undeclared_argument_fails_a_changing_tool_before_it_runs_and_not_a_r
     def list_builds(project: str) -> Projects:
         """List the builds."""
         ran.append(project)
+
         return Projects([])
 
     server = scratch()
@@ -621,6 +641,7 @@ def test_an_undeclared_argument_fails_a_changing_tool_before_it_runs_and_not_a_r
         async with Client(server) as client:
             changing = await client.call_tool("list_builds", {"project": "acme", "public": True})
             reading = await client.call_tool("list_projects", {"public": True})
+
             return changing.is_error, reading.is_error
 
     with pytest.MonkeyPatch.context() as patch:

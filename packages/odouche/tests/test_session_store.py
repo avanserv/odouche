@@ -31,8 +31,10 @@ KEY = (KEYRING_SERVICE, KEYRING_ENTRY)
 @pytest.fixture(autouse=True)
 def no_file_written(tmp_path, monkeypatch):
     monkeypatch.setenv("HOME", str(tmp_path))
+
     for name in ("XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", SESSION_ENV):
         monkeypatch.delenv(name, raising=False)
+
     yield
     assert list(tmp_path.iterdir()) == []
 
@@ -50,6 +52,7 @@ def shown(error):
     frames = [frame for frame, _ in traceback.walk_tb(error.__traceback__)]
     local = [repr(frame.f_locals) for frame in frames if frame.f_code.co_filename == _session.__file__]
     assert local
+
     return [str(error), repr(error), "".join(traceback.format_exception(error)), *local]
 
 
@@ -87,6 +90,7 @@ def test_ages_out(stored, clock):
 
     assert stored.entries == {}
     assert all(SESSION not in text for text in shown(raised.value))
+
     with pytest.raises(NoSessionError):
         store.load()
 
@@ -95,6 +99,7 @@ def test_a_caller_can_shorten_the_max_age(stored, clock):
     clock.now += timedelta(hours=2)
 
     assert SessionStore(max_age=timedelta(hours=2), clock=clock).load().expires_at == clock.now
+
     with pytest.raises(SessionExpiredError):
         SessionStore(max_age=timedelta(hours=1), clock=clock).load()
 
@@ -132,7 +137,6 @@ def test_the_environment_stays_in_memory(stored, clock, monkeypatch):
     entries, calls = dict(stored.entries), stored.calls
     monkeypatch.setenv(SESSION_ENV, OTHER)
     store = SessionStore(clock=clock)
-
     resolved = store.load()
     store.discard()
 
@@ -145,7 +149,6 @@ def test_the_environment_stays_in_memory(stored, clock, monkeypatch):
 
 def test_a_login_is_stored_whatever_the_environment_holds(backend, clock, monkeypatch):
     monkeypatch.setenv(SESSION_ENV, OTHER)
-
     SessionStore(clock=clock).save(Secret(SESSION))
 
     assert json.loads(backend.entries[KEY])["session"] == SESSION
@@ -167,7 +170,6 @@ def test_a_passed_session_wins_and_is_never_stored(stored, clock, monkeypatch):
     entries, calls = dict(stored.entries), stored.calls
     monkeypatch.setenv(SESSION_ENV, SESSION)
     store = SessionStore(Secret(OTHER), clock=clock)
-
     resolved = store.load()
     store.discard()
 
@@ -207,6 +209,7 @@ def test_check_raises_with_a_keyring_that_stays_locked(stored):
 def locked(stored, monkeypatch):
     monkeypatch.setattr(_session, "_WAIT", 0.01)
     stored.lock()
+
     yield stored
     stored.unlock()
 
@@ -238,7 +241,6 @@ def test_a_discard_given_up_on_deletes_nothing_later(locked, clock):
 
 def test_a_dialog_answered_within_the_wait_lets_the_call_through(locked, clock):
     threading.Timer(0.01, locked.dialog.set).start()
-
     SessionStore(clock=clock).save(Secret(OTHER), 60)
 
     assert json.loads(locked.entries[KEY])["session"] == OTHER
@@ -254,7 +256,6 @@ def test_a_write_that_has_started_is_waited_for(stored, clock, monkeypatch):
 
     monkeypatch.setattr(stored, "set_password", slow)
     threading.Timer(0.05, written.set).start()
-
     SessionStore(clock=clock).save(Secret(OTHER), 0.01)
 
     assert json.loads(stored.entries[KEY])["session"] == OTHER
@@ -283,6 +284,7 @@ def test_an_interrupted_wait_writes_nothing_later(locked, clock, monkeypatch):
             if self.interrupts:
                 self.interrupts = 0
                 raise KeyboardInterrupt
+
             return super().wait(timeout)
 
     monkeypatch.setattr(_session, "Event", Interrupted)

@@ -196,6 +196,7 @@ line-ending = "lf"
 # is a bare name because the hook hands files over without the leading `./` a tree walk gives them.
 [tool.codespell]
 skip = "uv.lock,./.git,./.venv,./.cache,./site,./dist,./build,./htmlcov,./coverage.xml,*.har"
+ignore-words-list = "spacify"
 
 [tool.vulture]
 paths = ["packages", "scripts", "examples"]
@@ -212,6 +213,7 @@ dev = [
     "pytest-cov>=7.1.0",
     "pytest-randomly>=5.0.0",
     "ruff>=0.16.9",
+    "spacify>=0.2.0",
     "vulture>=2.16",
     "zensical>=0.0.67",
     "zizmor>=1.30.1",

@@ -68,21 +68,29 @@ def to_json(value: object) -> object:
     """Turn a model into what `json` can dump, refusing any type it does not know."""
     if value is None or isinstance(value, (bool, int, float)):
         return value
+
     if isinstance(value, Enum):
         return to_json(value.value)
+
     if isinstance(value, (str, IPv4Address, IPv6Address, IPv4Network, IPv6Network)):
         return str(value)
+
     if isinstance(value, datetime):
         if value.utcoffset() is None:
             msg = "A datetime without an offset cannot be printed as JSON."
             raise ValueError(msg)
+
         return value.isoformat()
+
     if isinstance(value, (list, tuple)):
         return [to_json(item) for item in value]  # pyright: ignore[reportUnknownVariableType]
+
     if is_dataclass(value) and not isinstance(value, type):
         return {field.name: to_json(getattr(value, field.name)) for field in fields(value)}
+
     # The type only: the value could be a secret.
     msg = f"{type(value).__name__} cannot be printed as JSON."
+
     raise TypeError(msg)
 
 
@@ -95,18 +103,24 @@ class Output:
     def rows[T](self, items: Iterable[T], columns: Sequence[Column[T]], *, empty: str) -> None:
         """Print a list of models. With none, a table is the `empty` line on stderr."""
         items = list(items)
+
         if self.format is Format.JSON:
             _echo_json(items, indent=2)
             return
+
         if not items:
             typer.echo(empty, err=True)
             return
+
         plain = _plain()
         table = Table(box=None if plain else box.SIMPLE_HEAD, pad_edge=not plain)
+
         for column in columns:
             table.add_column(Text(column.header))
+
         for item in items:
             table.add_row(*(_cell(column, item) for column in columns))
+
         _print(table, plain=plain)
 
     def one[T](self, item: T, columns: Sequence[Column[T]]) -> None:
@@ -114,11 +128,14 @@ class Output:
         if self.format is Format.JSON:
             _echo_json(item, indent=2)
             return
+
         table = Table(box=None, show_header=False, pad_edge=False)
         table.add_column(style="bold")
         table.add_column()
+
         for column in columns:
             table.add_row(Text(column.header), _cell(column, item))
+
         _print(table, plain=_plain())
 
     def stream[T](self, items: Iterable[T], line: Callable[[T], str]) -> None:
@@ -138,18 +155,22 @@ class Output:
         if self.format is Format.JSON:
             self.stream(items, text)
             return
+
         if strip is None:
             strip = _is_terminal()
+
         for item in items:
             _echo_line(strip_line_control(text(item)) if strip else text(item))
 
 
 def _echo_json(value: object, *, indent: int | None) -> None:
     dumped = json.dumps(to_json(value), indent=indent, ensure_ascii=False)
+
     try:
         dumped.encode(sys.stdout.encoding or "utf-8")
     except (UnicodeEncodeError, LookupError):
         dumped = json.dumps(to_json(value), indent=indent)
+
     # `json` escapes C0 and leaves DEL and C1 as they are.
     typer.echo(_JSON_UNESCAPED.sub(lambda found: f"\\u{ord(found[0]):04x}", dumped))
 
@@ -166,6 +187,7 @@ def _cell[T](column: Column[T], item: T) -> Text:
     """Make a cell of literal text, so a value holding `[bold]` or an escape sequence is not obeyed."""
     value = column.value(item)
     style = column.style(item) if column.style else None
+
     return Text("" if value is None else strip_control(str(value)), style=style or "")
 
 
@@ -187,10 +209,13 @@ def _print(table: Table, *, plain: bool) -> None:
     if not plain:
         Console(file=sys.stdout, highlight=False).print(table)
         return
+
     # Not a terminal even where colour is forced, as it is on a CI runner.
     console = Console(file=sys.stdout, force_terminal=False, no_color=True, width=_PLAIN_WIDTH, highlight=False)
+
     with console.capture() as capture:
         console.print(table)
+
     # Rich pads every cell to its column's width.
     for line in capture.get().removesuffix("\n").split("\n"):
         typer.echo(line.rstrip())

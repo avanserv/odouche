@@ -13,7 +13,10 @@ def target(build: Build) -> SshTarget:
     # A negative number would start with a dash.
     if type(build.id) is not int or build.id < 1:
         raise UpstreamChangedError(_OPERATION, "id")
+
     host = builds.host(build, _OPERATION)
+
     if host is None:
         raise NotFoundError(f"Build {build.id} has no host to connect to.", operation=_OPERATION)
+
     return SshTarget(user=str(build.id), host=host)

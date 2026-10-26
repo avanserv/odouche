@@ -65,23 +65,33 @@ class File:
         asked = request.headers["Range"]
         self.ranges.append(asked)
         failure = self.failures.pop(0) if self.failures else None
+
         if isinstance(failure, type):
             raise failure(f"failed, token={TOKEN}", request=request)
+
         if failure is not None and failure >= httpx2.codes.OK:
             return httpx2.Response(failure)
+
         size = len(self.content)
+
         if not size:
             return httpx2.Response(200)
+
         first = max(size - int(asked[7:]), 0) if asked.startswith("bytes=-") else int(asked[6:-1])
+
         if self.whole and asked.startswith("bytes=-"):
             first = 0
+
         headers = {"Content-Range": f"bytes {first}-{size - 1}/{size}", "Set-Cookie": "session_id=w0rk3r; Path=/"}
         body = self.content[first:]
+
         if failure is not None:
             return httpx2.Response(206, headers=headers, stream=Dropped(body[:failure]))
+
         if self.chunk:
             pieces = [body[at : at + self.chunk] for at in range(0, len(body), self.chunk)]
             return httpx2.Response(206, headers=headers, content=iter(pieces))
+
         return httpx2.Response(206, headers=headers, content=body)
 
 
@@ -107,6 +117,7 @@ def time(monkeypatch):
     time = Time()
     monkeypatch.setattr(logs, "_monotonic", time.monotonic)
     monkeypatch.setattr(logs, "_sleep", time.sleep)
+
     return time
 
 
@@ -114,6 +125,7 @@ def time(monkeypatch):
 def file(upstream):
     upstream.bodies[INFO]["result"]["access_token"] = TOKEN
     upstream.bodies[INSTALL] = File()
+
     return upstream.bodies[INSTALL]
 
 
@@ -126,6 +138,7 @@ def build(client):
 def worker_requests(upstream, build):
     """The requests sent after the build was read."""
     upstream.requests.clear()
+
     return upstream.requests
 
 
@@ -168,6 +181,7 @@ def test_a_log_is_immutable(client, build, file):
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         line.text = "other"
+
     with pytest.raises(dataclasses.FrozenInstanceError):
         client.logs(PROJECT, build)[0].name = "other"
 
@@ -180,9 +194,11 @@ def test_a_worker_gets_the_token_and_never_the_session(client, build, file, work
     assert b'"params":{"token":"' + TOKEN.encode() + b'"}' in listing.content.replace(b" ", b"")
     assert (read.method, str(read.url)) == ("GET", f"https://{WORKER}{INSTALL}?token={TOKEN}")
     assert read.headers["Accept-Encoding"] == "identity"
+
     for request in (listing, read):
         assert "Cookie" not in request.headers
         assert session not in str(request.url)
+
     assert len(client._transport._client.cookies.jar) == 0
 
 
@@ -216,7 +232,6 @@ def test_a_tail_leaves_out_the_line_the_last_mebibyte_starts_inside(client, buil
 def test_a_part_longer_than_asked_for_is_read_from_its_last_mebibyte(client, build, file, monkeypatch):
     monkeypatch.setattr(logs, "TAIL_BYTES", len(CONTENT) - 10)
     file.whole = True
-
     lines = list(client.read_log(PROJECT, build, LogKind.INSTALL, tail=50))
 
     assert texts(lines) == LINES[1:]
@@ -226,6 +241,7 @@ def test_a_part_longer_than_asked_for_is_read_from_its_last_mebibyte(client, bui
 def test_a_tail_of_a_log_of_newlines_holds_no_line_for_each(client, build, file):
     file.content = b"\n" * 200_000
     tracemalloc.start()
+
     try:
         count = sum(1 for _ in client.read_log(PROJECT, build, LogKind.INSTALL, tail=len(file.content)))
         _, most = tracemalloc.get_traced_memory()
@@ -259,7 +275,6 @@ def test_lines_are_the_same_however_the_bytes_arrive(client, build, file):
 def test_a_line_longer_than_the_maximum_is_cut_and_marked(client, build, file):
     file.content = b"short\n" + b"x" * (logs.MAX_LINE * 3) + b"\nafter\n"
     file.chunk = 5000
-
     lines = list(client.read_log(PROJECT, build, LogKind.INSTALL))
 
     assert [(len(line.text), line.truncated) for line in lines] == [(5, False), (logs.MAX_LINE, True), (5, False)]
@@ -277,7 +292,6 @@ def test_following_from_the_offset_of_a_cut_line_starts_at_the_next_line(client,
     file.content = b"x" * (logs.MAX_LINE * 2) + b"\nafter\n"
     file.chunk = 5000
     cut = next(client.read_log(PROJECT, build, LogKind.INSTALL))
-
     following = client.follow_log(PROJECT, build, LogKind.INSTALL, timeout=60, offset=cut.offset)
 
     assert next(following).text == "after"
@@ -318,8 +332,10 @@ def test_a_build_that_waits_for_a_worker_has_no_log(client, file, upstream):
     upstream.requests.clear()
 
     assert client.logs(PROJECT, waiting) == []
+
     with pytest.raises(NotFoundError, match="waits for a worker"):
         client.read_log(PROJECT, waiting, LogKind.INSTALL)
+
     assert {request.url.host for request in upstream.requests} == {"www.odoo.sh"}
 
 
@@ -377,11 +393,13 @@ def test_a_token_that_is_not_one_is_a_changed_upstream(client, upstream, build, 
 def test_a_worker_that_is_not_a_host_of_odoo_com_is_asked_nothing(client, upstream, build, file, worker):
     for listed in upstream.bodies[BUILDS]["result"][0]["builds"]:
         listed["worker_url"] = worker
+
     upstream.requests.clear()
 
     for call in (client.logs, lambda *args: client.read_log(*args, LogKind.INSTALL)):
         with pytest.raises(UpstreamChangedError) as raised:
             call(PROJECT, build)
+
         assert raised.value.field == "worker_url"
 
     assert {request.url.host for request in upstream.requests} == {"www.odoo.sh"}
@@ -468,7 +486,6 @@ def test_follows_new_lines_one_request_a_second(client, build, file, time):
     file.content = b"old\n"
     added = [b"one\ntw", b"", b"o\nthree\n"]
     time.during = lambda: setattr(file, "content", file.content + added.pop(0))
-
     following = client.follow_log(PROJECT, build, LogKind.INSTALL, timeout=60)
     lines = [next(following) for _ in range(3)]
     following.close()
@@ -481,7 +498,6 @@ def test_follows_new_lines_one_request_a_second(client, build, file, time):
 
 def test_follows_after_the_last_lines_asked_for(client, build, file, time):
     time.during = lambda: setattr(file, "content", CONTENT + b"new\n")
-
     following = client.follow_log(PROJECT, build, LogKind.INSTALL, timeout=60, tail=2)
 
     assert texts(next(following) for _ in range(3)) == [*LINES[-2:], "new"]
@@ -517,7 +533,6 @@ def test_follows_from_the_offset_of_a_line_read_before(client, build, file, time
 def test_follows_through_a_dropped_connection_with_every_line_once(client, build, file, time):
     two = len(LINES[0]) + len(LINES[1]) + 2
     file.failures = [two + 10]
-
     following = client.follow_log(PROJECT, build, LogKind.INSTALL, timeout=60, offset=0)
 
     assert texts(next(following) for _ in LINES) == LINES
@@ -568,7 +583,6 @@ def test_a_log_still_followed_at_the_timeout_raises_the_timeout_error(client, bu
 def test_a_follow_with_no_limit_asks_every_second_and_raises_nothing(client, build, file, time):
     file.content = b"old\n"
     time.during = lambda: setattr(file, "content", file.content + b"new\n")
-
     following = client.follow_log(PROJECT, build, LogKind.INSTALL, timeout=math.inf)
 
     assert texts(next(following) for _ in range(3)) == ["new"] * 3
@@ -592,6 +606,7 @@ def test_closing_early_closes_the_connection_and_asks_nothing_more(client, build
     def watched(request):
         response = answer(request)
         response.stream.close = lambda: closed.append(True)
+
         return response
 
     file.__class__ = type("Watched", (File,), {"__call__": lambda self, request: watched(request)})
@@ -620,6 +635,7 @@ def test_an_error_and_the_library_log_hold_neither_the_token_nor_the_log(client,
     with caplog.at_level(logging.DEBUG):
         assert texts(client.read_log(PROJECT, build, LogKind.INSTALL)) == LINES
         file.failures = [failure] * 3
+
         with pytest.raises(OdoucheError) as raised:
             list(client.read_log(PROJECT, build, LogKind.INSTALL))
 
@@ -629,6 +645,7 @@ def test_an_error_and_the_library_log_hold_neither_the_token_nor_the_log(client,
     shown += [f"{record.getMessage()} {record.args}" for record in caplog.records]
     assert f"GET {INSTALL}: " in "".join(shown)
     assert f"HTTP Request: GET https://{WORKER}{INSTALL} " in "".join(shown)
+
     for text in shown:
         assert TOKEN not in text
         assert "odoo.modules.loading" not in text
@@ -638,7 +655,6 @@ def test_a_token_is_not_shown(client, build, file, monkeypatch):
     seen = []
     worker_call = type(client._transport).worker_call
     monkeypatch.setattr(type(client._transport), "worker_call", lambda *args: seen.append(args) or worker_call(*args))
-
     client.logs(PROJECT, build)
 
     assert TOKEN not in repr(seen)

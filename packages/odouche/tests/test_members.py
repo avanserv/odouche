@@ -150,7 +150,6 @@ def test_another_project_answered_is_a_changed_shape(client, upstream, path, bod
 
 def test_a_member_keeps_no_field_but_those_of_the_model(client, upstream):
     users(upstream)[1]["email"] = "jane@example.com"
-
     read = client.members("acme-shop")
 
     assert read[1] == MEMBERS[1]

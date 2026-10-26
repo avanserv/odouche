@@ -33,6 +33,7 @@ def first_column(heading: str) -> list[str]:
     section = GUIDE.read_text(encoding="utf-8").split(f"\n{heading}\n", 1)[1]
     rows = [line for line in section.split("\n#", 1)[0].splitlines() if line.startswith("|")]
     assert len(rows) > 2, f"No table under {heading}."
+
     return [row.split("|")[1].strip() for row in rows[2:]]
 
 
@@ -40,6 +41,7 @@ def read(source: str) -> list[str]:
     """Return each name the environment is asked for in a source, and fail on a read this does not follow."""
     found = [by_call or by_test for by_call, by_test in _ENVIRON.findall(source)]
     assert len(found) == len(_ENVIRON_WORD.findall(source)), "The environment is read in a way this does not follow."
+
     return found
 
 
@@ -48,7 +50,9 @@ def declared(command: Any) -> Iterator[str]:
     for parameter in command.params:
         variables = parameter.envvar or ()
         yield from [variables] if isinstance(variables, str) else variables
+
     children: dict[str, Any] = getattr(command, "commands", {})
+
     for child in children.values():
         yield from declared(child)
 
@@ -57,7 +61,6 @@ def test_the_exit_code_table_has_every_code_and_no_other():
     constants = {value for name, value in vars(_errors).items() if name.startswith("EXIT_") and isinstance(value, int)}
     mapped = {code for _, code, _ in _errors.EXIT_CODES}
     cells = first_column("### Exit codes")
-
     listed = [int(cell) for cell in cells if cell.isdecimal()]
 
     assert sorted(listed) == sorted(BUILT_IN | constants | mapped)
@@ -86,7 +89,6 @@ def test_a_named_exit_code_is_not(line: str):
 def test_the_variable_table_has_every_variable_an_option_reads():
     cells = first_column("### Environment variables")
     listed = {name for cell in cells for name in re.findall(r"`([A-Z_]+)`", cell)}
-
     options = set(declared(typer.main.get_command(app)))
 
     assert {"OSH_PROJECT", "OSH_BRANCH", "OSH_DEBUG"} <= options
@@ -96,7 +98,6 @@ def test_the_variable_table_has_every_variable_an_option_reads():
 def test_the_variable_table_has_every_variable_the_source_reads():
     cells = first_column("### Environment variables")
     listed = {name for cell in cells for name in re.findall(r"`([A-Z_]+)`", cell)}
-
     found = {name for path in sorted(SOURCE.glob("*.py")) for name in read(path.read_text(encoding="utf-8"))}
 
     # A new read needs a row in `READ`, and so in the table.

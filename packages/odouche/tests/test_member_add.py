@@ -50,6 +50,7 @@ def adds(upstream):
         body = upstream.load("add_collaborator.json")
         body["result"]["access_level"] = json.loads(request.content)["params"]["access_level"]
         users(upstream).append(body["result"])
+
         return httpx2.Response(200, json=body)
 
     upstream.bodies[ADD] = answer
@@ -255,6 +256,7 @@ def test_an_addition_whose_members_cannot_be_read_back_is_unknown(client, upstre
             upstream.failures[SETTINGS] = failure
         else:
             upstream.bodies[SETTINGS] = upstream.load(failure)
+
         return httpx2.Response(200, json=upstream.load("add_collaborator.json"))
 
     upstream.bodies[ADD] = answer
@@ -280,13 +282,15 @@ def test_a_check_refuses_what_an_addition_refuses_and_asks_nothing(upstream, ses
     client = Client(Secret(session), read_only=read_only)
     listed = Client(Secret(session)).members("acme-shop")
     upstream.requests.clear()
-
     client.check_add_member("octo-cat", MemberRole.TESTER)
     Client.check_add_member("octo-cat", MemberRole.TESTER, listed)
+
     with pytest.raises(MemberRefusedError, match="already a member"):
         client.check_add_member("Octo-Dev", MemberRole.TESTER, listed)
+
     with pytest.raises(ValueError, match="not a GitHub login"):
         Client.check_add_member("octo--cat", MemberRole.TESTER)
+
     with pytest.raises(ValueError, match="MemberRole"):
         client.check_add_member("octo-cat", "owner")  # pyright: ignore[reportArgumentType]
 

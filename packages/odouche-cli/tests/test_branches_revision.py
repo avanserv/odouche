@@ -17,7 +17,6 @@ from odouche_cli.app import app
 
 NOW = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
 SUBMODULES = "Submodule commits are not available: Odoo.sh does not give them.\n"
-
 ACME = odouche.Project(id=1, name="acme", repository="acme/odoo", url="https://www.odoo.sh/project/acme")
 MAIN = Branch(id=1, name="main", stage=Stage.PRODUCTION, stage_name="production")
 FEATURE = Branch(id=4, name="feature-x", stage=Stage.DEVELOPMENT, stage_name="dev")
@@ -111,6 +110,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
 
     monkeypatch.setattr(odouche, "Client", Client)
     monkeypatch.setattr(_time, "_now", lambda: NOW)
+
     return Client
 
 
@@ -121,6 +121,7 @@ def run(*args: str) -> Result:
 def pairs(result: Result) -> dict[str, str]:
     """Read each line as a header and its value, which two spaces or more separate."""
     found = [re.split(r"\s{2,}", line.strip(), maxsplit=1) for line in result.stdout.splitlines()]
+
     return {row[0]: row[1] if len(row) > 1 else "" for row in found}
 
 
@@ -154,7 +155,6 @@ def test_the_head_commit_and_the_branch_s_odoo_revision_are_on_a_line_each(clien
 )
 def test_a_pinned_revision_or_none_is_said(client: type[StubClient], selected: OdooRevision | None, shown: str):
     client.selected = selected
-
     shown_pairs = pairs(run("--project", "acme", "--branch", "feature-x"))
 
     assert shown_pairs["Branch's Odoo revision"] == shown
@@ -165,7 +165,6 @@ def test_a_pinned_revision_or_none_is_said(client: type[StubClient], selected: O
 
 def test_a_repository_s_name_is_printed_without_its_escape_sequences(client: type[StubClient]):
     client.selected = replace(LATEST, refs=(OdooRef("od\x1b[2Joo", ODOO, "https://github.com/odoo/odoo"),))
-
     result = run("--project", "acme", "--branch", "feature-x")
 
     assert "\x1b" not in result.stdout

@@ -10,10 +10,13 @@ def unhelped(command: Any, path: str) -> Iterator[str]:
     """Walk a command's tree and name each command, group, argument and option that has no help text."""
     if not (command.help or "").strip():
         yield path
+
     for parameter in command.params:
         if not (getattr(parameter, "help", None) or "").strip():
             yield f"{path} {parameter.opts[0]}"
+
     children: dict[str, Any] = getattr(command, "commands", {})
+
     for name, child in children.items():
         yield from unhelped(child, f"{path} {name}")
 
@@ -27,7 +30,9 @@ def test_every_command_has_an_example():
     def without(command: Any, path: str) -> Iterator[str]:
         if not (command.epilog or "").startswith("Example: "):
             yield path
+
         children: dict[str, Any] = getattr(command, "commands", {})
+
         for name, child in children.items():
             yield from without(child, f"{path} {name}")
 

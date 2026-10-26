@@ -15,7 +15,6 @@ from pathlib import Path
 LOG = Path(os.environ["FAKE_BROWSER_LOG"])
 COOKIES = json.loads(os.environ.get("FAKE_BROWSER_COOKIES", "[[]]"))
 MODE = os.environ.get("FAKE_BROWSER_MODE", "")
-
 TARGETS = [{"targetId": "browser-1", "type": "browser"}, "not a target", {"targetId": "page-1", "type": "page"}]
 
 
@@ -30,6 +29,7 @@ def write(message):
 
 def answer(message):
     method, reply = message["method"], {"id": message["id"], "result": {}}
+
     if method == "Target.getTargets":
         reply["result"] = {"targetInfos": TARGETS[:2] if MODE == "no-page" else TARGETS}
     elif method == "Target.attachToTarget":
@@ -41,34 +41,45 @@ def answer(message):
     elif method == "Network.getCookies":
         if MODE == "closed":
             sys.exit(0)
+
         reply["result"] = {"cookies": COOKIES.pop(0) if len(COOKIES) > 1 else COOKIES[0]}
     elif method == "Browser.close":
         if MODE == "hangs":
             return
+
         write(reply)
         sys.exit(0)
     else:
         reply = {"id": message["id"], "error": {"code": -32601, "message": "not found"}}
+
     write(reply)
 
 
 def main():
     profile = next(arg.partition("=")[2] for arg in sys.argv if arg.startswith("--user-data-dir="))
+
     if MODE != "elsewhere":
         Path(profile, "Cookies").write_text("what the profile holds of the GitHub sign-in")
+
     helper = os.fork() if MODE == "helper" else None
+
     if helper == 0:
         os.close(3)
         os.close(4)
+
         for beat in range(600):
             LOG.with_suffix(".helper").write_text(str(beat))
             time.sleep(0.05)
+
         return
+
     launch = {"argv": sys.argv[1:], "pid": os.getpid(), "helper": helper}
     record({**launch, "stdio": [os.fstat(fd).st_rdev for fd in (0, 1, 2)]})
     buffer = b""
+
     while chunk := os.read(3, 65536):
         buffer += chunk
+
         while b"\0" in buffer:
             raw, _, buffer = buffer.partition(b"\0")
             message = json.loads(raw)

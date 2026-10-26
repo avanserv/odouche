@@ -20,8 +20,6 @@ from odouche_cli.app import app, root
 
 # Every bidirectional control, each of which can reorder what a terminal shows.
 BIDI = "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
-
-
 SENTINEL = "sentinel-session-value"
 ANSI = re.compile(r"\x1b\[")
 BOX = re.compile(r"[─-╿]")
@@ -111,7 +109,6 @@ def test_a_terminal_table_has_a_rule_under_its_header(capsys: pytest.CaptureFixt
 @pytest.mark.usefixtures("terminal")
 def test_no_color_makes_a_terminal_table_plain(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]):
     monkeypatch.setenv("NO_COLOR", "1")
-
     Output().rows([THING], COLUMNS, empty="No things.")
 
     out = capsys.readouterr().out
@@ -154,6 +151,7 @@ def test_a_json_stream_prints_each_row_as_it_arrives(capsys: pytest.CaptureFixtu
     def things() -> Iterator[Thing]:
         yield THING
         seen.append(capsys.readouterr().out)
+
         yield OTHER
 
     Output(Format.JSON).stream(things(), lambda thing: thing.owner.name)
@@ -291,7 +289,6 @@ def test_a_terminal_table_has_no_colour_where_the_environment_refuses_it(
 ):
     monkeypatch.delenv("TTY_COMPATIBLE")
     monkeypatch.setenv(variable, value)
-
     Output().one(THING, COLUMNS)
 
     assert not ANSI.search(capsys.readouterr().out)

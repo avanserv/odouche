@@ -56,8 +56,11 @@ def login_step() -> str:
 def tool_error(error: odouche.OdoucheError) -> ToolError:
     """Return the tool error that says what happened and, when there is one, the next step."""
     step = next(step for kind, step in NEXT_STEPS if isinstance(error, kind))
+
     if isinstance(error, odouche.OutcomeUnknownError):
         step = OUTCOME_STEPS.get(error.operation or "", step)
+
     if step is LOGIN:
         step = login_step()
+
     return ToolError(f"{error} {step}" if step else str(error))

@@ -55,6 +55,7 @@ def settings(transport: Transport, branch_id: int) -> BranchSettings:
         ),
     )
     result = answer.child("result")
+
     return BranchSettings(
         push_behavior=choice(result, "push_behavior", _PUSH),
         project_defaults=result.boolean("apply_default_settings"),
@@ -82,13 +83,17 @@ def change_settings(transport: Transport, branch_id: int, change: SettingsChange
     stage = branches.stage(builds.entry(transport, branch_id, 1).child("branch_info").text("stage"))
     current = settings(transport, branch_id)
     narrowed = narrow(stage, current, change)
+
     if narrowed is None:
         return SettingsOutcome(current, current, ())
+
     transport.change(_OPERATION_CHANGE, f"/app/branch/{branch_id}/set_settings", _form(narrowed))
+
     try:
         after = settings(transport, branch_id)
     except OdoucheError:
         after = None
+
     return confirm(
         Sent(_OPERATION_CHANGE, f"branch {branch_id}'s settings", narrowed.given()), current, after, _SETTABLE, same
     )
@@ -115,13 +120,16 @@ def confirm[S](
         found = "the settings could not be read back"
     else:
         unsent = [name for name, value in sent.values.items() if not same(after, name, value)]
+
         if not unsent:
             # Odoo.sh may adjust a setting that depends on one sent, as the page does: reported, not refused.
             moved = tuple(
                 name for name in settable if name not in sent.values and not same(after, name, getattr(before, name))
             )
             return SettingsOutcome(before, after, moved)
+
         found = f"the settings read back show {', '.join(unsent)} not as sent"
+
     # As unknown: an error that reads as a failure invites a second change.
     raise OutcomeUnknownError(
         f"The change of {sent.subject} was sent, and {found}. Look before trying again.", operation=sent.operation
@@ -135,22 +143,29 @@ def narrow(stage: Stage, current: BranchSettings, change: SettingsChange) -> Set
     `SettingsConflictError` for one the tab disables, or hides, given the settings after the change.
     """
     differs = {name: value for name, value in change.given().items() if not same(current, name, value)}
+
     if not differs:
         return None
+
     if "push_behavior" in differs and stage is Stage.PRODUCTION:
         msg = "What a new commit does is not changed on a production branch: its Settings tab does not offer it."
         raise StageRefusedError(msg, operation=_OPERATION_CHANGE)
+
     if differs.keys() & _BUILD_OPTIONS and stage is not Stage.DEVELOPMENT:
         msg = f"The new build options are changed on a development branch only, and this one is {stage.value}."
         raise StageRefusedError(msg, operation=_OPERATION_CHANGE)
+
     after = replace(current, **differs)  # pyright: ignore[reportArgumentType]
+
     if differs.keys() & (_BUILD_OPTIONS - {"project_defaults"}) and after.project_defaults:
         msg = (
             "The project's development defaults apply to this branch, so its own new build options are not "
             "changed: turn `project_defaults` off in the same change."
         )
         raise SettingsConflictError(msg)
+
     check_options(differs.keys(), after)
+
     return replace(change, **dict.fromkeys(change.given().keys() - differs.keys()))
 
 
@@ -170,12 +185,15 @@ def check_options(changed: Set[str], after: Options) -> None:
     if "modules" in changed and after.module_install is not ModuleInstall.LISTED:
         msg = "`modules` applies only while `module_install` is `listed`: give both in one change."
         raise SettingsConflictError(msg)
+
     if changed & {"module_install", "modules"} and after.module_install is ModuleInstall.LISTED and not after.modules:
         msg = "`module_install` `listed` installs the modules of `modules`, which names none."
         raise SettingsConflictError(msg)
+
     if changed & {"tests", "test_tags"} and after.module_install is ModuleInstall.ALL:
         msg = "`tests` and `test_tags` are not offered while `module_install` is `all`, which turns the tests off."
         raise SettingsConflictError(msg)
+
     if "test_tags" in changed and after.tests is not BuildTests.TAGS:
         msg = "`test_tags` applies only while `tests` is `tags`: give both in one change."
         raise SettingsConflictError(msg)
@@ -184,9 +202,11 @@ def check_options(changed: Set[str], after: Options) -> None:
 def same(read: object, name: str, value: object) -> bool:
     """Tell whether the settings `read` hold `value` for the setting `name`."""
     held: object = getattr(read, name)
+
     if name == "test_tags":
         # Odoo.sh gives no tags as `false`, which the page shows as an empty field.
         return (value or None) == (held or None)
+
     return value == held
 
 
@@ -196,6 +216,7 @@ def _form(change: SettingsChange) -> dict[str, str]:
         "push_behavior": None if change.push_behavior is None else _PUSH_SENT[change.push_behavior],
         "apply_default_settings": None if change.project_defaults is None else flag(change.project_defaults),
     }
+
     return {key: value for key, value in sent.items() if value is not None} | option_params(change)
 
 
@@ -226,6 +247,7 @@ def option_params(change: GivenOptions) -> dict[str, str]:
         "demo_data": None if change.demo_data is None else flag(change.demo_data),
         "ai_agent": None if change.ai_agent is None else _AGENTS_SENT[change.ai_agent],
     }
+
     return {key: value for key, value in sent.items() if value is not None}
 
 
@@ -238,12 +260,15 @@ def choice[E](reader: Reader, key: str, known: dict[str, E]) -> E:
     """Return the member of `known` a field names. One it does not hold raises the changed shape error."""
     # Unlike a stage or a status, a setting is read to be written back: an unknown one is not passed through.
     member = known.get(reader.text(key))
+
     if member is None:
         raise reader.changed(key)
+
     return member
 
 
 def modules(reader: Reader) -> tuple[str, ...]:
     """Return the modules of a `modules` field, which Odoo.sh gives comma-separated, or `false` for none."""
     listed = reader.optional_text("modules")
+
     return () if listed is None else tuple(name for name in map(str.strip, listed.split(",")) if name)

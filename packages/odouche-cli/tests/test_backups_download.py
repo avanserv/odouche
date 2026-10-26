@@ -133,7 +133,9 @@ class StubClient:
 
     def wait_for_backup(self, project: str, request: BackupRequest, *, timeout: float) -> Iterator[Backup | None]:
         self.calls.append(f"wait backup {project} {request.build.id} {timeout:g}")
+
         yield None
+
         yield TAKEN
 
     def prepare_download(
@@ -146,13 +148,17 @@ class StubClient:
         self, project: str, backup: Backup, *, neutralized: bool = True, filestore: bool = True
     ) -> odouche.PreparedDownload | None:
         self.calls.append(f"find {project} {backup.taken_at:%H:%M:%S} {neutralized} {filestore}")
+
         if not self.held:
             return None
+
         return prepared(backup, neutralized=neutralized, filestore=filestore)
 
     def wait_for_download(self, project: str, prepared: odouche.PreparedDownload, *, timeout: float) -> Iterator[None]:
         self.calls.append(f"wait file {project} {timeout:g}")
+
         yield None
+
         if self.late is not None:
             raise self.late
 
@@ -166,6 +172,7 @@ class StubClient:
             if self.cut and index:
                 msg = "Odoo.sh could not be reached (ReadError)."
                 raise Cut(msg)
+
             yield chunk
 
 
@@ -183,6 +190,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     monkeypatch.setattr(odouche, "Client", Client)
     monkeypatch.setattr(_terminal, "stdin_is_terminal", lambda: True)
     monkeypatch.setattr(_terminal, "stderr_is_terminal", lambda: True)
+
     return Client
 
 
@@ -201,7 +209,6 @@ def changes(client: type[StubClient]) -> list[str]:
 
 def test_writes_the_latest_backup_to_a_file_only_its_owner_reads(client: type[StubClient], tmp_path: Path):
     target = tmp_path / "staging.zip"
-
     result = run(*DOWNLOAD, *ON_STAGING, "--output", str(target), stdin="y\n")
 
     assert result.exit_code == 0, result.output
@@ -217,6 +224,7 @@ def test_writes_the_latest_backup_to_a_file_only_its_owner_reads(client: type[St
         "download 12:48:50",
     ]
     assert result.stdout == ""
+
     for line in (
         "Project: acme",
         "Branch: staging (staging)",
@@ -232,6 +240,7 @@ def test_writes_the_latest_backup_to_a_file_only_its_owner_reads(client: type[St
 def test_the_file_is_private_whatever_the_umask(tmp_path: Path):
     target = tmp_path / "staging.zip"
     previous = os.umask(0)
+
     try:
         result = run(*DOWNLOAD, *ON_STAGING, "-o", str(target), "--yes")
     finally:
@@ -275,7 +284,6 @@ def test_a_time_shared_with_a_remote_copy_downloads_the_backup_that_can_be(clien
 
 def test_a_remote_backup_is_refused_before_any_change(client: type[StubClient], tmp_path: Path):
     client.listed = (REMOTE,)
-
     result = run(*DOWNLOAD, "2026-10-14 12:48:50", *ON_STAGING, "-o", str(tmp_path / "f.zip"), "--yes")
 
     assert result.exit_code == 4
@@ -294,7 +302,6 @@ def test_a_backup_that_is_not_there_is_not_found(
     client: type[StubClient], tmp_path: Path, args: tuple[str, ...], message: str
 ):
     client.listed = (ELSEWHERE,)
-
     result = run(*DOWNLOAD, *args, *ON_STAGING, "-o", str(tmp_path / "f.zip"), "--yes")
 
     assert result.exit_code == 4
@@ -364,7 +371,6 @@ def test_a_file_that_appears_meanwhile_is_not_written_over(
 def test_a_cut_connection_leaves_no_partial_file(client: type[StubClient], tmp_path: Path, debug: tuple[str, ...]):
     client.cut = True
     target = tmp_path / "f.zip"
-
     result = run(*debug, *DOWNLOAD, *ON_STAGING, "-o", str(target), "--yes")
 
     assert result.exit_code == 7
@@ -379,7 +385,6 @@ def test_an_interrupt_leaves_no_partial_file(client: type[StubClient], tmp_path:
         raise KeyboardInterrupt
 
     client._chunks = lambda _: interrupted()  # pyright: ignore[reportAttributeAccessIssue]
-
     result = run(*DOWNLOAD, *ON_STAGING, "-o", str(target), "--yes")
 
     assert result.exit_code != 0
@@ -388,7 +393,6 @@ def test_an_interrupt_leaves_no_partial_file(client: type[StubClient], tmp_path:
 
 def test_a_file_not_ready_in_time_is_a_timeout(client: type[StubClient], tmp_path: Path):
     client.late = odouche.StreamTimeoutError("The file of backup 2026-10-14 12:48:50 was not ready at the timeout.")
-
     result = run(*DOWNLOAD, *ON_STAGING, "-o", str(tmp_path / "f.zip"), "--yes", "--timeout", "30")
 
     assert result.exit_code == 8
@@ -426,7 +430,6 @@ def test_with_no_terminal_it_needs_yes(client: type[StubClient], monkeypatch: py
 
 def test_new_takes_a_backup_waits_for_it_and_downloads_it(client: type[StubClient], tmp_path: Path):
     target = tmp_path / "f.zip"
-
     result = run(*DOWNLOAD, *ON_STAGING, "-o", str(target), "--new", stdin="y\n")
 
     assert result.exit_code == 0, result.output
@@ -447,7 +450,6 @@ def test_new_takes_a_backup_waits_for_it_and_downloads_it(client: type[StubClien
 
 def test_new_on_a_development_branch_is_refused_before_any_question(client: type[StubClient], tmp_path: Path):
     client.on_branch = FEATURE
-
     result = run(*DOWNLOAD, "--project", "acme", "--branch", "feature-x", "-o", str(tmp_path / "f.zip"), "--new")
 
     assert result.exit_code == 9
@@ -473,7 +475,6 @@ def test_an_unconfirmed_preparation_says_it_can_be_sent_again(
 def test_a_file_odoo_sh_holds_is_written_with_no_question_and_no_preparation(client: type[StubClient], tmp_path: Path):
     client.held = True
     target = tmp_path / "f.zip"
-
     result = run(*DOWNLOAD, *ON_STAGING, "-o", str(target))
 
     assert result.exit_code == 0, result.output
@@ -486,7 +487,6 @@ def test_a_file_odoo_sh_holds_is_written_with_no_question_and_no_preparation(cli
 
 def test_the_link_of_a_file_odoo_sh_holds_is_printed_with_no_question(client: type[StubClient]):
     client.held = True
-
     result = run(*DOWNLOAD, *ON_STAGING, "--link", "--exact")
 
     assert result.exit_code == 0, result.output
@@ -497,7 +497,6 @@ def test_the_link_of_a_file_odoo_sh_holds_is_printed_with_no_question(client: ty
 
 def test_new_never_looks_for_a_file_odoo_sh_holds(client: type[StubClient], tmp_path: Path):
     client.held = True
-
     result = run(*DOWNLOAD, *ON_STAGING, "-o", str(tmp_path / "f.zip"), "--new", "--yes")
 
     assert result.exit_code == 0, result.output

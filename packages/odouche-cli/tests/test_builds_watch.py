@@ -18,10 +18,8 @@ from odouche_cli.app import app
 
 
 NOW = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
-
 ACME = odouche.Project(id=1, name="acme", repository="acme/odoo", url="https://www.odoo.sh/project/acme")
 FEATURE = Branch(id=4, name="feature-x", stage=Stage.DEVELOPMENT, stage_name="dev")
-
 ESCAPE = "\x1b[2J\x1b]0;owned\x07"
 URL = "https://acme-feature-x-104.dev.odoo.com"
 ON_FEATURE = ("--project", "acme", "--branch", "feature-x")
@@ -54,6 +52,7 @@ def build(number: int, commit: str | None = None, **changes: object) -> Build:
 def done(made: Build, result: BuildResult | None = BuildResult.SUCCESS, **changes: object) -> Build:
     name = None if result is None else result.value
     values = {"status": BuildStatus.DONE, "status_name": "done", "status_info": "done", **changes}
+
     return replace(made, result=result, result_name=name, **values)  # pyright: ignore[reportArgumentType]
 
 
@@ -97,6 +96,7 @@ class StubClient:
 
     def __init__(self, *, read_only: bool = False) -> None:
         self.modes.append(read_only)
+
         if self.error is not None:
             raise self.error
 
@@ -120,6 +120,7 @@ class StubClient:
     def builds(self, branch: Branch, *, limit: int = 4) -> list[Build]:
         asked = sum(call.startswith("builds") for call in self.calls)
         self.calls.append(f"builds {branch.name}")
+
         return list(self.listed[min(asked, len(self.listed) - 1)][:limit])
 
     def latest_build(self, branch: Branch) -> Build | None:
@@ -128,16 +129,20 @@ class StubClient:
 
     def watch_build(self, project: str, build: Build, *, timeout: float) -> Iterator[Build]:
         self.calls.append(f"watch {project} {build.id} {timeout:g}")
+
         if timeout <= 0:
             msg = "A timeout is more than 0"
             raise ValueError(msg)
+
         watch = self._watch(build)
         self.watches.append(watch)
+
         return watch
 
     def _watch(self, build: Build) -> Iterator[Build]:
         try:
             yield from self.changes
+
             if self.ending is not None:
                 raise self.ending
         finally:
@@ -154,6 +159,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
 
     monkeypatch.setattr(odouche, "Client", Client)
     monkeypatch.setattr(_time, "_now", lambda: NOW)
+
     return Client
 
 
@@ -162,6 +168,7 @@ def clock(monkeypatch: pytest.MonkeyPatch) -> Clock:
     clock = Clock()
     monkeypatch.setattr(builds, "_monotonic", clock.monotonic)
     monkeypatch.setattr(builds, "_sleep", clock.sleep)
+
     return clock
 
 
@@ -169,6 +176,7 @@ def clock(monkeypatch: pytest.MonkeyPatch) -> Clock:
 def head(checkout: Callable[..., None]) -> str:
     """Make the current directory a checkout of `feature-x`, and return its HEAD."""
     checkout("feature-x", origin="git@github.com:acme/odoo.git")
+
     return subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True).stdout.strip()  # noqa: S607
 
 
@@ -186,7 +194,6 @@ def test_a_build_that_succeeds_exits_0_and_the_last_line_has_its_address(client:
 
 def test_a_build_that_fails_exits_20_and_names_the_logs(client: type[StubClient]):
     client.changes = (RUNNING, done(RUNNING, BuildResult.FAILED))
-
     result = run("builds", "watch", *ON_FEATURE)
 
     assert result.exit_code == 20
@@ -196,7 +203,6 @@ def test_a_build_that_fails_exits_20_and_names_the_logs(client: type[StubClient]
 
 def test_a_build_that_ends_with_warnings_exits_21(client: type[StubClient]):
     client.changes = (RUNNING, done(RUNNING, BuildResult.WARNING))
-
     result = run("builds", "watch", *ON_FEATURE)
 
     assert result.exit_code == 21
@@ -214,7 +220,6 @@ def test_a_build_that_ends_with_warnings_exits_21(client: type[StubClient]):
 )
 def test_a_build_that_ends_without_a_result_exits_22(client: type[StubClient], ended: Build, said: str):
     client.changes = (RUNNING, ended)
-
     result = run("builds", "watch", *ON_FEATURE)
 
     assert result.exit_code == 22
@@ -229,7 +234,6 @@ def test_a_dropped_build_exits_with_the_result_it_had_and_is_said_replaced_with_
     client: type[StubClient], result: BuildResult, code: int, said: str
 ):
     client.changes = (done(RUNNING, result, status=BuildStatus.DROPPED, status_name="dropped"),)
-
     watched = run("builds", "watch", *ON_FEATURE)
 
     assert watched.exit_code == code
@@ -238,7 +242,6 @@ def test_a_dropped_build_exits_with_the_result_it_had_and_is_said_replaced_with_
 
 def test_a_build_dropped_without_a_result_has_no_address(client: type[StubClient]):
     client.changes = (done(RUNNING, None, status=BuildStatus.DROPPED, status_name="dropped"),)
-
     result = run("builds", "watch", *ON_FEATURE)
 
     assert result.exit_code == 22
@@ -248,7 +251,6 @@ def test_a_build_dropped_without_a_result_has_no_address(client: type[StubClient
 def test_a_build_still_running_at_the_timeout_exits_23(client: type[StubClient]):
     client.changes = (RUNNING,)
     client.ending = odouche.StreamTimeoutError("The build was still being watched at the timeout.", operation="watch")
-
     result = run("builds", "watch", *ON_FEATURE, "--timeout", "60")
 
     assert result.exit_code == 23
@@ -268,7 +270,6 @@ def test_a_timeout_that_is_not_positive_is_a_usage_error(client: type[StubClient
 @pytest.mark.usefixtures("head")
 def test_an_identifier_watches_that_build_and_waits_for_no_commit(client: type[StubClient]):
     client.changes = (OLDER,)
-
     result = run("builds", "watch", "103")
 
     assert result.exit_code == 0
@@ -281,7 +282,6 @@ def test_it_waits_for_a_build_of_head_and_watches_that_one(client: type[StubClie
     pushed = build(105, head)
     client.listed = ((RUNNING, OLDER), (RUNNING, OLDER), (pushed, RUNNING, OLDER))
     client.changes = (pushed, done(pushed))
-
     result = run("builds", "watch")
 
     assert result.exit_code == 0
@@ -301,7 +301,6 @@ def test_it_waits_for_a_build_of_head_and_watches_that_one(client: type[StubClie
 
 def test_a_build_of_head_that_is_listed_is_watched_at_once(client: type[StubClient], clock: Clock, head: str):
     client.listed = ((RUNNING, build(102, head, status_info="Testing: stock")),)
-
     result = run("builds", "watch")
 
     assert client.calls[-1] == "watch acme 102 1800"
@@ -337,7 +336,6 @@ def test_the_checkout_branch_named_by_the_flag_is_waited_on_for_head(client: typ
     pushed = build(105, head)
     client.listed = ((RUNNING, OLDER), (pushed, RUNNING, OLDER))
     client.changes = (done(pushed),)
-
     result = run("builds", "watch", "--branch", "feature-x")
 
     assert result.exit_code == 0
@@ -352,7 +350,6 @@ def test_the_checkout_branch_named_by_the_environment_is_waited_on_for_head(
     pushed = build(105, head)
     client.listed = ((RUNNING, OLDER), (pushed, RUNNING, OLDER))
     client.changes = (done(pushed),)
-
     result = run("builds", "watch")
 
     assert result.exit_code == 0
@@ -394,7 +391,6 @@ def test_the_checkout_of_a_project_named_by_the_environment_is_waited_on_for_hea
     pushed = build(105, head)
     client.listed = ((RUNNING, OLDER), (pushed, RUNNING, OLDER))
     client.changes = (done(pushed),)
-
     result = run("builds", "watch")
 
     assert result.exit_code == 0
@@ -438,7 +434,6 @@ def test_a_build_of_head_listed_by_the_last_request_allowed_is_still_watched(
     pushed = build(105, head)
     client.listed = ((RUNNING, OLDER), (RUNNING, OLDER), (pushed, RUNNING, OLDER))
     client.changes = (done(pushed),)
-
     result = run("builds", "watch", "--timeout", "6")
 
     assert result.exit_code == 0
@@ -463,7 +458,6 @@ def test_a_head_that_cannot_be_read_is_said_and_the_latest_build_is_watched(
 @pytest.mark.usefixtures("head")
 def test_an_escape_sequence_in_the_project_name_is_not_emitted_while_waiting(client: type[StubClient]):
     client.project = replace(ACME, name=f"acme{ESCAPE}")
-
     result = run("builds", "watch", "--timeout", "1")
 
     assert result.exit_code == 23
@@ -475,7 +469,6 @@ def test_a_commit_is_waited_for_by_the_start_of_its_hash(client: type[StubClient
     theirs = build(102, "c0ffee1" + "b" * 33)
     client.listed = ((build(105, "b" * 5 + "c0ffee1" + "b" * 28), RUNNING, theirs),)
     client.changes = (done(theirs),)
-
     result = run("builds", "watch", *ON_FEATURE, "--commit", "C0FFEE1")
 
     assert result.exit_code == 0
@@ -486,7 +479,6 @@ def test_a_commit_can_be_a_whole_sha_256_hash(client: type[StubClient]):
     theirs = build(102, "c0ffee1" + "b" * 57)
     client.listed = ((RUNNING, theirs),)
     client.changes = (done(theirs),)
-
     result = run("builds", "watch", *ON_FEATURE, "--commit", theirs.commit.hash)
 
     assert result.exit_code == 0
@@ -513,7 +505,6 @@ def test_a_commit_that_cannot_be_waited_for_is_a_usage_error(client: type[StubCl
 
 def test_as_json_stdout_is_one_object_for_each_change_and_nothing_else(client: type[StubClient]):
     client.changes = (RUNNING, TESTING, done(RUNNING, BuildResult.FAILED))
-
     result = run("--format", "json", "builds", "watch", *ON_FEATURE)
 
     assert result.exit_code == 20
@@ -590,7 +581,6 @@ def test_on_a_terminal_said_not_to_redraw_each_change_is_a_line(monkeypatch: pyt
 
 def test_a_build_waiting_for_a_worker_has_no_time(client: type[StubClient]):
     client.changes = (replace(RUNNING, started_at=None, status_info=None), done(RUNNING))
-
     result = run("builds", "watch", *ON_FEATURE)
 
     assert result.stderr.splitlines()[0] == "Build 104: progress"
@@ -598,7 +588,6 @@ def test_a_build_waiting_for_a_worker_has_no_time(client: type[StubClient]):
 
 def test_an_escape_sequence_in_what_the_build_is_doing_is_not_emitted(client: type[StubClient]):
     client.changes = (replace(RUNNING, status_info=f"Installing{ESCAPE}\x9b31m"), done(RUNNING, url=f"{URL}{ESCAPE}"))
-
     result = run("builds", "watch", *ON_FEATURE)
 
     assert result.exit_code == 0
@@ -646,7 +635,6 @@ def test_a_watch_that_is_not_a_generator_is_closed_too(client: type[StubClient],
 
 def test_logged_out_exits_3_and_names_the_login(client: type[StubClient]):
     client.error = odouche.NoSessionError("Not logged in.")
-
     result = run("builds", "watch", *ON_FEATURE)
 
     assert result.exit_code == 3
@@ -656,7 +644,6 @@ def test_logged_out_exits_3_and_names_the_login(client: type[StubClient]):
 
 def test_help_opens_neither_the_keyring_nor_the_network(client: type[StubClient]):
     client.error = odouche.KeyringUnavailableError()
-
     result = run("builds", "watch", "--help")
 
     assert result.exit_code == 0

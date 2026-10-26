@@ -49,8 +49,10 @@ class Messages:
         params = json.loads(request.content)["params"]
         self.asked.append(params["message_id"])
         answer = json.loads(json.dumps(self.answer))
+
         if params["message_id"] in self.sources:
             answer["result"]["source"] = self.sources[params["message_id"]]
+
         return httpx2.Response(200, json=answer)
 
 
@@ -58,6 +60,7 @@ class Messages:
 def messages(upstream):
     upstream.bodies[INFO]["result"]["access_token"] = TOKEN
     upstream.bodies[MESSAGE] = Messages(upstream.load("mail_message.json"))
+
     return upstream.bodies[MESSAGE]
 
 
@@ -75,15 +78,19 @@ def build(client):
 def worker_requests(upstream, branch, build, messages):
     """The requests sent after the branch and the build were read."""
     upstream.requests.clear()
+
     return upstream.requests
 
 
 def source(content, subtype="plain", **headers):
     message = EmailMessage()
     message["From"] = "Acme <noreply@example.com>"
+
     for name, value in headers.items():
         message[name] = value
+
     message.set_content(content, subtype=subtype)
+
     return message.as_string()
 
 
@@ -127,7 +134,6 @@ def test_a_limit_under_one_is_refused(client, branch, build, limit):
 
 def test_a_date_that_is_not_one_is_kept_as_text_and_listed_last(client, upstream, branch, build, messages):
     upstream.bodies[FETCH]["result"][0]["date"] = "yesterday"
-
     listed = client.mails(PROJECT, branch, build)
 
     assert (listed[-1].id, listed[-1].date, listed[-1].date_text) == (FIRST, None, "yesterday")
@@ -171,12 +177,13 @@ def test_half_a_surrogate_pair_in_a_header_or_an_id_does_not_break_the_listing(
     answer["result"][0].update({"id": "m\ud800", "subject": "Hi \udc80there"})
     # As JSON escapes them: the half of a pair cannot be written as UTF-8.
     upstream.bodies[FETCH] = lambda _: httpx2.Response(200, content=json.dumps(answer).encode())
-
     listed = next(mail for mail in client.mails(PROJECT, branch, build) if mail.id == "m?")
 
     assert listed.subject == "Hi ?there"
+
     with pytest.raises(NotFoundError, match="cannot be sent back"):
         client.mail(PROJECT, branch, build, "m?")
+
     assert messages.asked == []
 
 
@@ -189,6 +196,7 @@ def test_a_list_over_the_cap_is_an_error_that_names_it(client, upstream, branch,
     for call in (lambda: client.mails(PROJECT, branch, build), lambda: client.mail(PROJECT, branch, build, "1")):
         with pytest.raises(OdoucheError, match="over 1 MiB as the worker lists them"):
             call()
+
     assert messages.asked == []
 
 
@@ -197,8 +205,10 @@ def test_a_build_that_waits_for_a_worker_has_no_mail(client, upstream, branch, m
     upstream.requests.clear()
 
     assert client.mails(PROJECT, branch, waiting) == []
+
     with pytest.raises(NotFoundError, match="waits for a worker"):
         client.mail(PROJECT, branch, waiting, FIRST)
+
     assert {request.url.host for request in upstream.requests} == {"www.odoo.sh"}
 
 
@@ -208,8 +218,10 @@ def test_a_branch_of_another_stage_is_refused_before_any_request(client, branch,
 
     with pytest.raises(NotFoundError, match="Branch feature-invoicing is production"):
         client.mails(PROJECT, staged, build)
+
     with pytest.raises(NotFoundError, match="development or a staging build only"):
         client.mail(PROJECT, staged, build, FIRST)
+
     assert worker_requests == []
 
 
@@ -224,8 +236,10 @@ def test_a_build_of_another_branch_is_a_value_error(client, branch, build, worke
 
     with pytest.raises(ValueError, match="not of branch"):
         client.mails(PROJECT, other, build)
+
     with pytest.raises(ValueError, match="not of branch"):
         client.mail(PROJECT, other, build, FIRST)
+
     assert worker_requests == []
 
 
@@ -240,6 +254,7 @@ def test_the_worker_gets_the_token_and_never_the_session(client, branch, build, 
     fetch, message = (request for request in worker_requests if request.url.host == WORKER)
     assert json.loads(fetch.content)["params"] == {"token": TOKEN}
     assert json.loads(message.content)["params"] == {"message_id": FIRST, "token": TOKEN}
+
     for request in (fetch, message):
         assert request.method == "POST"
         assert "Cookie" not in request.headers
@@ -283,7 +298,6 @@ def test_an_html_body_is_read_as_text_and_nothing_in_it_is_followed(client, bran
         '<div><a href="https://shop.example.com">https://shop.example.com</a></div></body></html>'
     )
     messages.sources[FIRST] = source(html, subtype="html")
-
     body = client.mail(PROJECT, branch, build, FIRST).body
 
     assert body == (
@@ -300,7 +314,6 @@ def test_a_head_nothing_closes_ends_at_the_body(client, branch, build, messages)
 
 def test_a_plain_only_mail_is_read_unchanged(client, branch, build, messages):
     messages.sources[FIRST] = source("\x1b]0;title\x07Plain\n", Cc="")
-
     content = client.mail(PROJECT, branch, build, FIRST)
 
     assert (content.body, content.cc, content.attachments) == ("\x1b]0;title\x07Plain\n", "", ())
@@ -317,7 +330,6 @@ def test_a_body_in_a_charset_python_does_not_know_is_read_as_utf_8(client, branc
 def test_a_long_html_body_is_cut_before_it_is_read(client, branch, build, messages, monkeypatch):
     monkeypatch.setattr(_mime, "_MAX_HTML", 20)
     messages.sources[FIRST] = source("<p>" + "x" * 50 + "</p>", subtype="html")
-
     content = client.mail(PROJECT, branch, build, FIRST)
 
     assert (content.body, content.truncated) == ("x" * 17, True)
@@ -326,7 +338,6 @@ def test_a_long_html_body_is_cut_before_it_is_read(client, branch, build, messag
 def test_a_body_is_cut_at_a_byte_count_and_never_inside_a_character(client, branch, build, messages, monkeypatch):
     monkeypatch.setattr(_mime, "MAX_BODY", 5)
     messages.sources[FIRST] = source("\u00e9\u00e9\u00e9\u00e9")
-
     content = client.mail(PROJECT, branch, build, FIRST)
 
     assert (content.body, content.truncated) == ("\u00e9\u00e9", True)
@@ -335,16 +346,19 @@ def test_a_body_is_cut_at_a_byte_count_and_never_inside_a_character(client, bran
 def seconds(text):
     """Return the CPU time of the fastest of three parses: a noisy neighbour on a shared runner slows one, not all."""
     runs = []
+
     for _ in range(3):
         started = time.process_time()
         _mime.parse(text)
         runs.append(time.process_time() - started)
+
     return min(runs)
 
 
 def headers_and_parts(size):
     headers = "".join(f"X-Header-{number}: v\n" for number in range(size))
     parts = "".join(f"--x\nContent-Type: text/plain\n\nx{number}\n" for number in range(size))
+
     return f"From: a@example.com\n{headers}Content-Type: multipart/mixed; boundary=x\n\n{parts}--x--\n"
 
 
@@ -462,7 +476,6 @@ def test_an_encoded_word_is_decoded_and_one_in_an_unknown_charset_kept(client, b
 def test_a_long_body_is_cut_and_says_so(client, branch, build, messages, monkeypatch):
     monkeypatch.setattr(_mime, "MAX_BODY", 10)
     messages.sources[FIRST] = source("x" * 50)
-
     content = client.mail(PROJECT, branch, build, FIRST)
 
     assert (content.body, content.truncated) == ("x" * 10, True)
@@ -471,7 +484,6 @@ def test_a_long_body_is_cut_and_says_so(client, branch, build, messages, monkeyp
 def test_a_mail_over_the_cap_is_not_read(client, branch, build, messages, monkeypatch):
     monkeypatch.setattr(mails, "MAX_MESSAGE", 1000)
     messages.sources[FIRST] = source("x" * 2000)
-
     content = client.mail(PROJECT, branch, build, FIRST)
 
     assert content == MailContent(mail=content.mail, cc="", body="", attachments=(), truncated=True)
@@ -526,7 +538,9 @@ def test_mails_are_immutable(client, branch, build, messages):
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         content.body = "other"
+
     with pytest.raises(dataclasses.FrozenInstanceError):
         content.mail.subject = "other"
+
     with pytest.raises(dataclasses.FrozenInstanceError):
         content.attachments[0].name = "other"

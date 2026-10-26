@@ -29,10 +29,13 @@ def shown(value: object) -> str:
     """Return a setting's value: `yes` or `no`, an enumeration's value, a list joined by commas, and nothing as `none`."""
     if isinstance(value, bool):
         return "yes" if value else "no"
+
     if isinstance(value, StrEnum):
         return value.value
+
     if isinstance(value, tuple):
         return ", ".join(str(item) for item in value) or "none"
+
     return str(value) if value else "none"
 
 
@@ -57,9 +60,11 @@ def choice(kind: type[StrEnum]) -> Read:
 def flag(name: str, text: str) -> bool:
     """Read a yes or a no."""
     value = _FLAGS.get(text.lower())
+
     if value is None:
         msg = f"{text!r} is not a value of {name}. One of: yes, no."
         raise ValueError(msg)
+
     return value
 
 
@@ -77,6 +82,7 @@ def seconds(name: str, text: str) -> int:
     if not text.isascii() or not text.isdigit():
         msg = f"{text!r} is not a value of {name}: a whole number of seconds."
         raise ValueError(msg)
+
     return int(text)
 
 
@@ -88,20 +94,27 @@ def given(
     `refused` holds what to say of a name that is not given this way.
     """
     values: dict[str, object] = {}
+
     for pair in pairs:
         name, sign, value = pair.partition("=")
+
         if not sign:
             msg = f"{pair!r} is not NAME=VALUE."
             raise typer.BadParameter(msg, ctx=ctx, param_hint=PARAM)
+
         if refused and name in refused:
             raise typer.BadParameter(refused[name], ctx=ctx, param_hint=PARAM)
+
         if name not in reads:
             msg = f"{name!r} is not a setting that is changed. One of: {', '.join(reads)}."
             raise typer.BadParameter(msg, ctx=ctx, param_hint=PARAM)
+
         if name in values:
             msg = f"{name} is given twice."
             raise typer.BadParameter(msg, ctx=ctx, param_hint=PARAM)
+
         values[name] = _read(ctx, reads[name], name, value)
+
     return values
 
 

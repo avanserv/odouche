@@ -24,7 +24,6 @@ NAME = re.compile(r"[a-z]+(_[a-z]+)+")
 RETURNS = "Returns"
 TOUCHES = "Touches"
 BOUNDS = "Bounds"
-
 READS_ONLY = "reads only"
 """What a tool that changes nothing on Odoo.sh touches."""
 
@@ -47,22 +46,28 @@ def add_tool[**P, R](
     return type is a dataclass of the server's own: the library's models go in its fields.
     """
     name = fn.__name__
+
     if not NAME.fullmatch(name):
         msg = f"{name}: a tool is named verb then noun, as `list_projects`."
         raise ValueError(msg)
+
     # The server keeps the first of two and only logs it, and has no public way to ask but an awaited one.
     if server._tool_manager.get_tool(name):
         msg = f"{name}: a tool of that name is registered."
         raise ValueError(msg)
+
     # Its errors would pass through unmapped.
     if inspect.iscoroutinefunction(fn):
         msg = f"{name}: a tool is a plain function, which the server runs in a thread."
         raise TypeError(msg)
+
     summary = " ".join((inspect.getdoc(fn) or "").split("\n\n", 1)[0].split())
     lines = {RETURNS: returns, TOUCHES: touches, BOUNDS: bounds}
+
     if not summary or not all(text.strip() and "\n" not in text for text in lines.values()):
         msg = f"{name}: a tool has a docstring, and one line each for what it returns, touches and is bound by."
         raise ValueError(msg)
+
     _check_hints(name, annotations, touches)
 
     @functools.wraps(fn)
@@ -79,6 +84,7 @@ def add_tool[**P, R](
         # A return type with no schema fails here, not as a result without structure.
         structured_output=True,
     )
+
     if not annotations.read_only_hint:
         _refuse_undeclared(server, name)
 
@@ -91,9 +97,11 @@ def _check_hints(name: str, annotations: ToolAnnotations, touches: str) -> None:
         annotations.idempotent_hint,
         annotations.open_world_hint,
     )
+
     if any(hint is None for hint in hints):
         msg = f"{name}: a tool sets all four hints."
         raise ValueError(msg)
+
     if annotations.read_only_hint != (touches == READS_ONLY):
         msg = f"{name}: a read-only tool touches `{READS_ONLY}`, and only a read-only tool does."
         raise ValueError(msg)
@@ -106,9 +114,11 @@ def _refuse_undeclared(server: MCPServer[Any], name: str) -> None:
     in an argument the tool does not take would send the others and return as if done.
     """
     registered = server._tool_manager.get_tool(name)
+
     if registered is None:
         msg = f"{name}: the tool was not registered."
         raise ValueError(msg)
+
     declared = registered.fn_metadata.arg_model
     config = {**declared.model_config, "extra": "forbid"}
     strict = types.new_class(

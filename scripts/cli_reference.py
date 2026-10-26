@@ -45,8 +45,10 @@ def render(application: typer.Typer | None = None) -> str:
     """Return the page for an application, which is `osh` unless a test gives another."""
     root = typer.main.get_command(app if application is None else application)
     blocks = [_HEADER.rstrip("\n")]
+
     for context in _walk(typer.Context(root, info_name=root.name)):
         blocks.extend(_command(context))
+
     return "\n\n".join(blocks) + "\n"
 
 
@@ -60,6 +62,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 def _walk(context: typer.Context) -> Iterator[typer.Context]:
     """Yield the context of a command, then of each command under it."""
     yield context
+
     for child in _children(context):
         yield from _walk(child)
 
@@ -67,9 +70,12 @@ def _walk(context: typer.Context) -> Iterator[typer.Context]:
 def _children(context: typer.Context) -> list[typer.Context]:
     """Return the contexts of the commands of a group, in the order its help lists them."""
     group = context.command
+
     if not isinstance(group, TyperGroup):
         return []
+
     commands = [(name, group.get_command(context, name)) for name in group.list_commands(context)]
+
     return [
         typer.Context(command, info_name=name, parent=context)
         for name, command in commands
@@ -90,15 +96,18 @@ def _command(context: typer.Context) -> list[str]:
     blocks.extend(_parameter_tables(_parameters(context, path)))
     children = _children(context)
     epilog = _checked(command.epilog or "", f"The epilog of `{path}`")
+
     # A group's example is the one its command gives right below.
     if epilog and not (children and epilog.startswith(_EXAMPLE)):
         blocks.append(_epilog(epilog))
+
     if children:
         rows = [
             (f"[`{child.command_path}`](#{child.command_path.replace(' ', '-')})", _summary(child.command.help))
             for child in children
         ]
         blocks.append(_reference.table(("Command", "Description"), rows))
+
     return blocks
 
 
@@ -111,8 +120,10 @@ def _parameters(context: typer.Context, path: str) -> list[TyperArgument | Typer
         and parameter.name != _HELP_OPTION
         and not parameter.hidden
     ]
+
     for parameter in parameters:
         _check(parameter, path)
+
     return parameters
 
 
@@ -121,12 +132,15 @@ def _parameter_tables(parameters: list[TyperArgument | TyperOption]) -> list[str
     tables: list[str] = []
     arguments = [parameter for parameter in parameters if isinstance(parameter, TyperArgument)]
     options = [parameter for parameter in parameters if isinstance(parameter, TyperOption)]
+
     if arguments:
         rows = [(f"`{_metavar(argument)}`", _description(argument)) for argument in arguments]
         tables.append(_reference.table(("Argument", "Description"), rows))
+
     if options:
         rows = [(_flags(option), _description(option), _variable(option)) for option in options]
         tables.append(_reference.table(("Option", "Description", "Environment"), rows))
+
     return tables
 
 
@@ -135,20 +149,26 @@ def _check(parameter: TyperArgument | TyperOption, path: str) -> None:
     name = parameter.opts[0] if isinstance(parameter, TyperOption) else _metavar(parameter)
     where = f"`{name}` of `{path}`"
     _checked(parameter.help or "", f"The help of {where}")
+
     if parameter.default == "":
         msg = f"{where} has an empty default, which the page cannot show."
         raise UnsupportedError(msg)
+
     if isinstance(parameter.default, list | tuple):
         msg = f"{where} has several values as its default, which the page cannot show."
         raise UnsupportedError(msg)
+
     if isinstance(parameter, TyperOption) and parameter.show_default is not True:
         msg = f"{where} sets `show_default`, which the page does not follow."
         raise UnsupportedError(msg)
+
     if isinstance(parameter, TyperOption):
         return
+
     if parameter.envvar:
         msg = f"{where} is an argument that reads an environment variable, which the page does not show."
         raise UnsupportedError(msg)
+
     if _has_default(parameter):
         msg = f"{where} is an argument with a default, which the page does not show."
         raise UnsupportedError(msg)
@@ -159,23 +179,28 @@ def _checked(text: str, what: str) -> str:
     if _CONTROL.search(text):
         msg = f"{what} has a control character or a `\\b` marker, which the page cannot show."
         raise UnsupportedError(msg)
+
     if re.search("[<>]", _CODE.sub("", text)):
         msg = f"{what} has `<` or `>` outside backticks, which Markdown reads as HTML."
         raise UnsupportedError(msg)
+
     return text
 
 
 def _flags(option: TyperOption) -> str:
     """Return the names of an option, the long ones first, with what stands for its value."""
     names = sorted(option.opts, key=lambda name: not name.startswith("--"))
+
     if option.is_flag or option.count:
         return ", ".join(f"`{name}`" for name in [*names, *option.secondary_opts])
+
     return ", ".join(f"`{name} {_metavar(option)}`" for name in names)
 
 
 def _metavar(parameter: TyperArgument | TyperOption) -> str:
     """Return what stands for a parameter's value: the one it declares, or its own name in capitals."""
     name = max(parameter.opts, key=len).lstrip("-") if isinstance(parameter, TyperOption) else parameter.name or ""
+
     return parameter.metavar or name.replace("-", "_").upper()
 
 
@@ -183,46 +208,61 @@ def _description(parameter: TyperArgument | TyperOption) -> str:
     """Return a parameter's help, then what the help may not say: required, choices, range and default."""
     text = _reference.line(parameter.help or "")
     said = [text]
+
     if parameter.required:
         said.append("Required.")
+
     kind: Any = parameter.type
     choices: Sequence[object] | None = getattr(kind, "choices", None)
+
     if choices:
         said.append(f"One of {', '.join(f'`{_value(choice)}`' for choice in choices)}.")
+
     said.append(_range(kind))
     default = _default(parameter) if isinstance(parameter, TyperOption) else ""
+
     if default and _STATED_DEFAULT not in text:
         said.append(f"{_STATED_DEFAULT} `{default}`.")
+
     return " ".join(part for part in said if part)
 
 
 def _range(kind: Any) -> str:
     """Return the bounds of a number's type, or nothing for a type that has none."""
     lowest, highest = getattr(kind, "min", None), getattr(kind, "max", None)
+
     if lowest is not None and highest is not None:
         return f"From {lowest} to {highest}."
+
     if lowest is not None:
         return f"At least {lowest}."
+
     if highest is not None:
         return f"At most {highest}."
+
     return ""
 
 
 def _has_default(parameter: TyperArgument | TyperOption) -> bool:
     """Tell whether a parameter has a value when it is not given, and not one computed at run time."""
     default: object = parameter.default
+
     return not (default is None or callable(default))
 
 
 def _default(option: TyperOption) -> str:
     """Return what an option is when it is not given, or nothing for no value, a count and a flag with no off name."""
     default: object = option.default
+
     if not _has_default(option) or option.count:
         return ""
+
     if default is True:
         return option.opts[0]
+
     if default is False:
         return option.secondary_opts[0] if option.secondary_opts else ""
+
     return _value(default)
 
 
@@ -239,6 +279,7 @@ def _epilog(epilog: str) -> str:
     """Return a command's epilog, with the example it gives as a block to copy."""
     if not epilog.startswith(_EXAMPLE):
         return epilog.strip()
+
     return f"Example:\n\n```bash\n{epilog.removeprefix(_EXAMPLE).strip()}\n```"
 
 

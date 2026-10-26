@@ -68,8 +68,10 @@ class StubClient:
 
     def branch_settings(self, branch: Branch) -> BranchSettings:
         self.calls.append(f"settings {branch.name}")
+
         if self.refused is not None:
             raise self.refused
+
         return self.found
 
 
@@ -80,6 +82,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
         calls: list[str] = []
 
     monkeypatch.setattr(odouche, "Client", Client)
+
     return Client
 
 
@@ -90,6 +93,7 @@ def run(*args: str) -> Result:
 def pairs(result: Result) -> dict[str, str]:
     """Read each line as a header and its value, which two spaces or more separate."""
     found = [re.split(r"\s{2,}", line.strip(), maxsplit=1) for line in result.stdout.splitlines()]
+
     return {row[0]: row[1] if len(row) > 1 else "" for row in found}
 
 
@@ -184,7 +188,6 @@ def test_a_branch_the_project_does_not_have_exits_4(client: type[StubClient]):
 
 def test_a_setting_odoo_sh_changed_exits_6(client: type[StubClient]):
     client.refused = odouche.UpstreamChangedError("branch settings", "result.test_mode")
-
     result = run("--project", "acme", "--branch", "feature-x")
 
     assert result.exit_code == 6

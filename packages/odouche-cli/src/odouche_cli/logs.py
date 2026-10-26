@@ -115,9 +115,11 @@ def logs(
     output: Output = ctx.obj
     _refuse_conflicts(ctx)
     name = resolve_branch(ctx, branch)
+
     with open_client() as client:
         project_name, found = project_branch(ctx, client, project, name)
         build = find_build(client, project_name, found, build_id)
+
         if kinds:
             columns = [
                 Column[odouche.Log]("Kind", lambda log: log.kind.value),
@@ -126,27 +128,37 @@ def logs(
                 Column[odouche.Log]("Changed", lambda log: ago(log.modified_at)),
             ]
             output.rows(client.logs(project_name, build), columns, empty=f"Build {build.id} has no log yet.")
+
             return
+
         limit = math.inf if timeout is None else timeout
 
         def start(kind: str) -> Generator[odouche.LogLine]:
             if not follow:
                 return client.read_log(project_name, build, kind, tail=None if everything else tail)
+
             if everything:
                 return client.follow_log(project_name, build, kind, timeout=limit, offset=0)
+
             return client.follow_log(project_name, build, kind, timeout=limit, tail=tail)
 
         wanted = _DEFAULT_KINDS if kind is None else (kind,)
+
         try:
             lines = start(wanted[0])
         except odouche.NotFoundError:
             names = [log.name for log in client.logs(project_name, build)]
+
             if wanted[0] in names:
                 raise
+
             fallback = next((name for name in wanted[1:] if name in names), None)
+
             if fallback is None:
                 raise _absent(build, wanted, names) from None
+
             lines = start(fallback)
+
         with closing(lines):
             output.lines(lines, lambda line: line.text, strip=strip)
 
@@ -155,6 +167,7 @@ def _absent(build: odouche.Build, kinds: tuple[str, ...], names: list[str]) -> o
     """Make the error for a build that has none of `kinds`, which names the logs it has."""
     if not names:
         return odouche.NotFoundError(f"Build {build.id} has no log yet.")
+
     return odouche.NotFoundError(f"Build {build.id} has no {' or '.join(kinds)} log. It has: {', '.join(names)}.")
 
 
@@ -162,11 +175,13 @@ def _refuse_conflicts(ctx: typer.Context) -> None:
     """Fail on options that do not go together, as a usage error."""
     given = {parameter for parameter in _PRINTING if is_given(ctx, parameter)}
     msg = None
+
     if ctx.params["kinds"] and given:
         msg = f"--kinds does not go with {', '.join(flag for parameter, flag in _PRINTING.items() if parameter in given)}."
     elif {"tail", "everything"} <= given:
         msg = "--all does not go with --tail."
     elif "timeout" in given and "follow" not in given:
         msg = "--timeout goes with --follow only."
+
     if msg is not None:
         raise typer.BadParameter(msg, ctx=ctx)

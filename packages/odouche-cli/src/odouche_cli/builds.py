@@ -55,9 +55,7 @@ app = typer.Typer(
 
 _DEFAULT_LIMIT = 4
 _DEFAULT_MAILS = 20
-
 _HASH_LENGTH = 7
-
 _DEFAULT_TIMEOUT = 1800
 # How long between two requests for a build of the awaited commit.
 _POLL = 3.0
@@ -107,6 +105,7 @@ def _hash(value: str | None) -> str | None:
     if value is not None and not _COMMIT.fullmatch(value):
         msg = "A commit is 7 to 64 hexadecimal digits."
         raise typer.BadParameter(msg)
+
     return value
 
 
@@ -183,9 +182,11 @@ def list_(
     """List a branch's latest builds, newest first, with their status, result and commit."""
     output: Output = ctx.obj
     name = resolve_branch(ctx, branch)
+
     with open_client() as client:
         _, found = project_branch(ctx, client, project, name)
         builds = client.builds(found, limit=limit)
+
     columns = [
         Column[odouche.Build]("ID", lambda build: build.id),
         Column[odouche.Build]("Status", status_of),
@@ -207,9 +208,11 @@ def show(
     """Show one build of a branch, with its commit and the address of its database: its latest, or BUILD_ID."""
     output: Output = ctx.obj
     name = resolve_branch(ctx, branch)
+
     with open_client() as client:
         project_name, found = project_branch(ctx, client, project, name)
         build = find_build(client, project_name, found, build_id)
+
     output.one(build, _build_columns())
 
 
@@ -226,14 +229,18 @@ def watch(
 ) -> None:
     """Watch a build until it finishes, and exit with its result: the build of HEAD, or BUILD_ID."""
     output: Output = ctx.obj
+
     if commit is not None and (no_wait or build_id is not None):
         msg = "--commit goes with neither BUILD_ID nor --no-wait."
         raise typer.BadParameter(msg, ctx=ctx)
+
     name = resolve_branch(ctx, branch)
     deadline = _monotonic() + timeout
+
     with open_client() as client:
         project_name, found = project_branch(ctx, client, project, name)
         awaited = commit
+
         # A project read from the checkout is the checkout's: only one that was named is asked about.
         if (
             awaited is None
@@ -243,21 +250,27 @@ def watch(
             and (project is None or checkout_is_of(project_name, client.projects))
         ):
             awaited = checkout_head()
+
             if awaited is None:
                 typer.echo("HEAD could not be read: watching the branch's latest build.", err=True)
+
         if awaited is None:
             build = find_build(client, project_name, found, build_id)
         else:
             build = _await_build(client, found, awaited.lower(), min(deadline, _monotonic() + _COMMIT_WAIT))
+
             if build is None:
                 line = (
                     f"Timed out: branch {found.name} of {project_name} has no build of commit "
                     f"{awaited[:_HASH_LENGTH]}. Push it, or watch the latest build with --no-wait."
                 )
                 typer.echo(strip_control(line), err=True)
+
                 raise typer.Exit(EXIT_BUILD_TIMEOUT)
+
         # A build listed by the last request allowed is still watched.
         code = watch_build(client, output, project_name, build, timeout=max(deadline - _monotonic(), _POLL))
+
     raise typer.Exit(code)
 
 
@@ -276,31 +289,40 @@ def rebuild(
     Only a development or a staging branch is rebuilt. It asks first, unless `--yes` is given.
     """
     output: Output = ctx.obj
+
     if is_given(ctx, "timeout") and not then_watch:
         msg = "--timeout goes with --watch only."
         raise typer.BadParameter(msg, ctx=ctx)
+
     name = resolve_branch(ctx, branch)
+
     if not yes and not _terminal.can_ask():
         msg = (
             "Stdin or stderr is not a terminal, so the rebuild cannot be confirmed. "
             "Give --yes to rebuild without being asked."
         )
         raise ContextError(msg, ctx=ctx)
+
     with open_client(writes=True) as client:
         project_name, found = project_branch(ctx, client, project, name)
         client.check_rebuild(found)
         latest = client.latest_build(found)
+
         for line in _rebuilt(project_name, found, latest):
             typer.echo(strip_control(line), err=True)
+
         if not yes and not _terminal.confirmed("Start a new build of this branch?"):
             typer.echo("Nothing was sent.", err=True)
             raise typer.Exit(EXIT_DECLINED)
+
         # Sent once: an error is reported, never retried.
         started = client.rebuild(found)
         typer.echo(f"Build {started.id} was started.", err=True)
+
         if not then_watch:
             output.one(started, _build_columns())
             return
+
         try:
             code = watch_build(client, output, project_name, started, timeout=timeout)
         except odouche.OdoucheError:
@@ -308,6 +330,7 @@ def rebuild(
                 f"Build {started.id} may still be running. Follow it with `osh builds watch {started.id}`.", err=True
             )
             raise
+
     raise typer.Exit(code)
 
 
@@ -326,23 +349,31 @@ def open_(
     The monitor is the branch's, for a staging or a production branch, and takes no BUILD_ID.
     """
     output: Output = ctx.obj
+
     if panel is odouche.Panel.MONITOR and build_id is not None:
         msg = "The monitor is the branch's: it takes no BUILD_ID."
         raise typer.BadParameter(msg, ctx=ctx)
+
     name = resolve_branch(ctx, branch)
+
     with open_client() as client:
         project_name, found = project_branch(ctx, client, project, name)
         build = find_build(client, project_name, found, build_id)
         url = client.panel_url(project_name, found, build, panel)
+
     if not then_open:
         output.stream([url], str)
         return
+
     forget_session_env()
+
     if _browse(url):
         typer.echo(f"Sent the {panel.value} of build {build.id} to your browser.", err=True)
         return
+
     typer.echo("No browser could be started. Open this URL yourself:", err=True)
     output.stream([url], str)
+
     raise typer.Exit(EXIT_NO_BROWSER)
 
 
@@ -362,18 +393,23 @@ def mails(
     the build's: it is printed without escape sequences or control characters.
     """
     output: Output = ctx.obj
+
     if mail_id is not None and is_given(ctx, "limit"):
         msg = "--limit goes without --mail."
         raise typer.BadParameter(msg, ctx=ctx)
+
     name = resolve_branch(ctx, branch)
+
     with open_client() as client:
         project_name, found = project_branch(ctx, client, project, name)
         build = find_build(client, project_name, found, build_id)
         content = None if mail_id is None else client.mail(project_name, found, build, mail_id)
         caught = [] if content is not None else client.mails(project_name, found, build, limit=limit)
+
     if content is not None:
         _show_mail(output, content)
         return
+
     output.rows(caught, _mail_columns(), empty=f"Build {build.id} caught no mail.")
 
 
@@ -399,11 +435,14 @@ def _show_mail(output: Output, content: odouche.MailContent) -> None:
         Column[odouche.MailContent]("Attachments", _attachments),
     ]
     output.one(content, columns)
+
     if output.format is Format.TABLE:
         typer.echo()
         output.lines(content.body.splitlines(), str, strip=True)
+
     if not content.truncated:
         return
+
     if content.body:
         typer.echo(
             "The mail was cut: to 1 MiB of body, 65536 characters a header or 1000 MIME parts, containers included.",
@@ -425,8 +464,10 @@ def _attachments(content: odouche.MailContent) -> str | None:
 def _rebuilt(project: str, branch: odouche.Branch, latest: odouche.Build | None) -> list[str]:
     """Say what a rebuild is about to work on: the project, the branch and its latest build."""
     build = "none"
+
     if latest is not None:
         build = f"{latest.id}, of commit {latest.commit.hash[:_HASH_LENGTH]} {_subject(latest)}".rstrip()
+
     return [f"Project: {project}", f"Branch: {branch.name} ({stage_of(branch)})", f"Latest build: {build}"]
 
 
@@ -459,6 +500,7 @@ def watch_build(client: odouche.Client, output: Output, project: str, build: odo
 
     def changes(watched: Iterator[odouche.Build]) -> Iterator[odouche.Build]:
         nonlocal last
+
         for change in watched:
             last = change
             yield change
@@ -477,33 +519,42 @@ def watch_build(client: odouche.Client, output: Output, project: str, build: odo
     except odouche.StreamTimeoutError:
         typer.echo(f"Timed out: build {build.id} has not finished.", err=True)
         return EXIT_BUILD_TIMEOUT
+
     return _conclude(last, as_json=output.format is Format.JSON)
 
 
 def _await_build(client: odouche.Client, branch: odouche.Branch, commit: str, deadline: float) -> odouche.Build | None:
     """Return the branch's build of the commit that hash begins, or `None` when the deadline passes with none."""
     waiting = False
+
     while True:
         for build in client.builds(branch):
             if build.commit.hash.lower().startswith(commit):
                 return build
+
         if not waiting:
             line = f"Waiting for a build of commit {commit[:_HASH_LENGTH]} on branch {branch.name}."
             typer.echo(strip_control(line), err=True)
             waiting = True
+
         remaining = deadline - _monotonic()
+
         if remaining <= 0:
             return None
+
         _sleep(min(_POLL, remaining))
 
 
 def _progress(build: odouche.Build) -> str:
     """Say where a build is: its status, what it is doing, and for how long while it runs."""
     line = f"Build {build.id}: {status_of(build)}"
+
     if build.status_info and build.status_info != status_of(build):
         line += f", {build.status_info}"
+
     if build.started_at is not None and not build.finished:
         line += f" ({elapsed(build.started_at)})"
+
     return strip_control(line)
 
 
@@ -516,12 +567,16 @@ def _conclude(build: odouche.Build, *, as_json: bool) -> int:
     known = None if build.result is None else _RESULT_EXITS.get(build.result)
     code, said = known or no_result
     dropped = build.status is odouche.BuildStatus.DROPPED
+
     if dropped and known:
         said += ", then was replaced by a newer build"
+
     line = f"Build {build.id} {said}" + (f": {build.url}" if build.url and not dropped else ".")
     typer.echo(strip_control(line), err=as_json)
+
     if code == EXIT_BUILD_FAILED:
         typer.echo("Run `osh logs` to see why.", err=True)
+
     return code
 
 

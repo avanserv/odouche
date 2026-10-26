@@ -36,6 +36,7 @@ class Store:
 
     def __init__(self, *, read_only: bool) -> None:
         assert read_only
+
         if self.missing:
             raise self.missing
 
@@ -48,6 +49,7 @@ class Store:
     def identity(self) -> odouche.Identity:
         if self.rejected:
             raise self.rejected
+
         return self.identified
 
 
@@ -55,6 +57,7 @@ class Store:
 def store(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
     monkeypatch.setattr(odouche, "Client", Store)
     monkeypatch.delenv(odouche.SESSION_ENV, raising=False)
+
     return monkeypatch
 
 
@@ -63,12 +66,15 @@ def _call(*states: dict[str, Any]) -> list[CallToolResult]:
 
     async def run() -> list[CallToolResult]:
         results: list[CallToolResult] = []
+
         async with Client(create_server()) as client:
             for state in states:
                 with pytest.MonkeyPatch.context() as patch:
                     for name, value in state.items():
                         patch.setattr(Store, name, value)
+
                     results.append(await client.call_tool("get_session"))
+
         return results
 
     return asyncio.run(run())
@@ -163,9 +169,7 @@ def test_a_session_from_the_environment_has_no_time_left_to_report():
 @pytest.mark.parametrize(("left", "low", "high"), [(timedelta(hours=1), 3590, 3600), (-timedelta(hours=1), 0, 0)])
 def test_a_stored_session_reports_the_time_left(left: timedelta, low: int, high: int):
     identified = _identity(odouche.SessionSource.KEYRING, datetime.now(UTC) + left)
-
     (result,) = _call({"identified": identified})
-
     status = result.structured_content
     assert status is not None
     assert status["identity"]["session"]["source"] == "keyring"

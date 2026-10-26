@@ -50,9 +50,11 @@ def root(
 ) -> None:
     """Work with Odoo.sh projects from the command line (unofficial)."""
     output = ctx.obj = Output(output_format)
+
     if version:
         versions = Versions(osh=__version__, odouche=odouche.__version__)
         output.stream([versions], lambda found: f"osh {found.osh} (odouche {found.odouche})")
+
         raise typer.Exit
 
 

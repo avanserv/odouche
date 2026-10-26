@@ -46,6 +46,7 @@ def pages(upstream, total, *, repeat=False, pushed=0):
         asked = json.loads(request.content)["params"]["offset"]
         offset = 0 if repeat else max(asked - pushed, 0) if asked else 0
         page = [dict(copy.deepcopy(template), id=1000 - at) for at in range(offset, min(offset + 20, total))]
+
         return httpx2.Response(
             200, json={"jsonrpc": "2.0", "id": 1, "result": {"num_trackings": total, "trackings": page}}
         )
@@ -89,7 +90,6 @@ def test_the_stage_event_that_created_the_branch_has_no_build_and_no_pusher(clie
 def test_a_move_between_stages_has_both_stages(client, upstream):
     trackings(upstream)[-1]["source_stage"] = "dev"
     trackings(upstream)[-1]["target_stage"] = "staging"
-
     moved = list(client.history(BRANCH, timeout=10))[-1]
 
     assert (moved.source_stage, moved.target_stage) == (Stage.DEVELOPMENT, Stage.STAGING)
@@ -119,7 +119,6 @@ def test_nothing_is_asked_before_the_first_event_is_read(client, upstream):
 def test_the_next_page_is_asked_once_and_only_when_read_past_the_first(client, upstream):
     pages(upstream, 25)
     events = client.history(BRANCH, limit=100, timeout=10)
-
     first = [next(events) for _ in range(20)]
     assert offsets(upstream) == [0]
     rest = list(events)
@@ -185,8 +184,10 @@ def test_a_page_still_to_ask_for_at_the_timeout_raises_the_timeout_error(client,
     monkeypatch.setattr(history, "_monotonic", lambda: now[0])
     pages(upstream, 25)
     events = client.history(BRANCH, limit=100, timeout=5)
+
     for _ in range(20):
         next(events)
+
     now[0] += 5
 
     with pytest.raises(StreamTimeoutError) as raised:

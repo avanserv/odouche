@@ -50,6 +50,7 @@ def probe(command: Callable[..., None]) -> str:
     application = typer.Typer(name="tool", help="A tool.")
     application.callback()(lambda: None)
     application.command("probe", help="Probe.")(command)
+
     return cli_reference.render(application)
 
 
@@ -57,6 +58,7 @@ def paths(command: Any, path: str) -> Iterator[str]:
     """Walk a command's tree and yield the path of each command and group."""
     yield path
     children: dict[str, Any] = getattr(command, "commands", {})
+
     for name, child in children.items():
         if not child.hidden:
             yield from paths(child, f"{path} {name}")
@@ -73,6 +75,7 @@ def test_the_committed_page_is_what_the_commands_give():
 @pytest.mark.parametrize("variables", [{"COLUMNS": "20", "NO_COLOR": "1"}, {"FORCE_COLOR": "1", "TERM": "dumb"}])
 def test_the_page_does_not_depend_on_the_terminal(monkeypatch: pytest.MonkeyPatch, variables: dict[str, str]):
     page = cli_reference.render()
+
     for name, value in variables.items():
         monkeypatch.setenv(name, value)
 
@@ -301,6 +304,7 @@ def test_every_command_of_osh_has_a_section():
     found = list(paths(typer.main.get_command(app), "osh"))
 
     assert {"osh", "osh logs", "osh builds rebuild", "osh branches settings set"} <= set(found)
+
     for path in found:
         # The root and its commands share the top level, and each group's commands sit one under it.
         level = "#" * max(2, len(path.split()))

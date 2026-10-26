@@ -59,8 +59,10 @@ class StubClient:
 
     def move_branch(self, branch: Branch, to: Stage) -> Branch:
         self.calls.append(f"move {branch.name} {to.value}")
+
         if self.lost is not None:
             raise self.lost
+
         return replace(branch, stage=to, stage_name="dev" if to is Stage.DEVELOPMENT else to.value)
 
 
@@ -78,6 +80,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     monkeypatch.setattr(odouche, "Client", Client)
     monkeypatch.setattr(_terminal, "stdin_is_terminal", lambda: True)
     monkeypatch.setattr(_terminal, "stderr_is_terminal", lambda: True)
+
     return Client
 
 
@@ -206,7 +209,6 @@ def test_a_move_the_library_refuses_exits_9_before_the_question(
 
 def test_an_unknown_outcome_exits_10_and_says_where_to_look(client: type[StubClient]):
     client.lost = LOST
-
     result = run(*MOVE, "--branch", "feature-x", "--to", "staging", "--yes")
 
     assert result.exit_code == 10
@@ -238,7 +240,6 @@ def test_a_refusal_after_the_question_exits_9_and_says_nothing_was_moved(client:
 
 def test_an_escape_sequence_in_the_branch_name_is_not_emitted(client: type[StubClient]):
     client.listed = (MAIN, replace(FEATURE, name=f"feature{ESCAPE}"))
-
     result = run(*MOVE, "--branch", f"feature{ESCAPE}", "--to", "staging", stdin="y\n")
 
     assert result.exit_code == 0

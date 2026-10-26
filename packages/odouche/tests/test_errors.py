@@ -130,6 +130,7 @@ def test_shows_nothing_from_the_failed_request(error):
         raise_from_a_failed_request(error)
 
     rendered = [str(raised.value), repr(raised.value), "".join(traceback.format_exception(raised.value))]
+
     for text in rendered:
         assert COOKIE not in text
         assert HEADER not in text

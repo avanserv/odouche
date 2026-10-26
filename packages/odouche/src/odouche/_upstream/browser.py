@@ -51,23 +51,30 @@ def find(environ: Mapping[str, str] = os.environ) -> str | None:
     """Return a Chromium-family browser that can open a window here, or nothing."""
     if sys.platform == "win32":
         return None
+
     if sys.platform == "darwin":
         return next((path for path in _APPLICATIONS if os.access(path, os.X_OK)), None)
+
     if not (environ.get("DISPLAY") or environ.get("WAYLAND_DISPLAY")):
         return None
+
     return next((path for path in map(shutil.which, _NAMES) if path), None)
 
 
 def _session(result: dict[str, object]) -> Secret | None:
     """Take the session out of a `Network.getCookies` result and keep nothing else of it."""
     cookies = result.get("cookies")
+
     for cookie in cast("list[object]", cookies) if isinstance(cookies, list) else ():
         if not isinstance(cookie, dict):
             continue
+
         fields = cast("dict[str, object]", cookie)
         value = fields.get("value")
+
         if fields.get("name") == _COOKIE and fields.get("domain") == HOST and isinstance(value, str) and value:
             return Secret(value)
+
     return None
 
 
@@ -77,9 +84,12 @@ def _answer(raw: bytes, awaited: int) -> tuple[bool, dict[str, object] | None]:
         message = json.loads(raw)
     except ValueError:
         return False, None
+
     if not isinstance(message, dict) or cast("dict[str, object]", message).get("id") != awaited:
         return False, None
+
     result = cast("dict[str, object]", message).get("result")
+
     return True, cast("dict[str, object]", result) if isinstance(result, dict) else None
 
 
@@ -110,6 +120,7 @@ class Capture:
         except BaseException:
             self._end()
             raise
+
         return self
 
     def __exit__(self, *_: object) -> None:
@@ -118,21 +129,26 @@ class Capture:
     def cookie(self) -> Secret | None:
         """Return the `session_id` cookie of `HOST` as it is now, signed in or not."""
         result = self._ask("Network.getCookies", {"urls": [f"https://{HOST}"]}, self._page)
+
         if result is None:
             raise LoginError("The browser was closed before the login completed.")
+
         return _session(result)
 
     def _trap(self) -> None:
         for signum in (signal.SIGTERM, signal.SIGHUP):
             handler = signal.getsignal(signum)
+
             # An ignored signal stays ignored, and a handler Python did not set cannot be put back.
             if handler is None or handler == signal.SIG_IGN:
                 continue
+
             try:
                 signal.signal(signum, self._on_signal)
             except ValueError:
                 # Not the main thread, which is the only one a signal handler runs in.
                 return
+
             self._handlers[signum] = handler
 
     def _on_signal(self, signum: int, _frame: object) -> None:
@@ -146,8 +162,10 @@ class Capture:
         finally:
             for trapped, handler in self._handlers.items():
                 signal.signal(trapped, handler)
+
             self._handlers = {}
             signum, self._signalled = self._signalled, None
+
             if signum is not None:
                 signal.raise_signal(signum)
 
@@ -163,6 +181,7 @@ class Capture:
         ends = [fcntl.fcntl(fd, fcntl.F_DUPFD_CLOEXEC, 10) for fd in (to_browser, from_browser)]
         # An interrupt between the launch and the note of its pid would leave a browser nothing stops.
         mask = signal.pthread_sigmask(signal.SIG_BLOCK, {signal.SIGINT})
+
         try:
             self._pid = os.posix_spawn(
                 self._browser,
@@ -198,21 +217,27 @@ class Capture:
                     os.close(fd)
             finally:
                 signal.pthread_sigmask(signal.SIG_SETMASK, mask)
+
         raise LoginError(f"The browser could not be launched ({failure}).")
 
     def _attach(self) -> None:
         targets = (self._ask("Target.getTargets") or {}).get("targetInfos")
+
         for target in cast("list[object]", targets) if isinstance(targets, list) else ():
             fields = cast("dict[str, object]", target) if isinstance(target, dict) else {}
+
             if fields.get("type") != "page":
                 continue
+
             attached = self._ask("Target.attachToTarget", {"targetId": fields.get("targetId"), "flatten": True})
             page = (attached or {}).get("sessionId")
+
             if isinstance(page, str):
                 self._page = page
                 break
         else:
             raise LoginError("The browser did not open a window to log in from.")
+
         # A sandboxed browser can be given a directory of its own in place of this one.
         if self._profile is None or not os.listdir(self._profile):
             raise LoginError("The browser does not keep its profile where it can be deleted after the login.")
@@ -220,9 +245,12 @@ class Capture:
     def _send(self, method: str, params: dict[str, object] | None = None, page: str | None = None) -> int:
         self._last += 1
         message: dict[str, object] = {"id": self._last, "method": method, "params": params or {}}
+
         if page is not None:
             message["sessionId"] = page
+
         os.write(self._fds[1], json.dumps(message).encode() + b"\0")
+
         return self._last
 
     def _ask(
@@ -231,48 +259,60 @@ class Capture:
         """Send one command and return its result, or nothing if the browser does not give one."""
         if self._signalled is not None:
             raise LoginError("The login was ended by a signal.")
+
         try:
             awaited = self._send(method, params, page)
         except OSError:
             return None
+
         deadline = time.monotonic() + _REPLY_TIMEOUT
+
         while True:
             # Anything that is not the answer is dropped: no event is subscribed to.
             while b"\0" in self._buffer:
                 raw, _, self._buffer = self._buffer.partition(b"\0")
                 answered, result = _answer(raw, awaited)
+
                 if answered:
                     return result
+
             if not self._read(deadline):
                 return None
 
     def _read(self, deadline: float) -> bool:
         """Take what the browser wrote, and tell whether there was anything before the deadline."""
         remaining = deadline - time.monotonic()
+
         if remaining <= 0 or not self._readable.select(remaining):
             return False
+
         try:
             chunk = os.read(self._fds[0], 65536)
         except OSError:
             return False
+
         self._buffer += chunk
+
         return bool(chunk)
 
     def _close(self) -> None:
         """Stop the browser, then delete the profile. Each step runs even if the one before fails."""
         pid, self._pid = self._pid, None
         profile, self._profile = self._profile, None
+
         try:
             if pid is not None:
                 self._stop(pid)
         finally:
             try:
                 self._readable.close()
+
                 for fd in self._fds:
                     os.close(fd)
             finally:
                 self._fds = []
                 self._buffer = b""
+
                 if profile is not None and not _remove(profile):
                     raise LoginError(
                         f"The browser profile at {profile} could not be deleted. Delete it by hand: "
@@ -283,8 +323,10 @@ class Capture:
         try:
             with suppress(OSError):
                 self._send("Browser.close")
+
             # The browser closes its end as it exits.
             deadline = time.monotonic() + _EXIT_TIMEOUT
+
             while self._read(deadline):
                 self._buffer = b""
         finally:
@@ -292,16 +334,21 @@ class Capture:
             # not reaped before this, so its group cannot have become another process's.
             with suppress(OSError):
                 os.killpg(pid, signal.SIGKILL)
+
             with suppress(ChildProcessError):
                 os.waitpid(pid, 0)
 
 
 def _remove(profile: str) -> bool:
     deadline = time.monotonic() + _REMOVAL_TIMEOUT
+
     while True:
         shutil.rmtree(profile, ignore_errors=True)
+
         if not os.path.lexists(profile):
             return True
+
         if time.monotonic() >= deadline:
             return False
+
         time.sleep(_PAUSE)

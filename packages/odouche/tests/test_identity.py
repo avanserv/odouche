@@ -56,13 +56,13 @@ def test_an_identity_is_immutable_and_holds_no_payload(client):
     identity = client.identity()
 
     assert [field.name for field in dataclasses.fields(identity)] == ["user_id", "name", "username", "email", "session"]
+
     with pytest.raises(dataclasses.FrozenInstanceError):
         identity.name = "other"
 
 
 def test_the_stored_session_says_when_it_was_stored_and_expires_without_a_request(stored, upstream, session):
     before = datetime.now(UTC).replace(microsecond=0)
-
     info = Client().session
 
     assert info.source is SessionSource.KEYRING
@@ -112,17 +112,18 @@ def test_names_the_field_that_changed_shape(client, upstream, session, field, ch
     assert raised.value.operation == "identity"
     assert raised.value.field == f"result.{field}"
     text = "".join(traceback.format_exception(raised.value))
+
     for value in ("octo-dev", "dev@example.com", session):
         assert value not in text
 
 
 def test_logout_ends_the_session_on_both_sides(stored, upstream, session):
     assert logout() == LogoutResult(source=SessionSource.KEYRING, deleted=True, invalidated=True, failure=None)
-
     assert KEY not in stored.entries
     (request,) = upstream.requests
     assert (request.method, request.url.path, request.url.query) == ("GET", LOGOUT, b"redirect=%2F")
     assert request.headers["Cookie"] == f"session_id={session}"
+
     with pytest.raises(NoSessionError):
         Client()
 
@@ -130,7 +131,6 @@ def test_logout_ends_the_session_on_both_sides(stored, upstream, session):
 @pytest.mark.parametrize("failure", [httpx2.ConnectError, 503])
 def test_logout_deletes_the_session_when_odoo_sh_cannot_be_asked(stored, upstream, session, failure):
     upstream.failures[LOGOUT] = failure
-
     result = logout()
 
     assert (result.source, result.deleted, result.invalidated) == (SessionSource.KEYRING, True, False)
@@ -144,7 +144,6 @@ def test_logout_deletes_the_session_when_odoo_sh_cannot_be_asked(stored, upstrea
 
 def test_logout_reports_an_answer_it_does_not_know_and_still_deletes(stored, upstream):
     upstream.failures[LOGOUT] = 200
-
     result = logout()
 
     assert isinstance(result.failure, UpstreamChangedError)
@@ -182,6 +181,7 @@ def test_logout_leaves_a_passed_session_to_the_caller(stored, upstream):
 @pytest.mark.parametrize("source", [SessionSource.ARGUMENT, SessionSource.ENVIRONMENT])
 def test_logout_ends_a_given_session_only_when_asked(stored, upstream, monkeypatch, source):
     given = None
+
     if source is SessionSource.ARGUMENT:
         given = Secret("0th3r-v4lu3")
     else:
@@ -215,6 +215,7 @@ def test_an_interrupted_logout_stays_an_interrupt_when_the_session_cannot_be_del
 @pytest.mark.parametrize(("failure", "ended"), [(None, "was ended"), (503, "was not ended")])
 def test_logout_says_when_the_session_could_not_be_deleted(stored, upstream, session, failure, ended):
     stored.refuses_deletion = True
+
     if failure:
         upstream.failures[LOGOUT] = failure
 
