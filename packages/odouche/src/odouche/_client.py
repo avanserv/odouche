@@ -28,6 +28,7 @@ from odouche._upstream import (
     watch,
 )
 from odouche._upstream.transport import Transport
+from odouche.errors import NotFoundError
 from odouche.models import (
     AuditEntry,
     Backup,
@@ -253,6 +254,17 @@ class Client:
         branches. Asks Odoo.sh twice, for the projects and then for the branches.
         """
         return branches.branches(self._transport, _project_name(project))
+
+    def branch(self, project: Project | str, name: str) -> Branch:
+        """Return the branch of a project that has that name, raising `NotFoundError` when it has none.
+
+        Raises as `branches` does, and asks Odoo.sh as often.
+        """
+        for found in self.branches(project):
+            if found.name == name:
+                return found
+        msg = f"Project {_project_name(project)} has no branch {name}."
+        raise NotFoundError(msg, operation="branches")
 
     def backups(self, project: Project | str) -> list[Backup]:
         """List the backups of a project, given as a `Project` or by its name, newest first.

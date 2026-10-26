@@ -54,16 +54,8 @@ def parse(source: str) -> Parsed:
         # As bytes: each part is then decoded with its own charset, and half of a surrogate pair is replaced.
         message = email.message_from_bytes(source.encode("utf-8", "replace"), _class=_Part, policy=_POLICY)
         leaves, cut = _leaves(message)
-        texts = [part for part in leaves if not _held(part)]
-        body = next(
-            (part for kind in ("text/plain", "text/html") for part in texts if part.get_content_type() == kind), None
-        )
-        attachments: list[MailAttachment] = []
-        for part in leaves:
-            if part is not body and (_held(part) or part.get_filename()):
-                name, name_cut = _header(part.get_filename() or "")
-                attachments.append(MailAttachment(name=name, size=len(_content(part))))
-                cut = cut or name_cut
+        body = _body(leaves)
+        attachments, names_cut = _attachments(leaves, body)
         cc, cc_cut = _header(next((value for key, value in message.raw_items() if key.lower() == "cc"), ""))
         text, text_cut = ("", False) if body is None else _text(body)
     # The mail was written by the build's code: whatever `email` raises on it is not upstream changing.
@@ -74,7 +66,7 @@ def parse(source: str) -> Parsed:
         cc=cc,
         body=kept[:MAX_BODY].decode("utf-8", "ignore"),
         attachments=tuple(attachments),
-        truncated=cut or cc_cut or text_cut or len(kept) > MAX_BODY,
+        truncated=cut or names_cut or cc_cut or text_cut or len(kept) > MAX_BODY,
     )
 
 
@@ -131,6 +123,26 @@ class _Part(Message):
         if self._type is None:
             self._type = super().get_content_type()
         return self._type
+
+
+def _body(leaves: list[Message]) -> Message | None:
+    """Return the part shown as the mail's text: its first plain one not held as a file, else its first HTML one."""
+    texts = [part for part in leaves if not _held(part)]
+    return next(
+        (part for kind in ("text/plain", "text/html") for part in texts if part.get_content_type() == kind), None
+    )
+
+
+def _attachments(leaves: list[Message], body: Message | None) -> tuple[list[MailAttachment], bool]:
+    """Return the parts other than the body that are files, and whether a name was cut."""
+    attachments: list[MailAttachment] = []
+    cut = False
+    for part in leaves:
+        if part is not body and (_held(part) or part.get_filename()):
+            name, name_cut = _header(part.get_filename() or "")
+            attachments.append(MailAttachment(name=name, size=len(_content(part))))
+            cut = cut or name_cut
+    return attachments, cut
 
 
 def _leaves(message: Message) -> tuple[list[Message], bool]:

@@ -21,10 +21,28 @@ def test_lists_the_branches_with_their_stage_in_the_order_of_the_answer(client, 
     assert upstream.requests[1].headers["Cookie"] == f"session_id={session}"
 
 
+def test_finds_a_branch_by_its_name(client):
+    assert client.branch("acme-shop", "staging") == Branch(
+        id=51020, name="staging", stage=Stage.STAGING, stage_name="staging"
+    )
+
+
+@pytest.mark.parametrize("by_name", [True, False])
+def test_a_branch_the_project_does_not_have_is_not_found(client, *, by_name):
+    project = client.projects()[0]
+
+    with pytest.raises(NotFoundError) as raised:
+        client.branch(project.name if by_name else project, "Staging")
+
+    assert raised.value.operation == "branches"
+    assert str(raised.value) == "Project acme-shop has no branch Staging."
+
+
 def test_takes_a_project_or_its_name(client):
     project = client.projects()[0]
 
     assert client.branches(project) == client.branches(project.name)
+    assert client.branch(project, "staging") == client.branch(project.name, "staging")
 
 
 def test_a_branch_is_immutable_and_holds_no_payload(client):

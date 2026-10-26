@@ -18,7 +18,7 @@ from odouche_cli import _settings, _size, _terminal
 from odouche_cli._client import open_client
 from odouche_cli._context import ProjectOption, resolve_project, result_of, status_of
 from odouche_cli._errors import EXIT_CHECK_FAILED, EXIT_CHECK_WARNED, EXIT_DECLINED
-from odouche_cli._output import Column, Output, strip_control, strip_line_control
+from odouche_cli._output import Column, Output, strip_control
 from odouche_cli._settings import quoted, shown
 
 
@@ -256,8 +256,18 @@ def _changing(
         if name not in _ENTRIES:
             before, after = quoted(getattr(current, name)), quoted(value)
             lines.append(f"{name}: {before} → {after}" if name in sent else f"{name} is already {after}.")
+    return lines + _allow_list_changing(current, change, narrowed)
+
+
+def _allow_list_changing(
+    current: odouche.ProjectSettings,
+    change: odouche.ProjectSettingsChange,
+    narrowed: odouche.ProjectSettingsChange | None,
+) -> list[str]:
+    """Say what a change is about to do to the allow list, and which of its entries it leaves as they are."""
     allowed = () if narrowed is None else narrowed.allow_ips or ()
     removed = () if narrowed is None else narrowed.disallow_ips or ()
+    lines: list[str] = []
     if allowed or removed:
         lines.append(f"{_ALLOW_LIST}: {shown(current.ip_allow_list)} → {shown(_listed(current, allowed, removed))}")
     lines.extend(f"{address} is already allowed." for address in change.allow_ips or () if address not in allowed)
@@ -313,7 +323,7 @@ SinceOption = Annotated[
 
 def _untrusted(text: str) -> str:
     """Put text others wrote on one line, without its escape sequences."""
-    return strip_line_control(" ".join(text.splitlines()))
+    return odouche.strip_line_control(" ".join(text.splitlines()))
 
 
 def _action(entry: odouche.AuditEntry) -> str:

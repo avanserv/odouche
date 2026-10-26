@@ -47,6 +47,9 @@ class StubClient:
     def projects(self) -> list[odouche.Project]:
         return [ACME]
 
+    # The library's own, over `branches`.
+    branch = odouche.Client.branch
+
     def branches(self, project: str) -> list[Branch]:
         self.calls.append(f"branches {project}")
         return list(self.listed)

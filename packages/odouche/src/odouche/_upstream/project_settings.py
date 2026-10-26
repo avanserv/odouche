@@ -113,16 +113,25 @@ def narrow(current: ProjectSettings, change: ProjectSettingsChange) -> ProjectSe
         msg = "The timeouts are changed on a dedicated server only, and this project has none: its Settings page disables them."
         raise SettingsConflictError(msg)
     settings.check_options(differs.keys(), replace(current, **differs))  # pyright: ignore[reportArgumentType]
-    kept = [entry for entry in current.ip_allow_list if entry not in removed]
-    if allowed and len(kept) + len(allowed) > _MAX_ENTRIES:
-        msg = f"The allow list holds {_MAX_ENTRIES} entries at most, as its page says: remove some in the same change."
-        raise SettingsConflictError(msg)
+    _check_allow_list(current, allowed, removed)
     return replace(
         change,
         **dict.fromkeys(given.keys() - differs.keys() - _ENTRIES),
         allow_ips=allowed or None,
         disallow_ips=removed or None,
     )
+
+
+def _check_allow_list(
+    current: ProjectSettings,
+    allowed: tuple[ipaddress.IPv4Address, ...],
+    removed: tuple[ipaddress.IPv4Address | ipaddress.IPv6Address | ipaddress.IPv4Network | ipaddress.IPv6Network, ...],
+) -> None:
+    """Raise `SettingsConflictError` when entries are allowed and the list would then hold more than the page takes."""
+    kept = [entry for entry in current.ip_allow_list if entry not in removed]
+    if allowed and len(kept) + len(allowed) > _MAX_ENTRIES:
+        msg = f"The allow list holds {_MAX_ENTRIES} entries at most, as its page says: remove some in the same change."
+        raise SettingsConflictError(msg)
 
 
 def _read(name: str, answer: Reader) -> ProjectSettings:

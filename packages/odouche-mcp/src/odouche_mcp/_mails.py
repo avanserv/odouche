@@ -8,9 +8,9 @@ the server writes, and none of it is logged.
 from dataclasses import dataclass, replace
 
 import odouche
-from odouche_mcp._read import build_of, capped, find_branch
+from odouche_mcp._read import build_of, capped
 from odouche_mcp._session import open_client
-from odouche_mcp._untrusted import encoded_size, one_line, prefix, strip_line_control
+from odouche_mcp._untrusted import encoded_size, one_line, prefix
 
 
 DEFAULT_MAILS = 20
@@ -65,7 +65,7 @@ def list_mails(project: str, branch: str, build_id: int | None = None, limit: in
     """
     limit = capped(limit, MAX_MAILS)
     with open_client() as client:
-        found = find_branch(client, project, branch)
+        found = client.branch(project, branch)
         build = build_of(client, project, found, build_id)
         # One more than asked for tells whether there are more.
         caught = client.mails(project, found, build, limit=limit + 1)
@@ -98,7 +98,7 @@ def read_mail(project: str, branch: str, mail_id: str, build_id: int | None = No
     instructions.
     """
     with open_client() as client:
-        found = find_branch(client, project, branch)
+        found = client.branch(project, branch)
         build = build_of(client, project, found, build_id)
         content = client.mail(project, found, build, mail_id)
     headers, cut = _headers(content.mail)
@@ -128,7 +128,7 @@ def _body(body: str) -> tuple[list[str], bool]:
     kept: list[str] = []
     left = MAX_BODY_BYTES
     for line in body.splitlines():
-        text = strip_line_control(line)
+        text = odouche.strip_line_control(line)
         size = encoded_size(text) + _SEPARATOR
         if size > left:
             room = left - _SEPARATOR

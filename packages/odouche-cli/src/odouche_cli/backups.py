@@ -285,20 +285,9 @@ def download(
     neutralized, filestore = not exact, not no_filestore
     with open_client(writes=True) as client:
         project_name, found = project_branch(ctx, client, project, name)
-        if new:
-            client.check_backup(found)
-            latest = client.latest_build(found)
-            if latest is None:
-                msg = f"Branch {found.name} of {project_name} has no build to back up."
-                raise odouche.NotFoundError(msg)
-            chosen = ready = None
-            described = f"Backup: a new one of build {latest.id}, {latest.name}"
-        else:
-            chosen = _chosen(client.backups(project_name), found, taken)
-            ready = client.find_download(project_name, chosen, neutralized=neutralized, filestore=filestore)
-            described = (
-                f"Backup: {chosen.taken_at.strftime(_TAKEN)} UTC, {chosen.kind_name}, of build {chosen.build_name}"
-            )
+        chosen, ready, described = _download_source(
+            client, project_name, found, taken, new=new, choices=(neutralized, filestore)
+        )
         for line in (
             f"Project: {project_name}",
             f"Branch: {found.name} ({stage_of(found)})",
@@ -488,6 +477,36 @@ def _taken(ctx: typer.Context, value: str, hint: str, other: str = "") -> dateti
         raise typer.BadParameter(msg, ctx=ctx, param_hint=hint) from None
 
 
+def _download_source(
+    client: odouche.Client,
+    project: str,
+    branch: odouche.Branch,
+    taken: datetime | None,
+    *,
+    new: bool,
+    choices: tuple[bool, bool],
+) -> tuple[odouche.Backup | None, odouche.PreparedDownload | None, str]:
+    """Return the backup to download, its file when Odoo.sh holds it already, and the line that names it.
+
+    With `new` there is no backup yet: the line names the build a new one is to be taken of.
+    """
+    if new:
+        client.check_backup(branch)
+        latest = client.latest_build(branch)
+        if latest is None:
+            msg = f"Branch {branch.name} of {project} has no build to back up."
+            raise odouche.NotFoundError(msg)
+        return None, None, f"Backup: a new one of build {latest.id}, {latest.name}"
+    chosen = _chosen(client.backups(project), branch, taken)
+    neutralized, filestore = choices
+    ready = client.find_download(project, chosen, neutralized=neutralized, filestore=filestore)
+    return (
+        chosen,
+        ready,
+        f"Backup: {chosen.taken_at.strftime(_TAKEN)} UTC, {chosen.kind_name}, of build {chosen.build_name}",
+    )
+
+
 def _chosen(listed: list[odouche.Backup], branch: odouche.Branch, taken: datetime | None) -> odouche.Backup:
     """Return the branch's backup taken at `taken`, or its newest that can be downloaded."""
     mine = [backup for backup in listed if backup.branch_name == branch.name]
@@ -497,18 +516,21 @@ def _chosen(listed: list[odouche.Backup], branch: odouche.Branch, taken: datetim
     downloadable = [backup for backup in mine if backup.downloadable]
     if downloadable:
         return downloadable[0]
+    raise odouche.NotFoundError(strip_control(_none_downloadable(mine, branch, taken)))
+
+
+def _none_downloadable(mine: list[odouche.Backup], branch: odouche.Branch, taken: datetime | None) -> str:
+    """Say why none of the branch's backups, those taken at `taken` when it is given, can be downloaded."""
     if mine:
-        msg = (
+        return (
             f"Backup {mine[0].taken_at.strftime(_TAKEN)} of branch {branch.name} is {mine[0].kind_name}: "
             "Odoo.sh does not let it be downloaded."
         )
-    elif taken is not None:
-        msg = (
+    if taken is not None:
+        return (
             f"Branch {branch.name} has no backup taken at {taken.strftime(_TAKEN)} UTC. `osh backups list` lists them."
         )
-    else:
-        msg = f"Branch {branch.name} has no backup that can be downloaded."
-    raise odouche.NotFoundError(strip_control(msg))
+    return f"Branch {branch.name} has no backup that can be downloaded."
 
 
 def _new_backup(client: odouche.Client, project: str, branch: odouche.Branch, timeout: int) -> odouche.Backup:

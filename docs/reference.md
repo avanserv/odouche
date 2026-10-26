@@ -135,6 +135,8 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.MailAttachment
 
+::: odouche.strip_line_control
+
 ## Errors
 
 ::: odouche.OdoucheError

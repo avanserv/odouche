@@ -207,6 +207,7 @@ dev = [
     "deptry>=0.25.1",
     "mkdocstrings-python>=2.0.9",
     "prek>=0.5.4",
+    "pyscn>=1.33.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "pytest-randomly>=5.0.0",

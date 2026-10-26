@@ -157,7 +157,7 @@ Session capture, at the end of the browser flow:
 
 ## Commands
 
-Toolchain: uv (never `pip`), ruff, basedpyright, deptry, vulture, pytest, zensical, prek.
+Toolchain: uv (never `pip`), ruff, basedpyright, deptry, vulture, pyscn, pytest, zensical, prek.
 Python >= 3.12; `.python-version` pins 3.12 locally so the floor is what gets exercised, and CI
 tests 3.12 to 3.14.
 
@@ -168,6 +168,7 @@ make format         # ruff format
 make lint           # ruff check with fixes, zizmor on the workflows
 make type-check     # basedpyright
 make deps           # deptry, once per package
+make quality        # pyscn check: complexity, function length, dead code, clones
 make test           # pytest
 make coverage       # pytest with coverage; fail_under = 90
 make live-check PROJECT=<name>   # read path against the real Odoo.sh; by hand, never in CI

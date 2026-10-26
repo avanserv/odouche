@@ -60,7 +60,7 @@ runner = CliRunner()
 class StubClient:
     """Stands in for `odouche.Client`: takes backups as the library does, and records the calls."""
 
-    branch: Branch = STAGING
+    on_branch: Branch = STAGING
     latest: Build | None = LATEST
     looks: tuple[Backup | None, ...] = (None, None, TAKEN)
     """What a wait for the backup yields."""
@@ -83,9 +83,12 @@ class StubClient:
     def projects(self) -> list[odouche.Project]:
         return [ACME]
 
+    # The library's own, over `branches`.
+    branch = odouche.Client.branch
+
     def branches(self, project: str) -> list[Branch]:
         self.calls.append(f"branches {project}")
-        return [self.branch]
+        return [self.on_branch]
 
     def latest_build(self, branch: Branch) -> Build | None:
         self.calls.append(f"latest {branch.name}")
@@ -198,7 +201,7 @@ def test_a_run_nobody_attends_is_refused_before_a_client_is_opened(
 
 @pytest.mark.parametrize("arguments", [(), ("--yes",)], ids=["asked", "yes"])
 def test_a_development_branch_is_refused_before_anything_is_sent(client: type[StubClient], arguments: tuple[str, ...]):
-    client.branch = FEATURE
+    client.on_branch = FEATURE
 
     result = run(*CREATE, "--project", "acme", "--branch", "feature-x", *arguments, stdin="y\n")
 
@@ -230,7 +233,7 @@ def test_an_escape_sequence_in_a_name_is_not_emitted(client: type[StubClient]):
 
 
 def test_a_production_branch_is_backed_up(client: type[StubClient]):
-    client.branch = replace(STAGING, name="main", stage=Stage.PRODUCTION, stage_name="production")
+    client.on_branch = replace(STAGING, name="main", stage=Stage.PRODUCTION, stage_name="production")
 
     result = run(*CREATE, "--project", "acme", "--branch", "main", "--yes")
 

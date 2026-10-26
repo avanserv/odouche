@@ -6,6 +6,7 @@ from odouche._client import Client
 from odouche._login import LoginStep, login
 from odouche._logout import logout
 from odouche._session import KEYRING_ENTRY, KEYRING_SERVICE, SESSION_ENV
+from odouche._text import strip_line_control
 from odouche.errors import (
     KeyringUnavailableError,
     LoginError,
@@ -159,6 +160,7 @@ __all__ = [
     "__version__",
     "login",
     "logout",
+    "strip_line_control",
 ]
 
 __version__ = version("odouche")

@@ -13,7 +13,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 import odouche
 from odouche_mcp._read import capped, find_build
 from odouche_mcp._session import open_client
-from odouche_mcp._untrusted import encoded_size, prefix, strip_line_control
+from odouche_mcp._untrusted import encoded_size, prefix
 
 
 DEFAULT_LINES = 100
@@ -65,7 +65,7 @@ def read_log(
         kind, tail = _tail(client, project, build, kind, _EVERY_LINE if contains else lines + 1)
         for line in tail:
             cut = cut or line.truncated
-            text = strip_line_control(line.text)
+            text = odouche.strip_line_control(line.text)
             if not contains or contains in text:
                 kept.append(text)
     cut = cut or len(kept) > lines

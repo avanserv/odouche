@@ -176,7 +176,7 @@ def list_builds(project: str, branch: str, limit: int = DEFAULT_BUILDS) -> Build
     limit = capped(limit, MAX_BUILDS)
     with open_client() as client:
         # One more than asked for tells whether there are more.
-        found = client.builds(find_branch(client, project, branch), limit=limit + 1)
+        found = client.builds(client.branch(project, branch), limit=limit + 1)
     return Builds(found[:limit], truncated=len(found) > limit)
 
 
@@ -184,7 +184,7 @@ def list_history(project: str, branch: str, limit: int = DEFAULT_HISTORY) -> His
     """List the history of a branch of a project, newest first: each push with its commits, each rebuild and each move between stages."""
     limit = capped(limit, MAX_HISTORY)
     with open_client() as client:
-        found = client.history(find_branch(client, project, branch), limit=limit + 1, timeout=HISTORY_TIMEOUT)
+        found = client.history(client.branch(project, branch), limit=limit + 1, timeout=HISTORY_TIMEOUT)
         events = list(found)
     return History(events[:limit], truncated=len(events) > limit)
 
@@ -198,7 +198,7 @@ def get_build(project: str, branch: str, build_id: int | None = None) -> BuildRe
 def get_branch_settings(project: str, branch: str) -> SettingsRead:
     """Read the settings of a branch of a project: what a new commit does, which modules and tests a new build runs, its Odoo version and revision, its operating system and its custom domains."""
     with open_client() as client:
-        found = find_branch(client, project, branch)
+        found = client.branch(project, branch)
         return SettingsRead(found, client.branch_settings(found))
 
 
@@ -215,17 +215,9 @@ def capped(limit: int, cap: int, name: str = "A limit") -> int:
     return min(limit, cap)
 
 
-def find_branch(client: odouche.Client, project: str, name: str) -> odouche.Branch:
-    for branch in client.branches(project):
-        if branch.name == name:
-            return branch
-    msg = f"Project {project} has no branch {name}."
-    raise odouche.NotFoundError(msg)
-
-
 def find_build(client: odouche.Client, project: str, branch: str, build_id: int | None) -> odouche.Build:
     """Return the build of that number of a branch, or its latest one when none is given."""
-    return build_of(client, project, find_branch(client, project, branch), build_id)
+    return build_of(client, project, client.branch(project, branch), build_id)
 
 
 def build_of(client: odouche.Client, project: str, branch: odouche.Branch, build_id: int | None) -> odouche.Build:

@@ -63,18 +63,7 @@ def add_tool[**P, R](
     if not summary or not all(text.strip() and "\n" not in text for text in lines.values()):
         msg = f"{name}: a tool has a docstring, and one line each for what it returns, touches and is bound by."
         raise ValueError(msg)
-    hints = (
-        annotations.read_only_hint,
-        annotations.destructive_hint,
-        annotations.idempotent_hint,
-        annotations.open_world_hint,
-    )
-    if any(hint is None for hint in hints):
-        msg = f"{name}: a tool sets all four hints."
-        raise ValueError(msg)
-    if annotations.read_only_hint != (touches == READS_ONLY):
-        msg = f"{name}: a read-only tool touches `{READS_ONLY}`, and only a read-only tool does."
-        raise ValueError(msg)
+    _check_hints(name, annotations, touches)
 
     @functools.wraps(fn)
     def tool(*args: P.args, **kwargs: P.kwargs) -> R:
@@ -92,6 +81,22 @@ def add_tool[**P, R](
     )
     if not annotations.read_only_hint:
         _refuse_undeclared(server, name)
+
+
+def _check_hints(name: str, annotations: ToolAnnotations, touches: str) -> None:
+    """Raise when a tool leaves a hint unset, or when its read-only hint and what it touches disagree."""
+    hints = (
+        annotations.read_only_hint,
+        annotations.destructive_hint,
+        annotations.idempotent_hint,
+        annotations.open_world_hint,
+    )
+    if any(hint is None for hint in hints):
+        msg = f"{name}: a tool sets all four hints."
+        raise ValueError(msg)
+    if annotations.read_only_hint != (touches == READS_ONLY):
+        msg = f"{name}: a read-only tool touches `{READS_ONLY}`, and only a read-only tool does."
+        raise ValueError(msg)
 
 
 def _refuse_undeclared(server: MCPServer[Any], name: str) -> None:

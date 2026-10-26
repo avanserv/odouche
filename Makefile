@@ -2,7 +2,7 @@
 
 PACKAGES := odouche odouche-cli odouche-mcp
 
-.PHONY: help install format lint type-check deps deadcode test coverage live-check docs docs-cli docs-mcp docs-serve build hooks check clean
+.PHONY: help install format lint type-check deps deadcode quality test coverage live-check docs docs-cli docs-mcp docs-serve build hooks check clean
 
 help: ## List available targets with their descriptions
 	@grep -hE '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) \
@@ -32,6 +32,9 @@ deps: ## Check each package's declared dependencies against its imports (deptry)
 
 deadcode: ## Find dead code (vulture)
 	uv run vulture
+
+quality: ## Check complexity, function length, dead code and clones (pyscn)
+	uv run pyscn check packages scripts examples
 
 test: ## Run the test suite
 	uv run pytest
@@ -67,11 +70,11 @@ hooks: ## Run every git hook over every tracked file (prek)
 
 # The non-mutating forms, so a red gate means the tree is wrong rather than that it was just
 # rewritten: `make format` and `make lint` are the ones that fix.
-check: ## Full gate: format, lint, types, dependencies, dead code, tests with coverage, docs
+check: ## Full gate: format, lint, types, dependencies, dead code, quality, tests with coverage, docs
 	uv run ruff format --check
 	uv run ruff check --no-fix
 	uv run zizmor --no-progress --config .github/zizmor.yml .github/workflows .github/dependabot.yml
-	$(MAKE) --no-print-directory type-check deps deadcode coverage docs
+	$(MAKE) --no-print-directory type-check deps deadcode quality coverage docs
 
 clean: ## Remove build, coverage and documentation output
 	rm -rf build dist site .cache htmlcov coverage.xml .coverage .coverage.*

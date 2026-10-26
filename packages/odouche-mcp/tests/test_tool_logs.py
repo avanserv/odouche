@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import time
 from datetime import UTC, datetime
 from typing import Any, ClassVar, Self
 
@@ -11,7 +10,7 @@ from mcp.types import CallToolResult
 
 import odouche
 from odouche_mcp._logs import DEFAULT_LINES, MAX_BYTES, MAX_LINES
-from odouche_mcp._untrusted import encoded_size, strip_line_control
+from odouche_mcp._untrusted import encoded_size
 from odouche_mcp.server import create_server
 
 
@@ -63,6 +62,9 @@ class Upstream:
 
     def __exit__(self, *_: object) -> None:
         pass
+
+    # The library's own, over `branches`.
+    branch = odouche.Client.branch
 
     def branches(self, project: str) -> list[odouche.Branch]:
         if project != "acme":
@@ -364,18 +366,6 @@ def test_a_line_comes_without_its_sequences_and_control_characters_but_the_tab(
     upstream.setattr(Upstream, "held", {"install": _lines(line)})
 
     assert _answer()["untrusted_lines"] == [stripped]
-
-
-@pytest.mark.parametrize(
-    "line",
-    ["\x1b]" * 32768, "\x9d" * 65536, "\x1b[" * 32768, "\x1bP" * 32768, "\x9d" * 60000 + "\x1b[", "\x9d\x9b" * 32768],
-    ids=["OSC", "C1 OSC", "CSI", "DCS", "C1 OSC before a cut CSI", "C1 OSC and CSI"],
-)
-def test_a_long_line_of_sequences_that_never_end_is_stripped_quickly(line: str):
-    started = time.perf_counter()
-
-    assert strip_line_control(line) == ""
-    assert time.perf_counter() - started < 5
 
 
 def test_no_line_of_a_log_reaches_stderr_or_a_logger(
