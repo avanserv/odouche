@@ -31,7 +31,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project, a branch's history, show and change its settings, and the revision a build runs. |
 | [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, start a new one, open its panels and read the mails it caught. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
-| [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach, show one's overview, show and change its settings, check it, and read its audit log. |
+| [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach, show one's overview, show and change its settings, check it, read its audit log, and list its members. |
 | [`osh ssh`](#osh-ssh) | Open a shell on the branch's latest build, with your own `ssh`, its configuration and its keys. |
 
 ## `osh auth`
@@ -552,7 +552,7 @@ osh logs --follow
 
 ## `osh projects`
 
-List the Odoo.sh projects you can reach, show one's overview, show and change its settings, check it, and read its audit log.
+List the Odoo.sh projects you can reach, show one's overview, show and change its settings, check it, read its audit log, and list its members.
 
 ```text
 osh projects [OPTIONS] COMMAND [ARGS]...
@@ -563,6 +563,7 @@ osh projects [OPTIONS] COMMAND [ARGS]...
 | [`osh projects list`](#osh-projects-list) | List the projects you can reach, with their repository and address. |
 | [`osh projects show`](#osh-projects-show) | Show a project's overview, one fact per line: its subscription, Odoo version, hosting, production build and branches by stage. |
 | [`osh projects audit`](#osh-projects-audit) | List a project's audit log, newest first: who did what, when, on which stage, and what Odoo.sh adds about it. |
+| [`osh projects members`](#osh-projects-members) | List a project's members with their role, highest role first, then by login. |
 | [`osh projects check`](#osh-projects-check) | Check a project's subscription, production build, storage and branches, and exit 30 when one fails, 31 when one warns. |
 | [`osh projects settings`](#osh-projects-settings) | Show a project's settings, or change them. |
 
@@ -620,6 +621,26 @@ Example:
 
 ```bash
 osh projects audit --limit 10
+```
+
+### `osh projects members`
+
+List a project's members with their role, highest role first, then by login.
+
+Odoo.sh lists them to an admin of the project only: anyone else gets exit code 5. `Logged in` is `no` for a member invited who has not logged in to Odoo.sh yet. It changes nothing.
+
+```text
+osh projects members [OPTIONS]
+```
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+
+Example:
+
+```bash
+osh projects members --project acme-shop
 ```
 
 ### `osh projects check`

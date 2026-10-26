@@ -219,6 +219,18 @@ class StubClient:
             ip_allow_list=(),
         )
 
+    def members(self, project: str) -> list[odouche.ProjectMember]:
+        return [
+            odouche.ProjectMember(
+                id=61001,
+                login="octo-dev",
+                name="octo-dev",
+                role=odouche.MemberRole.ADMIN,
+                github_id=1000001,
+                pending_login=False,
+            )
+        ]
+
     # The library's own, which asks nothing.
     check_rebuild = odouche.Client.check_rebuild
     check_settings_change = odouche.Client.check_settings_change

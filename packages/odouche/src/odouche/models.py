@@ -796,6 +796,50 @@ class ProjectSettings:
     """
 
 
+class MemberRole(StrEnum):
+    """What a member may do on a project, declared lowest first as Odoo.sh ranks them.
+
+    Compare roles by `rank`, never with `<`: a `StrEnum` compares its values as strings.
+    """
+
+    DEVELOPER = "developer"
+    TESTER = "tester"
+    ADMIN = "admin"
+
+    @property
+    def rank(self) -> int:
+        """Its place among the roles, 0 for the lowest. A higher role reaches all a lower one does."""
+        return _ROLE_RANKS[self]
+
+
+_ROLE_RANKS = {role: rank for rank, role in enumerate(MemberRole)}
+
+
+@dataclass(frozen=True, slots=True)
+class ProjectMember:
+    """A member of a project, as its Settings page lists them to an admin. Odoo.sh gives no member's email."""
+
+    id: int
+    """The number of the membership, not of the person."""
+
+    login: str
+    """Their GitHub login. It is another person's personal data, carried as given, which can hold control
+    characters.
+    """
+
+    name: str
+    """What Odoo.sh calls them, the login in every member seen. Personal data as `login` is, carried as given."""
+
+    role: MemberRole
+    """What they may do on the project."""
+
+    github_id: int
+    """Their GitHub user number, which stays when they rename their login."""
+
+    pending_login: bool
+    """Whether they were invited and have not logged in to Odoo.sh yet."""
+
+
 @dataclass(frozen=True, slots=True, kw_only=True)
 class ProjectSettingsChange:
     """Settings to change on a project, named as in `ProjectSettings`: a field left `None` keeps its value on Odoo.sh.

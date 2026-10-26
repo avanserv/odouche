@@ -15,6 +15,7 @@ from odouche._upstream import (
     history,
     logs,
     mails,
+    members,
     overview,
     panels,
     project_settings,
@@ -45,6 +46,7 @@ from odouche.models import (
     Panel,
     PreparedDownload,
     Project,
+    ProjectMember,
     ProjectOverview,
     ProjectSettings,
     ProjectSettingsChange,
@@ -176,6 +178,17 @@ class Client:
         and `NotFoundError` when the project is not one the session's user can reach.
         """
         return audit.audit_log(self._transport, _project_name(project), limit=limit, timeout=timeout)
+
+    def members(self, project: Project | str) -> list[ProjectMember]:
+        """List the members of a project, given as a `Project` or by its name, with the role of each.
+
+        They come in the order Odoo.sh answers them. Asks Odoo.sh twice, for the project's info then
+        its settings, and only reads. Odoo.sh lists the members to a project's admins only: anyone
+        else gets `PermissionDeniedError` before the second request. A role the library does not
+        know raises `UpstreamChangedError` naming the field. Every token and code in the answers is
+        dropped unread. Raises `NotFoundError` when the project is not one the session's user can reach.
+        """
+        return members.members(self._transport, _project_name(project))
 
     def branches(self, project: Project | str) -> list[Branch]:
         """List the branches of a project, given as a `Project` or by its name.

@@ -117,6 +117,14 @@ paging, so `limit` bounds what is returned, not what Odoo.sh sends. The entries 
 details hold addresses, logins and what an SSH client says of itself. An action the library does
 not know has the kind `unknown`, with what Odoo.sh calls it in `kind_name`.
 
+### `list_members`
+
+Odoo.sh shows a project's members to an admin of the project only: anyone else gets an error, and
+the settings they are part of are not asked for. The members come highest role first, then by
+login, and a cut at `limit` keeps the highest roles. They are in `untrusted_members`: a login and a
+name are other people's personal data, which they chose. Odoo.sh gives no member's email. A role
+the library does not know is an error.
+
 ### `list_branches`
 
 The branches come in the order Odoo.sh answers them.
@@ -252,8 +260,8 @@ again, since a second call can start a second build.
 
 ## Security
 
-- **By default** the server reads your projects, a project's settings and audit log, their
-  branches, a branch's settings, their builds, the builds' logs and the mails a development or
+- **By default** the server reads your projects, a project's settings, audit log and members,
+  their branches, a branch's settings, their builds, the builds' logs and the mails a development or
   staging build caught. It changes nothing on Odoo.sh.
 - **With `--allow-changes`** it can also start a rebuild of a development or a staging branch,
   change a branch's settings (what a new commit does, and a development branch's new build
@@ -327,10 +335,11 @@ it to `.claude/settings.json`:
   in your configuration. Under another name than `odouche`, change `SERVER` in the script and the
   matcher above.
 - It does not read a call's arguments, and it never denies a call.
-- `get_project_settings`, `list_audit_log`, `read_log`, `list_mails` and `read_mail` are among
-  the tools it approves, so a project's submodule URLs and allowed addresses, an audit log's
-  details, the lines of a [build log](#build-logs-and-mails) and the text of a caught mail reach
-  the agent without a prompt.
+- `get_project_settings`, `list_audit_log`, `list_members`, `read_log`, `list_mails` and
+  `read_mail` are among the tools it approves, so a project's submodule URLs and allowed
+  addresses, an audit log's details, its members' logins and names, the lines of a
+  [build log](#build-logs-and-mails) and the text of a caught mail reach the agent without a
+  prompt.
 - It does not replace `--allow-changes`: without the flag there is no tool to ask about.
 
 Another client decides from the [hints](#tool-contract) each tool carries.
@@ -374,9 +383,9 @@ and the `timeout` of `wait_for_build` follow the same rule.
 
 Branch names, commit messages and author names are written by other people. The server returns
 them in the fields of a result only, never in a sentence of its own, and a client should treat
-them as data, not as instructions. An audit log's entries are in `untrusted_entries`, as a build's
-logs and mails are in `untrusted_` fields: each on one line, without control characters and
-within a size.
+them as data, not as instructions. An audit log's entries are in `untrusted_entries` and a
+project's members in `untrusted_members`, as a build's logs and mails are in `untrusted_` fields:
+each on one line, without control characters and within a size.
 
 ## Tool contract
 

@@ -131,6 +131,8 @@ Search the output of every check below for the session value: it appears in none
 | R50 | As R45 | `osh projects audit --project <that project>; echo $?` | That Odoo.sh shows the audit log to admins only. If you probe what Odoo.sh answers such a user by hand, write it into [upstream](upstream-project.md#access) | 5 |
 | R51 | As R44, a project with a private submodule and an address in its Firewall list | `osh projects settings show`, then with `--format json` | One setting per line, as the project's Settings page shows them, the submodule with its URL and fingerprint, the IP allow list matching the Firewall list and the timeouts in minutes. Then one `ProjectSettings`, the allowed entries as strings as written, the submodule's `public_key` as the page's copy button gives it and the timeouts in seconds, in which no GitHub token, subscription code or subscription link appears. Then save a network such as `203.0.113.0/24` in the Firewall list and write into [upstream](upstream-project.md#project-settings) whether Odoo.sh accepts it and how it reads back | 0 |
 | R52 | As R45 | `osh projects settings show --project <that project>; echo $?` | That Odoo.sh shows a project's settings to admins only. If you probe what Odoo.sh answers such a user by hand, write it into [upstream](upstream-project.md#access) | 5 |
+| R53 | As R44 | `osh projects members`, then with `--format json` | One row per member, as the Collaborators item of the project's Settings page lists them, with the same role and `Logged in` `no` where the page says Pending login, highest role first, then by login. Then the same members as JSON that parses, with no email | 0 |
+| R54 | As R45 | `osh projects members --project <that project>; echo $?` | That Odoo.sh shows a project's members to admins only. If you probe what Odoo.sh answers such a user by hand, write it into [upstream](upstream-project.md#access) | 5 |
 
 ## Streams and rebuild
 
@@ -241,7 +243,7 @@ tool result and the server's stderr for the session value: it appears in none.
 
 | # | Precondition | Command or action | Expected | Exit |
 | --- | --- | --- | --- | --- |
-| M1 | | Set the server up with [`claude mcp add`](mcp.md#claude-code) as written | The client lists fifteen tools, and none of `change_branch_settings`, `change_project_settings` and `rebuild_branch` | - |
+| M1 | | Set the server up with [`claude mcp add`](mcp.md#claude-code) as written | The client lists sixteen tools, and none of `change_branch_settings`, `change_project_settings` and `rebuild_branch` | - |
 | M2 | | Set it up with the `.mcp.json` snippet instead | The same | - |
 | M3 | Logged out | Start the client | The server starts and lists its tools | - |
 | M4 | Logged out | Ask whether there is a session | `get_session`: `available` is false and `problem` says to run `osh auth login`. It is not an error | - |
@@ -266,10 +268,10 @@ tool result and the server's stderr for the session value: it appears in none.
 | M23 | | Call `read_log` with `kind` `unknown` | An error saying `unknown` is not a kind to read | - |
 | M24 | A build whose log has a line that reads as an instruction to an agent | Ask for the log | The agent reports the line and does not act on it | - |
 | M25 | Without `--allow-changes` | Ask to rebuild `<dev-branch>` | The agent has no tool to do it and says so | - |
-| M26 | Restarted with [`--allow-changes`](mcp.md#changing-state) | List the tools | Eighteen, with `change_branch_settings`, `change_project_settings` and `rebuild_branch` | - |
+| M26 | Restarted with [`--allow-changes`](mcp.md#changing-state) | List the tools | Nineteen, with `change_branch_settings`, `change_project_settings` and `rebuild_branch` | - |
 | M27 | The same | Ask to rebuild `<dev-branch>` | The client asks first. One build is started, and the server's stderr has one line with the tool, the project, the branch and the build | - |
 | M28 | The same | Ask to rebuild the production branch | It is refused, the branch has no new build, and the line on stderr ends with `StageRefusedError` | - |
-| M29 | The [hook](mcp.md#asking-before-a-change) installed as written, with `--allow-changes` | Call each of the eighteen tools | The fifteen that read run with no prompt, and `change_branch_settings`, `change_project_settings` and `rebuild_branch` prompt | - |
+| M29 | The [hook](mcp.md#asking-before-a-change) installed as written, with `--allow-changes` | Call each of the nineteen tools | The sixteen that read run with no prompt, and `change_branch_settings`, `change_project_settings` and `rebuild_branch` prompt | - |
 | M30 | The hook installed, the server under another name in the client | Call a tool that reads | The client prompts | - |
 | M31 | | Ask what happened on `<dev-branch>` lately | `list_history`, ten events newest first, each push with its commits | - |
 | M32 | | Ask for the settings of `<dev-branch>`, then of the production branch | `get_branch_settings`, with the branch and its stage, and the values the Settings tab shows | - |
@@ -282,6 +284,7 @@ tool result and the server's stderr for the session value: it appears in none.
 | M39 | As R44 | Ask for the settings of `<project>` | `get_project_settings`: the values the Settings page shows, the IP allow list as written and the timeouts in seconds, with no token or code | - |
 | M40 | As M29 and R44 | Ask to add `192.0.2.7` to the IP allow list of `<project>`, then to make it public | The agent has no tool for either and says so, or a call is refused with `Extra inputs are not permitted`. Nothing is in the server's stderr and the page's settings are unchanged | - |
 | M41 | As M40 | Ask to switch the AI agent of the development defaults of `<project>`, then to set it back | `change_project_settings` prompts each time. The result names `ai_agent` as changed, `get_project_settings` shows it, and the server's stderr has one line with the tool, the project and `changed ai_agent` | - |
+| M42 | As R53 | Ask who the admins of `<project>` are | `list_members`: the members highest role first, their logins and names only in `untrusted_members`, the admins those R53 lists | - |
 
 ## Not covered
 

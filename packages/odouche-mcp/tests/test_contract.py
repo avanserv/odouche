@@ -203,6 +203,16 @@ RESULTS: dict[str, object] = {
             succeeded=True,
         )
     ],
+    "members": [
+        odouche.ProjectMember(
+            id=61001,
+            login="octo-dev",
+            name="octo-dev",
+            role=odouche.MemberRole.ADMIN,
+            github_id=1000001,
+            pending_login=False,
+        )
+    ],
     "logs": [odouche.Log(odouche.LogKind.INSTALL, "install", datetime(2026, 1, 1, tzinfo=UTC), "1 KB")],
     "read_log": [odouche.LogLine("Loading modules", offset=16, truncated=False)],
     "mails": [MAIL],
