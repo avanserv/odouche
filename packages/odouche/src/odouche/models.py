@@ -1,7 +1,8 @@
 """What the library returns: its own models, not the payloads of Odoo.sh."""
 
+import re
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from datetime import datetime
 from enum import StrEnum
 
@@ -499,6 +500,102 @@ class BranchSettings:
 
     dns_target: str | None
     """The host a custom domain's CNAME record points to."""
+
+
+_MODULE = re.compile(r"[A-Za-z0-9_]+")
+# The characters of Odoo's `--test-tags`: `[-][tag][/module][:class][.method][[params]]`, separated by commas.
+_TEST_TAGS = re.compile(r"[A-Za-z0-9_/:.,*+\-\[\]]*")
+# What each field of a change is given as.
+_KINDS: dict[str, type] = {
+    "push_behavior": PushBehavior,
+    "project_defaults": bool,
+    "module_install": ModuleInstall,
+    "modules": tuple,
+    "tests": BuildTests,
+    "test_tags": str,
+    "demo_data": bool,
+    "ai_agent": AiAgent,
+}
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class SettingsChange:
+    """Settings to change on a branch, named as in `BranchSettings`: a field left `None` keeps its value on Odoo.sh.
+
+    Raises `ValueError` when no field is given, for a module name of anything but ASCII letters,
+    digits and underscores, and for test tags of other characters than Odoo's tags have, and
+    `TypeError` for a value of another type, such as a choice given as text rather than as its
+    enum's member.
+    """
+
+    push_behavior: PushBehavior | None = None
+    """What a new commit does."""
+
+    project_defaults: bool | None = None
+    """Whether the project's development defaults apply instead of the branch's own new build options."""
+
+    module_install: ModuleInstall | None = None
+    """Which modules a new build installs."""
+
+    modules: tuple[str, ...] | None = None
+    """The modules a new build installs with `LISTED`."""
+
+    tests: BuildTests | None = None
+    """Which tests a new build runs."""
+
+    test_tags: str | None = None
+    """The Odoo test tags `TAGS` runs. An empty text clears them."""
+
+    demo_data: bool | None = None
+    """Whether a new build loads demonstration data."""
+
+    ai_agent: AiAgent | None = None
+    """The agent the AI tab runs."""
+
+    def __post_init__(self) -> None:
+        given = self.given()
+        if not given:
+            msg = "A change of settings names at least one setting."
+            raise ValueError(msg)
+        for name, value in given.items():
+            _check_setting(name, value)
+
+    def given(self) -> dict[str, object]:
+        """Return the settings given, by name, in the order of the fields."""
+        return {field.name: value for field in fields(self) if (value := getattr(self, field.name)) is not None}
+
+
+@dataclass(frozen=True, slots=True)
+class SettingsOutcome:
+    """What a change of a branch's settings did: the settings before and after it."""
+
+    before: BranchSettings
+    """The settings read before the change."""
+
+    after: BranchSettings
+    """The settings read back after it, which show every setting sent as sent."""
+
+    moved: tuple[str, ...]
+    """The settings not sent that Odoo.sh changed along with those sent, such as the tests a new
+    build runs once it installs every module. `before` and `after` hold their values."""
+
+
+def _check_setting(name: str, value: object) -> None:
+    kind = _KINDS[name]
+    # `bool` is checked exactly: an `int` is not a yes or a no.
+    if not (type(value) is kind if kind is bool else isinstance(value, kind)):
+        msg = f"`{name}` is given as a {kind.__name__}."
+        raise TypeError(msg)
+    if isinstance(value, tuple):
+        for module in value:
+            # A comma would split the name in two once sent, and a space or a control character is no module's.
+            if not isinstance(module, str) or not _MODULE.fullmatch(module):
+                msg = f"{module!r} is not a module name: one has only ASCII letters, digits and underscores."
+                raise ValueError(msg)
+    # What Odoo.sh does with the text is not seen: it is held to what Odoo reads as tags.
+    if name == "test_tags" and isinstance(value, str) and not _TEST_TAGS.fullmatch(value):
+        msg = "Test tags hold only ASCII letters, digits and `_/:.,*+-[]`."
+        raise ValueError(msg)
 
 
 @dataclass(frozen=True, slots=True)

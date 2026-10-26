@@ -71,6 +71,8 @@ EXIT_CODES: tuple[tuple[type[odouche.OdoucheError], int, str | None], ...] = (
 # Where to look after an unconfirmed change, by the operation the library names, when it is not a build.
 _OUTCOME_HINTS = {
     "backup": "`osh backups list` shows whether the backup was taken.",
+    "branch settings change": "`osh branches settings show` shows whether the settings were changed. Sending the "
+    "same change again does no harm.",
     "download preparation": "Preparing the file again does no harm: run the command again, naming the backup rather "
     "than giving --new.",
 }

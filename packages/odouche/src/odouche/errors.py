@@ -88,6 +88,13 @@ class StageRefusedError(OdoucheError):
     """Raised when a branch is in a stage the library does not change. Nothing was changed."""
 
 
+class SettingsConflictError(ValueError):
+    """Raised when a change of settings gives one the branch's Settings tab disables or hides, given the others after it.
+
+    Nothing was sent. It is a `ValueError`, as an argument the caller can correct, not an `OdoucheError`.
+    """
+
+
 class OutcomeUnknownError(OdoucheError):
     """Raised when a state-changing request was sent and what Odoo.sh did with it is not known.
 

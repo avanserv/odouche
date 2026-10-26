@@ -60,9 +60,11 @@ That gate is the page's. What upstream answers a user below it was not seen.
   [Builds of a branch](upstream.md#builds-of-a-branch).
 - Seen once on each stage.
 
-`POST /app/branch/<id>/set_settings`, read from the script. Its params are one section of the
-tab, as form values, and its `result` is the branch's settings, which the page merges into what
-it holds. The page never sends the whole tab:
+### Change a branch's settings
+
+`POST /app/branch/<id>/set_settings`, read from the script (`Branch.updateSettings`). Its params
+are one section of the tab, as form values, and its `result` is the branch's settings, which the
+page merges into what it holds. The page never sends the whole tab:
 
 | Section | Params | Stages | Sent |
 | --- | --- | --- | --- |
@@ -72,12 +74,25 @@ it holds. The page never sends the whole tab:
 | Custom domains | `add_domain` or `delete_domain` | All | On click |
 | Operating system | `machine`, `machine_next_commit` | All | On save |
 
-- Values are strings from the form: a checkbox is `"on"` or `"off"`, a revision is its id or
-  `"latest"`.
+- A section is one `<form>`, sent as `Object.fromEntries(new FormData(form))`, so values are
+  strings. A checkbox is a hidden input of value `"off"` followed by the box, of value `"on"`, and
+  the last wins: it is sent as `"on"` or `"off"`. A revision is its id or `"latest"`.
 - A disabled field is left out. With `apply_default_settings` on, the other fields of its section
-  are disabled, so it is sent alone.
-- The page's "unmute" sends `push_behavior` alone. That a field left out keeps its value is
-  inferred from it, not seen.
+  are disabled, so it is sent alone. A field the page does not render is left out too: `modules`
+  while the stored `modules_auto` is not `none`, `test_mode` while it is `all`, `test_tags` while
+  `test_mode` is not `all`, and `demo_data` before Odoo 19.0. Behavior upon new commits is hidden
+  while `upgrade_step` is set.
+- The page's "unmute" sends `push_behavior` alone.
+- That a field left out keeps its value is inferred, not seen: every save of the page leaves most
+  fields out, and the hidden `"off"` inputs are needed only by a server that keeps a missing box.
+- The library sends, in one request, the fields it is given that differ from `get_settings`,
+  encoded as the form does. It reads the stage from `builds` and the settings before, and the
+  settings after: it checks those rather than reading `result`, whose shape was not seen.
+  `set_settings.json` stands for that answer, as the `get_settings` one.
+- The library refuses what the page does not offer: `push_behavior` on `production`, a new build
+  option on another stage than `dev`, one while `apply_default_settings` stays on, and one the page
+  would not render given the values after the change. It does not check `upgrade_step` or the
+  Odoo version for `demo_data`.
 - The page warns that saving the Odoo version restarts the server with the new revision.
 
 ## Revision
@@ -204,7 +219,9 @@ in place of the one it holds.
 
 ## Not seen
 
-- Any write on this page, and the answer to each.
+- Any write on this page, and the answer to each. The library sends payloads the page does not:
+  fields of two sections in one request, a new build option without `apply_default_settings`,
+  `modules` with a change of `modules_auto`, and `test_tags` with a change of `test_mode`.
 - Shell and editor requests, a mail, and a pinned revision.
 - The revision requests for a version past its end of life.
 - The answer for a pinned revision past its `date_expiration`.

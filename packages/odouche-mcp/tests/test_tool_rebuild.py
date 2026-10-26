@@ -16,6 +16,8 @@ from odouche_mcp.server import create_server
 
 SENTINEL = "sentinel-session-value"
 SWITCH = ("allow", "change", "write", "read_only", "readonly")
+# The verb of the tools that change state, which is left out of their names alone.
+VERB = "change_"
 
 MAIN = odouche.Branch(id=3, name="main", stage=odouche.Stage.PRODUCTION, stage_name="production")
 FEATURE = odouche.Branch(id=4, name="feature-x", stage=odouche.Stage.DEVELOPMENT, stage_name="dev")
@@ -232,6 +234,10 @@ def test_a_stderr_that_is_closed_does_not_fail_a_rebuild_that_was_sent(monkeypat
 def test_no_tool_or_argument_sets_the_switch(*, allow_changes: bool):
     tools = _tools(create_server(allow_changes=allow_changes))
 
-    names = [name for tool in tools.values() for name in (tool.name, *tool.input_schema.get("properties", {}))]
+    names = [
+        name
+        for tool in tools.values()
+        for name in (tool.name.removeprefix(VERB), *tool.input_schema.get("properties", {}))
+    ]
 
     assert [name for name in names if any(word in name.lower() for word in SWITCH)] == []

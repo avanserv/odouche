@@ -44,6 +44,8 @@ from odouche.models import (
     Project,
     ProjectOverview,
     SessionInfo,
+    SettingsChange,
+    SettingsOutcome,
     SshTarget,
     Tracking,
 )
@@ -269,6 +271,31 @@ class Client:
         the session's user can reach. Asks Odoo.sh once, and only reads.
         """
         return settings.settings(self._transport, _branch_id(branch))
+
+    def change_branch_settings(self, branch: Branch | int, change: SettingsChange) -> SettingsOutcome:
+        """Change state on Odoo.sh: set the settings `change` gives on a branch, and return its settings before and after.
+
+        Only those that differ are sent, in one request, as the page sends a section of its Settings
+        tab: the others keep their value. The branch's stage is read again, and a setting the tab
+        does not show in it raises `StageRefusedError` before the request; one it disables or hides,
+        given the settings after the change, raises `SettingsConflictError`.
+
+        Sent once. Raises `OutcomeUnknownError` when Odoo.sh did not confirm it, or the settings read
+        back do not show it, `ReadOnlyError` on a read-only client, `PermissionDeniedError` when
+        refused, and `NotFoundError` for a branch out of reach. Another setting Odoo.sh moved along
+        is in the outcome's `moved`. Asks Odoo.sh four times, twice when nothing differs.
+        """
+        return settings.change_settings(self._transport, _branch_id(branch), change)
+
+    def check_settings_change(
+        self, branch: Branch, current: BranchSettings, change: SettingsChange
+    ) -> SettingsChange | None:
+        """Return the part of `change` that differs from `current`, or `None`, and raise as `change_branch_settings` would.
+
+        `current` is the branch's settings, as `branch_settings` reads them. Odoo.sh is not asked
+        and nothing changes, on a read-only client too: call it before asking the user.
+        """
+        return settings.narrow(branch.stage, current, change)
 
     def build_revision(self, project: Project | str, build: Build) -> BuildRevision:
         """Return the revision a build of a project runs: its head commit, its Odoo version, and its branch's selected Odoo revision.

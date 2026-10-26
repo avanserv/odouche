@@ -24,6 +24,7 @@ A tool that changes Odoo.sh is registered only when the server is started with
 | [`read_log`](#read_log) | No | reads only |
 | [`list_mails`](#list_mails) | No | reads only |
 | [`read_mail`](#read_mail) | No | reads only |
+| [`change_branch_settings`](#change_branch_settings) | Yes | the settings given of the branch: what a new commit does, and on a development branch the new build options. |
 | [`rebuild_branch`](#rebuild_branch) | Yes | starts a new build of the branch, which replaces its latest one. |
 
 ## `get_session`
@@ -291,6 +292,34 @@ Read one mail a build of a development or a staging branch of a project caught, 
 | --- | --- |
 | `readOnlyHint` | true |
 | `destructiveHint` | false |
+| `idempotentHint` | true |
+| `openWorldHint` | true |
+
+## `change_branch_settings`
+
+Change state on Odoo.sh: change settings of a branch of a project, sending only those given; the others keep their value. What a new commit does is not changed on a production branch, and the new build options only on a development branch, with `project_defaults` false while the project's defaults apply. `modules` is module names separated by commas, and an empty `test_tags` clears the tags.
+
+| Argument | Type | Default |
+| --- | --- | --- |
+| `project` | string | Required. |
+| `branch` | string | Required. |
+| `push_behavior` | one of `nothing`, `new_build`, `update` | |
+| `project_defaults` | boolean | |
+| `module_install` | one of `repository`, `all`, `listed` | |
+| `modules` | string | |
+| `tests` | one of `off`, `modules`, `tags` | |
+| `test_tags` | string | |
+| `demo_data` | boolean | |
+| `ai_agent` | one of `claude`, `opencode` | |
+
+- **Returns**: the branch, the names of the settings changed and of those already at that value, each other setting Odoo.sh changed along with them, before and after, and the settings after.
+- **Touches**: the settings given of the branch: what a new commit does, and on a development branch the new build options.
+- **Bounds**: seven requests to Odoo.sh, three when every setting already has that value; the change is sent once and never retried.
+
+| Hint | Value |
+| --- | --- |
+| `readOnlyHint` | false |
+| `destructiveHint` | true |
 | `idempotentHint` | true |
 | `openWorldHint` | true |
 

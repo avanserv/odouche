@@ -11,7 +11,8 @@ An unofficial [Model Context Protocol](https://modelcontextprotocol.io) server f
 
 **Status: pre-alpha.** The server reports its session, lists projects, branches, a branch's history and builds, and reads one
 build and its logs, whose lines reach the agent as the build printed them, secrets included. It changes
-nothing on Odoo.sh unless it is started with `--allow-changes`, which adds a tool that starts a rebuild.
+nothing on Odoo.sh unless it is started with `--allow-changes`, which adds tools that start a rebuild and
+change a branch's settings.
 
 Log in with `osh auth login`, from [`odouche-cli`](https://pypi.org/project/odouche-cli/), then give
 your client the server's command:
