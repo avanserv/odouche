@@ -135,16 +135,26 @@ caught.
 
 ## Panels
 
+The URLs are read from the script. None needs a request: each is built from the build, the
+branch and the project.
+
 | Panel | URL | Authentication |
 | --- | --- | --- |
-| Shell | The page `/project/<project_name>/branches/<branch>/shell` frames `<build url>/odoo-sh/webshell` | The build host's own, below |
-| Editor | `<build url>/odoo-sh/editor`, in a new tab | The build host's own |
-| Monitor | `/project/<project_name>/branches/<branch>/monitoring?theme=<theme>` on `www.odoo.sh` | The session |
+| Shell | The tab `/project/<project_name>/branches/<branch>/shell` frames `<build url>/odoo-sh/webshell`. A build's menu links to the latter, in a new tab | The build host's own, below |
+| Editor | `<build url>/odoo-sh/editor`, from the tab and a build's menu, in a new tab | The build host's own |
+| Monitor | The tab `/project/<project_name>/branches/<branch>/monitor` frames `.../monitoring?theme=<theme>` on `www.odoo.sh`, `<theme>` being the `grafana_theme` cookie or `dark` | The session |
 
-- Shell and editor URLs are derived from a build's `url`, with no request, and carry no token.
-  The build host hands access over from the session through `/paas/build/<id>/token`: see
-  [Hosts](upstream.md#hosts). They were not opened in this capture.
+- `<branch>` is the branch's name encoded with `encodeURIComponent`. The project's name is not
+  encoded.
+- The three tabs are enabled when the branch's latest build is `done`, and a build's menu offers
+  Web Shell and Editor for any listed build that is `done`. The Monitor tab exists for
+  `production` and `staging` branches only.
+- Shell and editor URLs are derived from a build's `url` and carry no token. The build host hands
+  access over from the session through `/paas/build/<id>/token`: see [Hosts](upstream.md#hosts).
+  They were not opened in this capture.
 - The AI tab of a `dev` branch frames `<build url>/odoo-sh/webshell?ai=<ai_agent>`.
+- The library builds the tab's `/monitor` URL and never asks for `.../monitoring` or follows its
+  redirect, whose target names a dashboard.
 
 The monitor page answers 302 to `/monitoring/public-dashboards/<dashboard>?project=<project_name>&branch=<branch>`,
 a Grafana dashboard served by `www.odoo.sh`. Its data comes from requests whose body is a bare

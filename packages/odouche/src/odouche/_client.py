@@ -13,6 +13,7 @@ from odouche._upstream import (
     builds,
     history,
     logs,
+    panels,
     projects,
     rebuild,
     revision,
@@ -34,6 +35,7 @@ from odouche.models import (
     Log,
     LogKind,
     LogLine,
+    Panel,
     PreparedDownload,
     Project,
     SessionInfo,
@@ -270,6 +272,19 @@ class Client:
         its address is not one that can be handed to `ssh` as it is.
         """
         return ssh.target(build)
+
+    def panel_url(self, project: Project | str, branch: Branch, build: Build, panel: Panel | str) -> str:
+        """Return the address of a panel of a build of a branch, for a browser to open. Odoo.sh is not asked.
+
+        The shell and the editor are on the build's own host, the monitor is the branch's on
+        `www.odoo.sh`. None carries a token or the session: the browser signs in to Odoo.sh on its
+        own. As on the page, a build has panels once it is `DONE`, judged from `build` as given,
+        and only a staging or a production branch has a monitor, which shows its latest build.
+        Raises `NotFoundError` for a build that is not done, one waiting for a worker included, or
+        a monitor of another stage, `ValueError` for an unknown panel or a build of another branch,
+        and `UpstreamChangedError` when the build's address is not a bare host under `odoo.com`.
+        """
+        return panels.url(_project_name(project), branch, build, Panel(panel))
 
     def allow_ip(self, branch: Branch | int) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
         """Change state on Odoo.sh: let the address this machine reaches it from connect with `ssh`.

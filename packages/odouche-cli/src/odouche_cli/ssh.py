@@ -20,7 +20,7 @@ from rich.text import Text
 
 import odouche
 from odouche_cli import _terminal
-from odouche_cli._client import open_client
+from odouche_cli._client import forget_session_env, open_client
 from odouche_cli._context import BranchOption, ContextError, ProjectOption, find_build, project_branch, resolve_branch
 from odouche_cli._errors import EXIT_DECLINED, EXIT_NO_SSH, EXIT_OUTCOME_UNKNOWN, EXIT_TIMEOUT
 from odouche_cli._output import strip_control
@@ -108,9 +108,7 @@ def reach(
 
     `again` is the command the user is told to run again when the address is still kept out.
     """
-    # The session is not `ssh`'s to inherit, nor that of a program `ssh` runs under.
-    if odouche.SESSION_ENV in os.environ:
-        del os.environ[odouche.SESSION_ENV]
+    forget_session_env()
     kept_out = _kept_out(program, target)
     if kept_out is not None:
         _allow(ctx, branch, target, program, kept_out, yes=yes, again=again)

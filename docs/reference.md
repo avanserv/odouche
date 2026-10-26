@@ -49,6 +49,8 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.SshTarget
 
+::: odouche.Panel
+
 ::: odouche.Commit
 
 ::: odouche.BuildRevision

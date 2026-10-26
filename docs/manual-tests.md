@@ -113,6 +113,12 @@ Search the output of every check below for the session value: it appears in none
 | R32 | A branch with over 20 events in its History tab | `osh branches history`, then with `--limit 30`, then `--limit 30 --commits` | Ten events, newest first, as the History tab lists them. Columns `When`, `Kind`, `Build`, `Status`, `Result`, `By`, `Change`. Then thirty, the last ten matching the tab past its first twenty, which settles the `offset` question in [upstream](upstream.md). Then each commit in full | 0 |
 | R33 | | `osh branches settings --branch <dev-branch>`, then on the production branch, then with `--format json` | One setting per line, as the branch's Settings tab shows them: `On new commit` is `new_build` on the development branch and `update` on the production one. Then one `BranchSettings`, with the library's values | 0 |
 | R34 | A project whose repository has a submodule, a branch that pins an Odoo revision, and one that follows the latest. A branch pinned to a revision past its `date_expiration`, if there is one | On each branch, `osh branches revision`, then with `--build <an older build>`, then with `--format json` | The head commit as GitHub shows it, then the Odoo version and the refs, which match the branch's Settings tab under "Repository revisions", marked pinned or latest. The submodule line on stderr each time, and one `BuildRevision` as JSON. Write the answer to `/app/revision/<id>`, and the one for an expired revision, into [upstream](upstream-branches.md#revision) | 0 |
+| R35 | The latest builds of `<dev-branch>` and of a staging branch `done` | `osh builds open shell`, then `editor`, then `osh builds open monitor --branch <staging branch>`, each piped into `cat`, then with `--format json` | One URL each on stdout, nothing on stderr, and no browser opens. The shell's and the editor's are on the `.dev.odoo.com` host of the build, the monitor's is `https://www.odoo.sh/project/<project>/branches/<staging branch>/monitor`. Then each as a JSON string | 0 |
+| R36 | As R35, a browser logged in to Odoo.sh | Each of R35 with `--open` | The panel opens in that browser, and stderr names the panel and the build. The shell and the editor of the development build load through the host's `/paas/build/<id>/token` handover. Write the requests the shell and the editor make before they load into [upstream](upstream-branches.md#panels), and whether the `/monitor` address loads as a direct visit | 0 |
+| R37 | As R36, the browser logged out of Odoo.sh | `osh builds open shell --open` | The browser shows Odoo.sh's login page: nothing of odouche's session reaches it | 0 |
+| R38 | | `osh builds open bogus`, then `osh builds open monitor <build>` | A usage error naming the three panels, then that the monitor takes no BUILD_ID | 2 |
+| R39 | | `osh builds open monitor` | That branch `<dev-branch>` has no monitor | 4 |
+| R40 | As R35, no console browser (`www-browser`, `lynx`, `w3m`, `links`) installed | `env -u DISPLAY -u WAYLAND_DISPLAY BROWSER=false osh builds open shell --open` | That no browser could be started on stderr, and the URL on stdout | 14 |
 
 ## Streams and rebuild
 
@@ -170,6 +176,7 @@ check that names production is the refusal.
 | S47 | The same | `osh ssh -- true`, and answer `y` | `Odoo.sh allowed <address> for one hour`, the address the page's Allow my IP shows. A waiting line until `ssh` gets in, within ten minutes, then the command runs with no `Connection closed`. Write down what the request answered and whether another branch of the project is reachable too, in [Upstream reference](upstream.md#allow-an-ip) | 0 |
 | S48 | Within the hour after S47, then over an hour after it | `osh ssh -- true`, then `osh ssh --yes -- true` | First no question and no waiting line. Then the address is allowed again with no question. The command runs each time | 0 |
 | S49 | An address not allowed | `osh ssh -- true < /dev/null` | That allowing cannot be confirmed, with `--yes` and Allow my IP as the ways. Nothing is sent | 2 |
+| S50 | Right after S33, while the new build waits for a worker | `osh builds open shell` | `Build <id> is waiting for a worker: it has no panels yet.` | 4 |
 
 ## Backups
 

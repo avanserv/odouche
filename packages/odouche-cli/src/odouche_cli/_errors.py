@@ -33,6 +33,9 @@ EXIT_BUILD_TIMEOUT = 23
 
 # What `osh ssh` exits with when there is no `ssh` to become.
 EXIT_NO_SSH = 14
+# What `osh builds open --open` exits with when no browser opens: as with `osh ssh`, what to use
+# by hand is shown.
+EXIT_NO_BROWSER = 14
 
 # What a command exits with when a change it sent was not confirmed.
 EXIT_OUTCOME_UNKNOWN = 10
