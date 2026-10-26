@@ -17,6 +17,7 @@ def test_server_identifies_itself():
 READS = [
     "get_session",
     "list_projects",
+    "get_project_overview",
     "list_branches",
     "list_builds",
     "list_history",

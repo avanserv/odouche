@@ -15,6 +15,7 @@ from odouche_mcp.server import create_server
 
 READS = [
     "list_projects",
+    "get_project_overview",
     "list_branches",
     "list_builds",
     "list_history",
@@ -106,6 +107,33 @@ SELECTED = odouche.OdooRevision(
 )
 
 
+OVERVIEW = odouche.ProjectOverview(
+    id=ACME.id,
+    name=ACME.name,
+    repository=ACME.repository,
+    subscription=odouche.Subscription.TRIAL,
+    subscription_name="trial",
+    trial_days_left=12,
+    odoo_version="19.0",
+    region="Europe",
+    dedicated=False,
+    production_build=odouche.ProductionBuild(id=7, branch_name="main", url="https://acme.odoo.com"),
+    access_level="admin",
+    hosting=odouche.ProjectHosting(438272000, 1073741824, 1, 1),
+    stages=(
+        odouche.StageCount(odouche.Stage.PRODUCTION, "production", 1),
+        odouche.StageCount(odouche.Stage.STAGING, "staging", 0),
+        odouche.StageCount(odouche.Stage.DEVELOPMENT, "dev", 1),
+    ),
+    branches=(
+        odouche.BranchSummary(
+            MAIN, odouche.TrackedBuild(7, odouche.BuildStatus.DONE, "done", odouche.BuildResult.SUCCESS, "success")
+        ),
+        odouche.BranchSummary(FEATURE, None),
+    ),
+)
+
+
 class Upstream:
     """A client over one project, `acme`, with its branches and the builds of `feature-x`."""
 
@@ -128,6 +156,12 @@ class Upstream:
 
     def projects(self) -> list[odouche.Project]:
         return list(self.listed)
+
+    def project_overview(self, project: str) -> odouche.ProjectOverview:
+        if project != ACME.name:
+            msg = f"No project {project} among those you can reach."
+            raise odouche.NotFoundError(msg)
+        return OVERVIEW
 
     def branches(self, project: str) -> list[odouche.Branch]:
         if project != ACME.name:
@@ -208,6 +242,85 @@ def test_projects_are_listed():
         "projects": [{"id": 1, "name": "acme", "repository": "acme/odoo", "url": "https://www.odoo.sh/project/acme"}],
         "truncated": False,
     }
+
+
+def test_the_overview_is_the_library_model_whole():
+    assert _answer("get_project_overview", project="acme") == {
+        "overview": {
+            "id": 1,
+            "name": "acme",
+            "repository": "acme/odoo",
+            "subscription": "trial",
+            "subscription_name": "trial",
+            "trial_days_left": 12,
+            "odoo_version": "19.0",
+            "region": "Europe",
+            "dedicated": False,
+            "production_build": {"id": 7, "branch_name": "main", "url": "https://acme.odoo.com"},
+            "access_level": "admin",
+            "hosting": {
+                "storage_used_bytes": 438272000,
+                "storage_quota_bytes": 1073741824,
+                "workers": 1,
+                "staging_branches": 1,
+            },
+            "stages": [
+                {"stage": "production", "stage_name": "production", "count": 1},
+                {"stage": "staging", "stage_name": "staging", "count": 0},
+                {"stage": "development", "stage_name": "dev", "count": 1},
+            ],
+            "branches": [
+                {
+                    "branch": {"id": 3, "name": "main", "stage": "production", "stage_name": "production"},
+                    "last_build": {
+                        "id": 7,
+                        "status": "done",
+                        "status_name": "done",
+                        "result": "success",
+                        "result_name": "success",
+                    },
+                },
+                {
+                    "branch": {"id": 4, "name": "feature-x", "stage": "development", "stage_name": "dev"},
+                    "last_build": None,
+                },
+            ],
+        },
+        "truncated": False,
+    }
+
+
+def test_the_overview_below_admin_has_no_hosting(upstream: pytest.MonkeyPatch):
+    upstream.setattr(Upstream, "project_overview", lambda *_: replace(OVERVIEW, access_level="tester", hosting=None))
+
+    answer = _answer("get_project_overview", project="acme")
+
+    assert (answer["overview"]["access_level"], answer["overview"]["hosting"]) == ("tester", None)
+
+
+def test_the_overview_s_branches_are_cut_at_the_cap_and_say_so(upstream: pytest.MonkeyPatch):
+    many = tuple(odouche.BranchSummary(replace(FEATURE, id=number), None) for number in range(MAX_LISTED + 1))
+    upstream.setattr(Upstream, "project_overview", lambda *_: replace(OVERVIEW, branches=many))
+
+    answer = _answer("get_project_overview", project="acme")
+
+    assert len(answer["overview"]["branches"]) == MAX_LISTED
+    assert answer["overview"]["branches"][0]["branch"]["id"] == 0
+    assert answer["overview"]["stages"] == [
+        {"stage": "production", "stage_name": "production", "count": 1},
+        {"stage": "staging", "stage_name": "staging", "count": 0},
+        {"stage": "development", "stage_name": "dev", "count": 1},
+    ]
+    assert answer["truncated"] is True
+
+
+def test_the_overview_with_as_many_branches_as_the_cap_is_whole(upstream: pytest.MonkeyPatch):
+    many = tuple(odouche.BranchSummary(replace(FEATURE, id=number), None) for number in range(MAX_LISTED))
+    upstream.setattr(Upstream, "project_overview", lambda *_: replace(OVERVIEW, branches=many))
+
+    answer = _answer("get_project_overview", project="acme")
+
+    assert (len(answer["overview"]["branches"]), answer["truncated"]) == (MAX_LISTED, False)
 
 
 def test_branches_are_listed():
@@ -404,6 +517,7 @@ def test_a_limit_below_one_is_refused_before_odoo_sh_is_asked(tool: str, argumen
 @pytest.mark.parametrize(
     ("tool", "arguments"),
     [
+        ("get_project_overview", {}),
         ("list_branches", {}),
         ("list_builds", {"branch": "feature-x"}),
         ("list_builds", {"project": "acme"}),
@@ -426,6 +540,7 @@ def test_a_call_without_its_project_or_branch_is_rejected_and_nothing_is_guessed
 @pytest.mark.parametrize(
     ("tool", "arguments", "message"),
     [
+        ("get_project_overview", {"project": "other"}, "No project other among those you can reach."),
         ("list_branches", {"project": "other"}, "No project other among those you can reach."),
         ("list_builds", {"project": "other", "branch": "main"}, "No project other among those you can reach."),
         ("list_builds", {"project": "acme", "branch": "gone"}, "Project acme has no branch gone."),
@@ -455,6 +570,7 @@ def test_what_is_not_found_is_an_error_with_its_message(tool: str, arguments: di
     ("tool", "arguments"),
     [
         ("list_projects", {}),
+        ("get_project_overview", {"project": "acme"}),
         ("list_branches", {"project": "acme"}),
         ("list_builds", {"project": "acme", "branch": "feature-x"}),
         ("list_history", {"project": "acme", "branch": "feature-x"}),

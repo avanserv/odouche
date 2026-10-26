@@ -19,6 +19,7 @@ READ_ONLY = frozenset(
         "get_branch_settings",
         "get_build",
         "get_build_revision",
+        "get_project_overview",
         "get_session",
         "list_branches",
         "list_builds",
