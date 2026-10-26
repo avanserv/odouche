@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.7.0](https://github.com/avanserv/odouche/compare/v0.6.0...v0.7.0) (2026-10-26)
+
+
+### Features
+
+* Add a member and change a member's role with osh projects members ([#87](https://github.com/avanserv/odouche/issues/87)) ([13f2adb](https://github.com/avanserv/odouche/commit/13f2adb9340cca35a6e6510cd1738c121f15d85f))
+* Change a branch's settings with osh branches settings set ([#80](https://github.com/avanserv/odouche/issues/80)) ([b6eb76e](https://github.com/avanserv/odouche/commit/b6eb76e92a7c0584c3daea699a6d90dbaf510813))
+* Change a project's settings with osh projects settings set ([#84](https://github.com/avanserv/odouche/issues/84)) ([517866e](https://github.com/avanserv/odouche/commit/517866e28bf7aa90d35cfa159ec8e506ee5d4ba1))
+* Check a project's health with osh projects check ([#81](https://github.com/avanserv/odouche/issues/81)) ([3073c61](https://github.com/avanserv/odouche/commit/3073c6178903e7f2392c6cafd2f4732a95d95069))
+* List a branch's history with osh branches history ([#69](https://github.com/avanserv/odouche/issues/69)) ([c777fc4](https://github.com/avanserv/odouche/commit/c777fc4bff27df923e08672f838b40285f2f6a90))
+* List a project's members with their role ([#85](https://github.com/avanserv/odouche/issues/85)) ([c2ca1f7](https://github.com/avanserv/odouche/commit/c2ca1f77a19feeaa91e6de7cfebf0bf6644a5a35))
+* List the mails a build caught with osh builds mails ([#77](https://github.com/avanserv/odouche/issues/77)) ([9cd0161](https://github.com/avanserv/odouche/commit/9cd01617f3ea57303ae9fdbb06f0851abaf74f38))
+* Move a branch between development and staging with osh branches move ([#86](https://github.com/avanserv/odouche/issues/86)) ([6ac7907](https://github.com/avanserv/odouche/commit/6ac7907640eecd9282dd4acc0d05c93139a0a1f6))
+* Print the URL of a build's panels with osh builds open ([#76](https://github.com/avanserv/odouche/issues/76)) ([1c50056](https://github.com/avanserv/odouche/commit/1c50056361fcf1d5a788db19d089702f77156c71))
+* Read a branch's settings as a typed model ([#74](https://github.com/avanserv/odouche/issues/74)) ([19b3534](https://github.com/avanserv/odouche/commit/19b353400db5480aed1a61d383f9af70846c64dd))
+* Read a project's audit log with osh projects audit ([#82](https://github.com/avanserv/odouche/issues/82)) ([3d84a9d](https://github.com/avanserv/odouche/commit/3d84a9d00df9ea0158b63beff152a18cc3accde2))
+* Read a project's settings with osh projects settings show ([#83](https://github.com/avanserv/odouche/issues/83)) ([565eaee](https://github.com/avanserv/odouche/commit/565eaee020e8c30ede41d24db074c0a0f334e3f5))
+* Report the revision a build runs with osh branches revision ([#75](https://github.com/avanserv/odouche/issues/75)) ([8b5c437](https://github.com/avanserv/odouche/commit/8b5c437891178bec607598598433c566013b8e97))
+* Show a project's overview with osh projects show ([#79](https://github.com/avanserv/odouche/issues/79)) ([7bf081c](https://github.com/avanserv/odouche/commit/7bf081c4d31b784ccd92045ecab57f2ab22fac16))
+
+
+### Documentation
+
+* Map branch settings, mails, panels, stage moves and project administration of Odoo.sh ([#72](https://github.com/avanserv/odouche/issues/72)) ([9a95636](https://github.com/avanserv/odouche/commit/9a95636071d1e5beae4ffd1ab24c521bfcf35178))
+
 ## [0.6.0](https://github.com/avanserv/odouche/compare/v0.5.0...v0.6.0) (2026-10-17)
 
 
