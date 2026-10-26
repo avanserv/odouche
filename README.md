@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/avanserv/odouche/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/avanserv/odouche/actions/workflows/ci.yml?query=branch%3Amain)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![pyscn quality](https://img.shields.io/badge/pyscn-A-brightgreen)](https://github.com/ludo-technologies/pyscn)
 
 An unofficial toolkit for working with [Odoo.sh](https://www.odoo.sh) from your development
 environment: list branches, watch builds, stream logs, from a script, a terminal or an agent.

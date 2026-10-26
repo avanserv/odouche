@@ -97,6 +97,9 @@ class StubClient:
         self.calls.append("projects")
         return []
 
+    # The library's own, over `branches`.
+    branch = odouche.Client.branch
+
     def branches(self, project: str) -> list[Branch]:
         self.calls.append(f"branches {project}")
         return [FEATURE]

@@ -16,7 +16,7 @@ from mcp.server.mcpserver import Context
 from mcp.server.mcpserver.exceptions import ToolError
 
 import odouche
-from odouche_mcp._read import capped, find_branch, find_build
+from odouche_mcp._read import capped, find_build
 from odouche_mcp._session import open_client
 
 
@@ -81,7 +81,7 @@ def wait_for_build(
         if commit is None:
             build = find_build(client, project, branch, build_id)
         else:
-            build = _awaited(client, find_branch(client, project, branch), commit.lower(), deadline)
+            build = _awaited(client, client.branch(project, branch), commit.lower(), deadline)
             if build is None:
                 return answer(None, NOT_LISTED)
         remaining = deadline - _monotonic()

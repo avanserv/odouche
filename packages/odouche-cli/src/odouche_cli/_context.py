@@ -104,21 +104,12 @@ def resolve_branch(ctx: typer.Context, value: str | None) -> str:
     return branch
 
 
-def find_branch(client: odouche.Client, project: str, name: str) -> odouche.Branch:
-    """Return the project's branch of that name, as Odoo.sh knows it."""
-    for branch in client.branches(project):
-        if branch.name == name:
-            return branch
-    msg = f"Project {project} has no branch {name}."
-    raise odouche.NotFoundError(msg)
-
-
 def project_branch(
     ctx: typer.Context, client: odouche.Client, project: str | None, name: str
 ) -> tuple[str, odouche.Branch]:
     """Return the project's name and its branch of that name."""
     project_name = resolve_project(ctx, project, client.projects)
-    return project_name, find_branch(client, project_name, name)
+    return project_name, client.branch(project_name, name)
 
 
 def find_build(client: odouche.Client, project: str, branch: odouche.Branch, build_id: int | None) -> odouche.Build:

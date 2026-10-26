@@ -22,9 +22,9 @@ make check
 ```
 
 runs everything CI runs: format and lint (ruff), type check (basedpyright), dependency
-declarations (deptry), dead code (vulture), the tests with coverage (pytest), and the documentation
-build (zensical). `make help` lists the individual targets, and `make format` and `make lint` apply
-fixes where `make check` only reports.
+declarations (deptry), dead code (vulture), complexity and duplication (pyscn), the tests with
+coverage (pytest), and the documentation build (zensical). `make help` lists the individual
+targets, and `make format` and `make lint` apply fixes where `make check` only reports.
 
 The git hooks run the same checks on the files you commit, plus a few that only make sense there:
 secrets (gitleaks), spelling (codespell), Markdown (markdownlint) and the workflow audits

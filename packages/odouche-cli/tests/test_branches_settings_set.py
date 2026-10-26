@@ -47,7 +47,7 @@ class StubClient:
     """Stands in for `odouche.Client`: changes settings as the library does, and records the calls."""
 
     found: BranchSettings = OWN
-    branch: Branch = FEATURE
+    on_branch: Branch = FEATURE
     lost: Exception | None = None
     modes: list[bool]
     calls: list[str]
@@ -65,9 +65,12 @@ class StubClient:
     def projects(self) -> list[odouche.Project]:
         return [ACME]
 
+    # The library's own, over `branches`.
+    branch = odouche.Client.branch
+
     def branches(self, project: str) -> list[Branch]:
         self.calls.append(f"branches {project}")
-        return [MAIN, self.branch]
+        return [MAIN, self.on_branch]
 
     def branch_settings(self, branch: Branch) -> BranchSettings:
         self.calls.append(f"settings {branch.name}")
@@ -304,7 +307,7 @@ def test_an_unknown_outcome_exits_10_and_says_where_to_look(client: type[StubCli
 
 
 def test_an_escape_sequence_in_the_branch_name_is_not_emitted(client: type[StubClient]):
-    client.branch = replace(FEATURE, name=f"feature{ESCAPE}")
+    client.on_branch = replace(FEATURE, name=f"feature{ESCAPE}")
 
     result = run(
         "branches",

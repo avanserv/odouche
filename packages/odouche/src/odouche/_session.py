@@ -109,11 +109,7 @@ def _use[T](action: "Callable[[KeyringBackend], T]", *, wait: float | None = Non
     if not backend.viable:
         raise KeyringUnavailableError
     deadline = time.monotonic() + (_WAIT if wait is None else wait)
-    for left in list(_left):
-        if not left.wait(max(0.0, deadline - time.monotonic())):
-            raise KeyringUnavailableError(_LOCKED)
-        with suppress(ValueError):
-            _left.remove(left)
+    _wait_for_left(deadline)
     gate = _Gate()
     done = Event()
     results: list[T] = []
@@ -156,6 +152,15 @@ def _use[T](action: "Callable[[KeyringBackend], T]", *, wait: float | None = Non
             f"The keyring could not be used ({failure}). Unlock it, or supply the session through the environment."
         )
     return results[0]
+
+
+def _wait_for_left(deadline: float) -> None:
+    """Wait until `deadline` for the calls left behind, raising for a keyring still locked by one of them."""
+    for left in list(_left):
+        if not left.wait(max(0.0, deadline - time.monotonic())):
+            raise KeyringUnavailableError(_LOCKED)
+        with suppress(ValueError):
+            _left.remove(left)
 
 
 def _get(backend: "KeyringBackend") -> tuple[bool, tuple[Secret, datetime] | None]:

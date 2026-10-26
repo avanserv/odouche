@@ -100,7 +100,7 @@ runner = CliRunner()
 class StubClient:
     """Stands in for `odouche.Client`: rebuilds as the library does, and answers what every command reads."""
 
-    branch: Branch = FEATURE
+    on_branch: Branch = FEATURE
     listed: tuple[odouche.Backup, ...] = ()
     latest: Build | None = LATEST
     changes: tuple[Build, ...] = (STARTED, done(STARTED))
@@ -135,9 +135,12 @@ class StubClient:
     def projects(self) -> list[odouche.Project]:
         return [ACME]
 
+    # The library's own, over `branches`.
+    branch = odouche.Client.branch
+
     def branches(self, project: str) -> list[Branch]:
         self.calls.append(f"branches {project}")
-        return [self.branch]
+        return [self.on_branch]
 
     def backups(self, project: str) -> list[odouche.Backup]:
         return list(self.listed)
@@ -461,7 +464,7 @@ def test_the_question_comes_after_what_is_rebuilt(client: type[StubClient]):
 
 
 def test_a_stage_the_library_does_not_know_exits_9_and_sends_nothing(client: type[StubClient]):
-    client.branch = replace(FEATURE, stage=Stage.UNKNOWN, stage_name="preview")
+    client.on_branch = replace(FEATURE, stage=Stage.UNKNOWN, stage_name="preview")
 
     result = run(*REBUILD, *ON_FEATURE, "--yes")
 
@@ -621,7 +624,7 @@ def test_an_unknown_outcome_exits_10_names_the_builds_to_check_and_is_not_sent_a
 def test_a_production_branch_exits_9_with_the_message_of_the_library_and_no_question(
     client: type[StubClient], arguments: tuple[str, ...]
 ):
-    client.branch = MAIN
+    client.on_branch = MAIN
 
     result = run(*REBUILD, "--project", "acme", "--branch", "main", *arguments, stdin="y\n")
 
@@ -718,10 +721,10 @@ def test_only_the_writers_build_a_client_that_writes(
     monkeypatch.setenv(PROJECT_ENV, "acme")
     monkeypatch.setenv(BRANCH_ENV, "feature-x")
     # Rebuilt and backed up both.
-    client.branch = replace(FEATURE, stage=Stage.STAGING, stage_name="staging")
+    client.on_branch = replace(FEATURE, stage=Stage.STAGING, stage_name="staging")
     if path == PULL:
         # Copied from production alone.
-        client.branch = replace(FEATURE, stage=Stage.PRODUCTION, stage_name="production")
+        client.on_branch = replace(FEATURE, stage=Stage.PRODUCTION, stage_name="production")
         client.listed = (DAILY,)
     monkeypatch.delenv(odouche.SESSION_ENV, raising=False)
     monkeypatch.setattr(odouche, "login", lambda **_: None)

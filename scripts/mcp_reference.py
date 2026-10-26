@@ -119,6 +119,21 @@ def _argument(argument: dict[str, Any], schema: dict[str, Any], where: str, *, r
 
     The type is a scalar or a list of choices. An argument that may also be null is one left out.
     """
+    kind = _kind(argument, schema, where, required=required)
+    choices: list[object] | None = kind.get("enum")
+    default: object = argument.get("default")
+    cells = (
+        "one of " + ", ".join(f"`{choice}`" for choice in choices) if choices else str(kind["type"]),
+        "Required." if required else "" if default is None else f"`{json.dumps(default)}`",
+    )
+    if not all(map(_fits, cells)):
+        msg = f"{where} has a choice or a default a table cell cannot hold."
+        raise UnsupportedError(msg)
+    return cells
+
+
+def _kind(argument: dict[str, Any], schema: dict[str, Any], where: str, *, required: bool) -> dict[str, Any]:
+    """Return the schema of the one scalar an argument is, its reference followed, failing on any other argument."""
     kinds: list[dict[str, Any]] = argument.get("anyOf", [argument])
     scalars = [kind for kind in kinds if kind != _NULL]
     if argument.keys() - _SHOWN or len(scalars) != 1 or (required and len(kinds) > 1):
@@ -128,20 +143,15 @@ def _argument(argument: dict[str, Any], schema: dict[str, Any], where: str, *, r
     reference: str = kind.get("$ref", "")
     if reference.startswith(_REFERENCE):
         kind = schema.get("$defs", {}).get(reference.removeprefix(_REFERENCE), {})
-    choices: list[object] | None = kind.get("enum")
-    name: object = kind.get("type")
-    if name not in _SCALARS or "const" in kind:
+    if kind.get("type") not in _SCALARS or "const" in kind:
         msg = f"{where} has a schema the page cannot show."
         raise UnsupportedError(msg)
-    default: object = argument.get("default")
-    cells = (
-        "one of " + ", ".join(f"`{choice}`" for choice in choices) if choices else str(name),
-        "Required." if required else "" if default is None else f"`{json.dumps(default)}`",
-    )
-    if any(re.search(r"[|\n]", cell) or cell.count("`") % 2 or "``" in cell for cell in cells):
-        msg = f"{where} has a choice or a default a table cell cannot hold."
-        raise UnsupportedError(msg)
-    return cells
+    return kind
+
+
+def _fits(cell: str) -> bool:
+    """Tell whether a table cell holds text as it is: no pipe, no line break and its backticks paired."""
+    return not (re.search(r"[|\n]", cell) or cell.count("`") % 2 or "``" in cell)
 
 
 def _checked(text: str, what: str) -> str:

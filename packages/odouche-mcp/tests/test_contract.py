@@ -87,6 +87,7 @@ RESULTS: dict[str, object] = {
     "projects": [PROJECT],
     "identity": IDENTITY,
     "branches": [BRANCH],
+    "branch": BRANCH,
     "builds": [BUILD],
     "history": [
         odouche.Tracking(

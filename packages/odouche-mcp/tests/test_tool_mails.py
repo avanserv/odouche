@@ -82,6 +82,9 @@ class Upstream:
     def __exit__(self, *_: object) -> None:
         pass
 
+    # The library's own, over `branches`.
+    branch = odouche.Client.branch
+
     def branches(self, project: str) -> list[odouche.Branch]:
         if project != "acme":
             msg = f"No project {project} among those you can reach."

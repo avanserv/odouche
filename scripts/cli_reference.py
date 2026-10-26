@@ -87,23 +87,7 @@ def _command(context: typer.Context) -> list[str]:
     text = _checked(command.help or "", f"The help of `{path}`")
     blocks.extend(paragraph.strip() for paragraph in text.split("\n\n") if paragraph.strip())
     blocks.append(f"```text\n{' '.join([path, *command.collect_usage_pieces(context)])}\n```")
-    parameters = [
-        parameter
-        for parameter in command.get_params(context)
-        if isinstance(parameter, (TyperArgument, TyperOption))
-        and parameter.name != _HELP_OPTION
-        and not parameter.hidden
-    ]
-    for parameter in parameters:
-        _check(parameter, path)
-    arguments = [parameter for parameter in parameters if isinstance(parameter, TyperArgument)]
-    options = [parameter for parameter in parameters if isinstance(parameter, TyperOption)]
-    if arguments:
-        rows = [(f"`{_metavar(argument)}`", _description(argument)) for argument in arguments]
-        blocks.append(_reference.table(("Argument", "Description"), rows))
-    if options:
-        rows = [(_flags(option), _description(option), _variable(option)) for option in options]
-        blocks.append(_reference.table(("Option", "Description", "Environment"), rows))
+    blocks.extend(_parameter_tables(_parameters(context, path)))
     children = _children(context)
     epilog = _checked(command.epilog or "", f"The epilog of `{path}`")
     # A group's example is the one its command gives right below.
@@ -116,6 +100,34 @@ def _command(context: typer.Context) -> list[str]:
         ]
         blocks.append(_reference.table(("Command", "Description"), rows))
     return blocks
+
+
+def _parameters(context: typer.Context, path: str) -> list[TyperArgument | TyperOption]:
+    """Return the parameters of a command that the page shows, failing on one it would show wrongly."""
+    parameters = [
+        parameter
+        for parameter in context.command.get_params(context)
+        if isinstance(parameter, (TyperArgument, TyperOption))
+        and parameter.name != _HELP_OPTION
+        and not parameter.hidden
+    ]
+    for parameter in parameters:
+        _check(parameter, path)
+    return parameters
+
+
+def _parameter_tables(parameters: list[TyperArgument | TyperOption]) -> list[str]:
+    """Return the table of a command's arguments, then the one of its options, each only when it has some."""
+    tables: list[str] = []
+    arguments = [parameter for parameter in parameters if isinstance(parameter, TyperArgument)]
+    options = [parameter for parameter in parameters if isinstance(parameter, TyperOption)]
+    if arguments:
+        rows = [(f"`{_metavar(argument)}`", _description(argument)) for argument in arguments]
+        tables.append(_reference.table(("Argument", "Description"), rows))
+    if options:
+        rows = [(_flags(option), _description(option), _variable(option)) for option in options]
+        tables.append(_reference.table(("Option", "Description", "Environment"), rows))
+    return tables
 
 
 def _check(parameter: TyperArgument | TyperOption, path: str) -> None:
@@ -177,17 +189,23 @@ def _description(parameter: TyperArgument | TyperOption) -> str:
     choices: Sequence[object] | None = getattr(kind, "choices", None)
     if choices:
         said.append(f"One of {', '.join(f'`{_value(choice)}`' for choice in choices)}.")
-    lowest, highest = getattr(kind, "min", None), getattr(kind, "max", None)
-    if lowest is not None and highest is not None:
-        said.append(f"From {lowest} to {highest}.")
-    elif lowest is not None:
-        said.append(f"At least {lowest}.")
-    elif highest is not None:
-        said.append(f"At most {highest}.")
+    said.append(_range(kind))
     default = _default(parameter) if isinstance(parameter, TyperOption) else ""
     if default and _STATED_DEFAULT not in text:
         said.append(f"{_STATED_DEFAULT} `{default}`.")
     return " ".join(part for part in said if part)
+
+
+def _range(kind: Any) -> str:
+    """Return the bounds of a number's type, or nothing for a type that has none."""
+    lowest, highest = getattr(kind, "min", None), getattr(kind, "max", None)
+    if lowest is not None and highest is not None:
+        return f"From {lowest} to {highest}."
+    if lowest is not None:
+        return f"At least {lowest}."
+    if highest is not None:
+        return f"At most {highest}."
+    return ""
 
 
 def _has_default(parameter: TyperArgument | TyperOption) -> bool:

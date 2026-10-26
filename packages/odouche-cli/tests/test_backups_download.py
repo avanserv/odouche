@@ -85,7 +85,7 @@ def prepared(backup: Backup, *, neutralized: bool, filestore: bool) -> odouche.P
 class StubClient:
     """Stands in for `odouche.Client`: prepares and downloads as the library does, and records the calls."""
 
-    branch: Branch = STAGING
+    on_branch: Branch = STAGING
     listed: tuple[Backup, ...] = (ELSEWHERE, REMOTE, NEWER, OLDER)
     content: tuple[bytes, ...] = (CONTENT[:4], CONTENT[4:])
     size: int | None = len(CONTENT)
@@ -110,9 +110,12 @@ class StubClient:
     def projects(self) -> list[odouche.Project]:
         return [ACME]
 
+    # The library's own, over `branches`.
+    branch = odouche.Client.branch
+
     def branches(self, project: str) -> list[Branch]:
         self.calls.append(f"branches {project}")
-        return [self.branch]
+        return [self.on_branch]
 
     def backups(self, project: str) -> list[Backup]:
         self.calls.append(f"backups {project}")
@@ -443,7 +446,7 @@ def test_new_takes_a_backup_waits_for_it_and_downloads_it(client: type[StubClien
 
 
 def test_new_on_a_development_branch_is_refused_before_any_question(client: type[StubClient], tmp_path: Path):
-    client.branch = FEATURE
+    client.on_branch = FEATURE
 
     result = run(*DOWNLOAD, "--project", "acme", "--branch", "feature-x", "-o", str(tmp_path / "f.zip"), "--new")
 

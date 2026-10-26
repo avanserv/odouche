@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.12"
 resolution-markers = [
     "python_full_version >= '3.14'",
@@ -868,6 +868,7 @@ dev = [
     { name = "deptry" },
     { name = "mkdocstrings-python" },
     { name = "prek" },
+    { name = "pyscn" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-randomly" },
@@ -890,6 +891,7 @@ dev = [
     { name = "deptry", specifier = ">=0.25.1" },
     { name = "mkdocstrings-python", specifier = ">=2.0.9" },
     { name = "prek", specifier = ">=0.5.4" },
+    { name = "pyscn", specifier = ">=1.33.0" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-randomly", specifier = ">=5.0.0" },
@@ -1097,6 +1099,17 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/2a/94/858e0163cb4d83d6d8234018a01792c749a56daee41794cac7d6c46661e8/pymdown_extensions-12.1.tar.gz", hash = "sha256:fdb8f47f5d7fd069d10ef2a7d8908e613d7865ff0419d544a0ffd3984e884f11", size = 868245, upload-time = "2026-09-23T00:08:42Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/36/d1/98313da89960a604402266a115311b510254900ff1295ea426403f9423cc/pymdown_extensions-12.1-py3-none-any.whl", hash = "sha256:4a254b771acfcddc6c110a7f4590d818f1f849e2d5aacf69b4b07c8dd2a9700d", size = 277069, upload-time = "2026-09-23T00:08:40.069Z" },
+]
+
+[[package]]
+name = "pyscn"
+version = "1.33.0"
+source = { registry = "https://pypi.org/simple" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/19/71/90c53836768f4621b53556e3144e8b31370ca75a3a77367519a86e53a04e/pyscn-1.33.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:626c91297ec9f1dd269839df45973e3867b8ff068b2256de662c8ba4191fa07f", size = 10312652, upload-time = "2026-10-24T06:31:31.97Z" },
+    { url = "https://files.pythonhosted.org/packages/c4/d0/bf652ec3f46a1aab9601571423fc80c0745b99728f8a0a8ba2b506e488da/pyscn-1.33.0-py3-none-manylinux_2_34_aarch64.whl", hash = "sha256:642f9d31b3c08d74e396fb3a5a798d911bcfbbacca4c9f44d3557deb76584382", size = 10129303, upload-time = "2026-10-24T06:31:34.478Z" },
+    { url = "https://files.pythonhosted.org/packages/38/c6/975d308e165794293948562936d8f0b5c7a10307f9a7bf0629932768f5ca/pyscn-1.33.0-py3-none-manylinux_2_34_x86_64.whl", hash = "sha256:5a99d5f1bc506a8f565ade7289a1d98e63f515a68ba5f4482d8019fc879f0f1c", size = 11257893, upload-time = "2026-10-24T06:31:36.576Z" },
+    { url = "https://files.pythonhosted.org/packages/ab/3e/d9b775bb3e6fd08b84df89cdb56fa558b6a5fcfe95d13c1e42ea6707f9dd/pyscn-1.33.0-py3-none-win_amd64.whl", hash = "sha256:944f4b1cbeacc153793bd066a1eb4476ea0c3ff6010ab67253204ad52dfca424", size = 12232276, upload-time = "2026-10-24T06:31:38.927Z" },
 ]
 
 [[package]]

@@ -13,7 +13,6 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 
 import odouche
-from odouche_mcp._read import find_branch
 from odouche_mcp._session import open_client
 
 
@@ -68,7 +67,7 @@ def changing_tool(*, allow_changes: bool) -> Callable[[str, str], Rebuilt]:
         try:
             with open_client(changes=allow_changes) as client:
                 # Sent once: an error is reported, never retried.
-                started = client.rebuild(find_branch(client, project, branch))
+                started = client.rebuild(client.branch(project, branch))
         except Exception as error:
             _audit("rebuild_branch", _target(project, branch), type(error).__name__)
             raise
@@ -112,7 +111,7 @@ def settings_tool(*, allow_changes: bool) -> Callable[..., SettingsChanged]:
             except ValueError as error:
                 raise ToolError(str(error)) from None
             with open_client(changes=allow_changes) as client:
-                found = find_branch(client, project, branch)
+                found = client.branch(project, branch)
                 current = client.branch_settings(found)
                 narrowed = _refused(partial(client.check_settings_change, found, current, change))
                 outcome = odouche.SettingsOutcome(current, current, ())

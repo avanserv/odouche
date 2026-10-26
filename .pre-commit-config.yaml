@@ -132,6 +132,14 @@ repos:
         pass_filenames: false
         require_serial: true
 
+      - id: pyscn
+        name: python   | quality (pyscn)
+        entry: make quality
+        language: system
+        types: [python]
+        pass_filenames: false
+        require_serial: true
+
       - id: basedpyright
         name: python   | type check (basedpyright)
         entry: uv run basedpyright

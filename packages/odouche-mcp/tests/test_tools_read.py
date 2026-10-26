@@ -253,6 +253,9 @@ class Upstream:
             raise odouche.NotFoundError(msg)
         return PROJECT_SETTINGS
 
+    # The library's own, over `branches`.
+    branch = odouche.Client.branch
+
     def branches(self, project: str) -> list[odouche.Branch]:
         if project != ACME.name:
             msg = f"No project {project} among those you can reach."
