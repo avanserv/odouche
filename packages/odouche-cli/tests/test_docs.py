@@ -61,7 +61,7 @@ def test_the_exit_code_table_has_every_code_and_no_other():
     listed = [int(cell) for cell in cells if cell.isdecimal()]
 
     assert sorted(listed) == sorted(BUILT_IN | constants | mapped)
-    assert [cell for cell in cells if not cell.isdecimal()] == ["24 to 29"]
+    assert [cell for cell in cells if not cell.isdecimal()] == ["24 to 29", "32 to 39"]
 
 
 def test_no_exit_code_is_written_out_of_the_table():
