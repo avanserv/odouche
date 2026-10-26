@@ -40,8 +40,10 @@ def main(stdin: TextIO, stdout: TextIO) -> None:
     """Write an approval when the call on `stdin` is to a read-only tool, and nothing otherwise."""
     try:
         name = json.load(stdin)["tool_name"]
+
         if name not in {f"mcp__{SERVER}__{tool}" for tool in READ_ONLY}:
             return
+
         decision = {
             "hookEventName": "PreToolUse",
             "permissionDecision": "allow",
@@ -50,6 +52,7 @@ def main(stdin: TextIO, stdout: TextIO) -> None:
         approval = json.dumps({"hookSpecificOutput": decision})
     except Exception:  # noqa: BLE001  No output is a prompt, which is the answer to anything unexpected.
         return
+
     stdout.write(approval + "\n")
 
 

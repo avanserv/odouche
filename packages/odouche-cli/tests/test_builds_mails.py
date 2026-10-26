@@ -13,7 +13,6 @@ from odouche_cli.app import app
 
 
 NOW = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
-
 ACME = odouche.Project(id=1, name="acme", repository="acme/odoo", url="https://www.odoo.sh/project/acme")
 STAGING = Branch(id=2, name="staging", stage=Stage.STAGING, stage_name="staging")
 
@@ -103,14 +102,18 @@ class StubClient:
 
     def mails(self, project: str, branch: Branch, build: Build, *, limit: int = 20) -> list[Mail]:
         self.calls.append(f"mails {project} {branch.name} {build.id} {limit}")
+
         if self.failure is not None:
             raise self.failure
+
         return list(self.caught)[:limit]
 
     def mail(self, project: str, branch: Branch, build: Build, mail_id: str) -> MailContent:
         self.calls.append(f"mail {project} {branch.name} {build.id} {mail_id}")
+
         if self.failure is not None:
             raise self.failure
+
         return self.content
 
 
@@ -122,6 +125,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
 
     monkeypatch.setattr(odouche, "Client", Client)
     monkeypatch.setattr(_time, "_now", lambda: NOW)
+
     return Client
 
 
@@ -153,7 +157,6 @@ def test_lists_the_mails_of_a_build_by_its_number_up_to_the_limit(client: type[S
 
 def test_a_build_that_caught_nothing_says_so_and_exits_0(client: type[StubClient]):
     client.caught = ()
-
     result = run()
 
     assert result.exit_code == 0
@@ -163,7 +166,6 @@ def test_a_build_that_caught_nothing_says_so_and_exits_0(client: type[StubClient
 
 def test_as_json_a_build_that_caught_nothing_is_an_empty_list(client: type[StubClient]):
     client.caught = ()
-
     result = run(json_format=True)
 
     assert result.exit_code == 0
@@ -185,7 +187,6 @@ def test_as_json_each_mail_is_its_model():
 
 def test_a_header_is_listed_without_its_escape_sequences(client: type[StubClient]):
     client.caught = (Mail("m3", None, "", "x", "y", "\x1b]0;owned\x07Hi\x1b[2J\nthere"),)
-
     result = run()
 
     assert "\x1b" not in result.stdout
@@ -221,7 +222,6 @@ def test_the_body_is_printed_without_escape_sequences_on_a_terminal_or_not(
 ):
     monkeypatch.setattr(_output, "_is_terminal", lambda: stdout == "terminal")
     client.content = MailContent(RESET, "", "\x1b]0;title\x07Click\x1b[2J here\x9b31m\x00", (), truncated=False)
-
     result = run("--mail", "m2")
 
     assert result.exit_code == 0, result.output
@@ -231,7 +231,6 @@ def test_the_body_is_printed_without_escape_sequences_on_a_terminal_or_not(
 
 def test_a_mail_with_no_attachment_shows_none(client: type[StubClient]):
     client.content = MailContent(WELCOME, "cc@example.com", "", (), truncated=False)
-
     result = run("--mail", "m1")
 
     assert "Attachments" in result.stdout.splitlines()
@@ -289,7 +288,6 @@ def test_a_limit_with_a_mail_is_a_usage_error(client: type[StubClient]):
 @pytest.mark.parametrize("args", [(), ("--mail", "m9")])
 def test_what_is_not_found_exits_4(client: type[StubClient], args: tuple[str, ...]):
     client.failure = odouche.NotFoundError("Branch staging is production: no mail.")
-
     result = run(*args)
 
     assert result.exit_code == 4

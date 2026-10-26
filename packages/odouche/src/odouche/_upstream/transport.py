@@ -39,7 +39,6 @@ from odouche.secret import Secret
 
 
 HOST = "www.odoo.sh"
-
 _LOGIN_PATH = "/web/login"
 _BUS_PATH = "/websocket"
 # The `v` of the page's worker script. With another, the socket opens and sends nothing.
@@ -86,6 +85,7 @@ class _WithoutQuery(logging.Filter):
             record.args = tuple(
                 arg.copy_with(query=None) if isinstance(arg, httpx2.URL) else arg for arg in record.args
             )
+
         return True
 
 
@@ -95,10 +95,12 @@ class _EventOnly(logging.Filter):
     def filter(self, record: logging.LogRecord) -> bool:
         record.msg = record.getMessage().split(" ", 1)[0]
         record.args = None
+
         return True
 
 
 logging.getLogger("httpx2").addFilter(_WithoutQuery())
+
 for _layer in ("http11", "http2", "connection", "proxy", "socks"):
     logging.getLogger(f"httpcore2.{_layer}").addFilter(_EventOnly())
 
@@ -169,6 +171,7 @@ class Socket:
             return None
         except (WebSocketDisconnect, WebSocketNetworkError) as error:
             failure = type(error).__name__
+
         raise _unavailable(self._operation, failure)
 
     def _write(self, write: Callable[[], None]) -> None:
@@ -179,6 +182,7 @@ class Socket:
             failure = type(error).__name__
         else:
             return
+
         raise _unavailable(self._operation, failure)
 
 
@@ -186,6 +190,7 @@ def is_unauthenticated(status: int, location: str | None, body: object) -> bool:
     """Tell whether an answer is one of the two Odoo.sh gives to a missing or expired session."""
     if status == httpx2.codes.SEE_OTHER:
         return _lands_on(location, _LOGIN_PATH)
+
     return status == httpx2.codes.OK and _error_name(body) == _SESSION_EXPIRED
 
 
@@ -198,6 +203,7 @@ def _error_name(body: object) -> object:
     """Return the name of the exception an answer reports, when it reports one."""
     error = cast("dict[str, object]", body).get("error") if isinstance(body, dict) else None
     data = cast("dict[str, object]", error).get("data") if isinstance(error, dict) else None
+
     return cast("dict[str, object]", data).get("name") if isinstance(data, dict) else None
 
 
@@ -205,17 +211,21 @@ def _lands_on(location: str | None, path: str) -> bool:
     """Tell whether a redirect sends the browser to a path of Odoo.sh."""
     if location is None:
         return False
+
     try:
         url = httpx2.URL(f"https://{HOST}/").join(location)
     except httpx2.InvalidURL:
         return False
+
     return (url.scheme, url.host, url.port, url.path) == ("https", HOST, None, path)
 
 
 def _url(path: str) -> httpx2.URL:
     url = httpx2.URL(f"https://{HOST}{path}")
+
     if not path.startswith("/") or path.startswith("//") or url.scheme != "https" or url.host != HOST:
         raise ValueError(f"A request path is absolute and on {HOST}")
+
     return url
 
 
@@ -223,12 +233,16 @@ def _worker_url(operation: str, worker: str, path: str) -> httpx2.URL:
     """Return an address on a worker, which is a host of `odoo.com` that Odoo.sh named."""
     if _WORKER.fullmatch(worker) is None:
         raise UpstreamChangedError(operation, "worker_url")
+
     # The host is compared as the client reads it, which is not always as it is written.
     if f"https://{httpx2.URL(worker).host}" != worker:
         raise UpstreamChangedError(operation, "worker_url")
+
     url = httpx2.URL(f"{worker}{path}")
+
     if not path.startswith("/") or path.startswith("//") or f"{url.scheme}://{url.host}" != worker:
         raise ValueError("A request path is absolute and on the worker")
+
     return url
 
 
@@ -236,7 +250,9 @@ def _bounded(within: float | None) -> httpx2.Timeout:
     """Return the timeout of a request that has `within` seconds left: each phase is cut to them."""
     if within is None:
         return _TIMEOUT
+
     left = max(within, 0.001)
+
     return httpx2.Timeout(
         connect=min(_PHASE, left), read=min(_READ, left), write=min(_PHASE, left), pool=min(_PHASE, left)
     )
@@ -250,26 +266,36 @@ def _unexpected(status: int, body: object) -> str | None:
     """Name the part of an answer that the upstream reference does not describe."""
     if status != httpx2.codes.OK:
         return "Location" if httpx2.codes.is_redirect(status) else "status"
+
     if not isinstance(body, dict):
         return "body"
+
     return "error.data.name" if "error" in body else None
 
 
 def _error(operation: str, answer: _Answer, not_found: str | None) -> OdoucheError | None:
     status = answer.status
+
     if status is None:
         return _unavailable(operation, str(answer.failure))
+
     if httpx2.codes.is_server_error(status) or status == httpx2.codes.TOO_MANY_REQUESTS:
         return UpstreamUnavailableError(f"Odoo.sh answered with status {status}.", operation=operation, status=status)
+
     if status in _REFUSED:
         cls, message = _REFUSED[status]
         return cls(message, operation=operation, status=status)
+
     name = _error_name(answer.body)
+
     if status == httpx2.codes.OK and isinstance(name, str) and name in _DENIALS:
         return PermissionDeniedError(_DENIALS[name], operation=operation, status=status)
+
     if not_found is not None and status == httpx2.codes.OK and name == _UNEXPLAINED:
         return NotFoundError(not_found, operation=operation, status=status)
+
     field = _unexpected(status, answer.body)
+
     return UpstreamChangedError(operation, field, status=status) if field else None
 
 
@@ -345,13 +371,18 @@ class Transport:
         raised when Odoo.sh's grant on GitHub lacks a scope: where to give it.
         """
         answer = self._attempt(operation, "POST", _url(path), params, retry=retry, within=within, limit=limit)
+
         if answer.status == httpx2.codes.OK and answer.body is _OVERSIZED:
             raise TooLargeError
+
         error = _error(operation, answer, not_found)
+
         if grant is not None and answer.status == httpx2.codes.OK and _error_name(answer.body) == _INSUFFICIENT_SCOPE:
             error = PermissionDeniedError(f"{_NARROW_GRANT} {grant}", operation=operation, status=answer.status)
+
         if error is not None:
             raise error
+
         return cast("dict[str, object]", answer.body)
 
     def change(self, operation: str, path: str, params: Mapping[str, object] | None = None) -> dict[str, object]:
@@ -363,20 +394,26 @@ class Transport:
         """
         if self._read_only:
             raise _read_only(operation)
+
         answer = self._attempt(operation, "POST", _url(path), params, retry=False)
+
         if answer.status is None:
             unknown = answer.failure not in _NOT_SENT
         else:
             unknown = httpx2.codes.is_server_error(answer.status) or _error_name(answer.body) == _UNEXPLAINED
+
         if unknown:
             raise OutcomeUnknownError(
                 f"Odoo.sh did not confirm the {operation}, which may have been done. Look before trying again.",
                 operation=operation,
                 status=answer.status,
             )
+
         error = _error(operation, answer, None)
+
         if error is not None:
             raise error
+
         return cast("dict[str, object]", answer.body)
 
     def leave(
@@ -387,10 +424,13 @@ class Transport:
         `params` is the query. Any answer other than a 303 to `to` raises as in `call`.
         """
         answer = self._attempt(operation, "GET", _url(path), params, retry=retry)
+
         if answer.status == httpx2.codes.SEE_OTHER and _lands_on(answer.location, to):
             return
+
         if answer.status == httpx2.codes.OK:
             raise UpstreamChangedError(operation, "status", status=answer.status)
+
         raise cast("OdoucheError", _error(operation, answer, None))
 
     def worker_call(
@@ -410,14 +450,19 @@ class Transport:
         """
         if params is not None and "token" in params:
             raise ValueError("The token is sent by the transport alone")
+
         url = _worker_url(operation, worker, path)
         sent = {**(params or {}), "token": token.expose_secret()}
         answer = self._attempt(operation, "POST", url, sent, retry=True, limit=limit)
+
         if answer.status == httpx2.codes.OK and answer.body is _OVERSIZED:
             raise TooLargeError
+
         error = _error(operation, answer, None)
+
         if error is not None:
             raise error
+
         return cast("dict[str, object]", answer.body)
 
     @contextmanager
@@ -438,13 +483,17 @@ class Transport:
             headers={"Range": byte_range, "Accept-Encoding": "identity"},
         )
         response = failure = None
+
         try:
             response = self._client.send(request, stream=True)
         except httpx2.RequestError as error:
             failure = type(error).__name__
+
         _logger.debug("GET %s: %s", url.path, failure or cast("httpx2.Response", response).status_code)
+
         if response is None:
             raise _unavailable(operation, str(failure))
+
         try:
             yield _part(operation, response)
         finally:
@@ -463,8 +512,10 @@ class Transport:
         answer = self._attempt(
             operation, "GET", _url(handover), {"redirect": url.raw_path.decode(), "base_url": worker}, retry=True
         )
+
         if answer.status != httpx2.codes.FOUND:
             raise _error(operation, answer, None) or UpstreamChangedError(operation, "status", status=answer.status)
+
         token = _handed_over(operation, url, answer.location)
         request = self._client.build_request(
             "GET",
@@ -474,13 +525,17 @@ class Transport:
             headers={"Accept-Encoding": "identity"},
         )
         response = failure = None
+
         try:
             response = self._client.send(request, stream=True)
         except httpx2.RequestError as error:
             failure = type(error).__name__
+
         _logger.debug("GET %s: %s", url.path, failure or cast("httpx2.Response", response).status_code)
+
         if response is None:
             raise _unavailable(operation, str(failure))
+
         try:
             yield _body(operation, response)
         finally:
@@ -494,6 +549,7 @@ class Transport:
         """
         url = _url(_BUS_PATH)
         session = status = failure = None
+
         with ExitStack() as stack:
             try:
                 session = stack.enter_context(
@@ -513,10 +569,14 @@ class Transport:
                 status = error.response.status_code
             except httpx2.RequestError as error:
                 failure = type(error).__name__
+
             _logger.debug("GET %s: %s", url.path, failure or status or httpx2.codes.SWITCHING_PROTOCOLS.value)
+
             if session is None:
                 raise _not_opened(operation, status, failure)
+
             stack.callback(_hang_up, session)
+
             yield Socket(operation, session)
 
     def _attempt(
@@ -532,21 +592,28 @@ class Transport:
     ) -> _Answer:
         """Send a request, again if it may be, and raise if Odoo.sh rejects the session."""
         end = None if within is None else time.monotonic() + within
+
         with self._lock:
             answer = self._send(method, url, params, within, limit)
+
             for delay in _BACKOFF if retry else ():
                 left = None if end is None else end - time.monotonic() - delay
+
                 if not answer.transient or (left is not None and left <= 0):
                     break
+
                 self._sleep(delay)
                 answer = self._send(method, url, params, left, limit)
+
         rejected = answer.status is not None and is_unauthenticated(answer.status, answer.location, answer.body)
+
         # A worker knows nothing of the session.
         if rejected and url.host == HOST:
             self._on_rejected()
             raise SessionExpiredError(
                 "Odoo.sh rejected the session. Log in again.", operation=operation, status=answer.status
             )
+
         return answer
 
     def _send(
@@ -567,6 +634,7 @@ class Transport:
         headers = {"Cookie": f"session_id={self._session.expose_secret()}"} if url.host == HOST else {}
         started = time.perf_counter()
         end = None if within is None else time.monotonic() + within
+
         try:
             if method == "GET":
                 query = {key: str(value) for key, value in (params or {}).items()}
@@ -580,14 +648,17 @@ class Transport:
                     timeout=_bounded(within),
                 )
                 response = self._client.send(request, stream=limit is not None)
+
             content = response.content if limit is None else _capped(response, limit, end)
         except httpx2.RequestError as error:
             answer = _Answer(failure=type(error).__name__)
         else:
             body = _OVERSIZED if content is None else _json(content)
             answer = _Answer(response.status_code, response.headers.get("Location"), body)
+
         elapsed = (time.perf_counter() - started) * 1000
         _logger.debug("%s %s: %s in %.0f ms", method, url.path, answer.status or answer.failure, elapsed)
+
         return answer
 
 
@@ -603,6 +674,7 @@ def state_changing[**P, R](
     def guarded(transport: Transport, *args: P.args, **kwargs: P.kwargs) -> R:
         if transport.read_only:
             raise _read_only(function.__name__)
+
         return function(transport, *args, **kwargs)
 
     return guarded
@@ -616,7 +688,9 @@ def _hang_up(session: WebSocketSession) -> None:
     """End the read a socket is left in: closing does not, and Odoo.sh may never answer."""
     with suppress(WebSocketNetworkError, LocalProtocolError):
         session.send(CloseConnection(1000))
+
     connection = session.stream.get_extra_info("socket")
+
     if isinstance(connection, socket.socket):
         with suppress(OSError):
             connection.shutdown(socket.SHUT_RDWR)
@@ -625,37 +699,48 @@ def _hang_up(session: WebSocketSession) -> None:
 def _not_opened(operation: str, status: int | None, failure: str | None) -> OdoucheError:
     if status == httpx2.codes.OK:
         return UpstreamChangedError(operation, "status", status=status)
+
     return cast("OdoucheError", _error(operation, _Answer(status, failure=failure), None))
 
 
 def _part(operation: str, response: httpx2.Response) -> Part | None:
     status = response.status_code
     chunks = _chunks(operation, response)
+
     if status == httpx2.codes.PARTIAL_CONTENT:
         found = _CONTENT_RANGE.fullmatch(response.headers.get("Content-Range", ""))
+
         if found is None:
             raise UpstreamChangedError(operation, "Content-Range", status=status)
+
         return Part(int(found.group(1)), chunks)
+
     if status == httpx2.codes.OK:
         # An empty file. A body is a range that was not honoured.
         if any(chunks):
             raise UpstreamChangedError(operation, "body", status=status)
+
         return None
+
     raise cast("OdoucheError", _error(operation, _Answer(status, response.headers.get("Location")), None))
 
 
 def _chunks(operation: str, response: httpx2.Response) -> Iterator[bytes]:
     """Yield a body as it arrives. The failure is raised out of the handler, as in `_send`."""
     chunks = response.iter_bytes()
+
     while True:
         try:
             chunk = next(chunks, None)
         except httpx2.RequestError as error:
             failure = type(error).__name__
             break
+
         if chunk is None:
             return
+
         yield chunk
+
     raise _unavailable(operation, failure)
 
 
@@ -665,22 +750,29 @@ def _handed_over(operation: str, asked: httpx2.URL, location: str | None) -> Sec
         url = httpx2.URL(location or "")
     except httpx2.InvalidURL:
         url = None
+
     if url is not None and (url.scheme, url.host, url.port, url.path) == (asked.scheme, asked.host, None, asked.path):
         added = list(url.params.multi_items())
         tokens = [value for key, value in added if key == _GRANT]
         rest = sorted(item for item in added if item[0] != _GRANT)
+
         if len(tokens) == 1 and _GRANT_ALPHABET.fullmatch(tokens[0]) and rest == sorted(asked.params.multi_items()):
             return Secret(tokens[0])
+
     raise UpstreamChangedError(operation, "Location", status=httpx2.codes.FOUND)
 
 
 def _body(operation: str, response: httpx2.Response) -> Body:
     status = response.status_code
+
     if status != httpx2.codes.OK:
         raise cast("OdoucheError", _error(operation, _Answer(status, response.headers.get("Location")), None))
+
     length = response.headers.get("Content-Length")
+
     if length is not None and not length.isdecimal():
         raise UpstreamChangedError(operation, "Content-Length", status=status)
+
     return Body(None if length is None else int(length), _chunks(operation, response))
 
 
@@ -691,16 +783,20 @@ def _capped(response: httpx2.Response, limit: int, end: float | None) -> bytes |
     bounds each wait for a chunk, not the whole body.
     """
     held = bytearray()
+
     try:
         # Decoded: an answer compressed small is still counted at its size.
         for chunk in response.iter_bytes():
             held += chunk
+
             if len(held) > limit:
                 return None
+
             if end is not None and time.monotonic() >= end:
                 raise httpx2.ReadTimeout("The answer was still arriving when the time left ran out.")
     finally:
         response.close()
+
     return bytes(held)
 
 

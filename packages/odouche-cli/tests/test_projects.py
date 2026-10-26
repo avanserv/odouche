@@ -61,6 +61,7 @@ class StubClient:
 
     def __init__(self, *, read_only: bool = False) -> None:
         self.modes.append(read_only)
+
         if self.error is not None:
             raise self.error
 
@@ -86,6 +87,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
         calls: list[str] = []
 
     monkeypatch.setattr(odouche, "Client", Client)
+
     return Client
 
 
@@ -115,7 +117,6 @@ def test_list_as_json_is_the_whole_model():
 
 def test_no_projects_is_a_line_on_stderr(client: type[StubClient]):
     client.found = ()
-
     result = run("projects", "list")
 
     assert result.exit_code == 0
@@ -125,7 +126,6 @@ def test_no_projects_is_a_line_on_stderr(client: type[StubClient]):
 
 def test_no_projects_as_json_is_an_empty_list(client: type[StubClient]):
     client.found = ()
-
     result = run("--format", "json", "projects", "list")
 
     assert result.exit_code == 0
@@ -134,7 +134,6 @@ def test_no_projects_as_json_is_an_empty_list(client: type[StubClient]):
 
 def test_logged_out_exits_3_and_names_the_login(client: type[StubClient]):
     client.error = odouche.NoSessionError("Not logged in.")
-
     result = run("projects", "list")
 
     assert result.exit_code == 3
@@ -155,7 +154,6 @@ def test_help_opens_neither_the_keyring_nor_the_network(
     client: type[StubClient], command: tuple[str, ...], example: str
 ):
     client.error = odouche.KeyringUnavailableError()
-
     result = run(*command)
 
     assert result.exit_code == 0
@@ -190,7 +188,6 @@ def test_show_prints_the_overview_one_fact_per_line(client: type[StubClient]):
 
 def test_show_below_admin_prints_admins_only_for_the_hosting(client: type[StubClient]):
     client.overview = dataclasses.replace(OVERVIEW, access_level="developer", hosting=None)
-
     result = run("projects", "show", "--project", "acme")
 
     assert result.exit_code == 0
@@ -215,7 +212,6 @@ def test_show_names_an_unknown_subscription_its_trial_and_unknown_stages(client:
     )
 
     result = run("projects", "show", "--project", "acme")
-
     shown = rows(result)
     assert ["Subscription", "suspended,", "12", "days", "left"] in shown
     assert ["Dedicated", "yes"] in shown
@@ -238,7 +234,6 @@ def test_show_colours_the_subscription_on_a_terminal(
     client: type[StubClient], subscription: odouche.Subscription, colour: str
 ):
     client.overview = dataclasses.replace(OVERVIEW, subscription=subscription, subscription_name=subscription.value)
-
     result = run("projects", "show", "--project", "acme")
 
     assert f"{colour}{subscription.value}" in result.stdout
@@ -302,7 +297,6 @@ def test_show_gives_no_share_of_a_quota_of_nothing(client: type[StubClient]):
     assert OVERVIEW.hosting is not None
     hosting = dataclasses.replace(OVERVIEW.hosting, storage_used_bytes=512, storage_quota_bytes=0)
     client.overview = dataclasses.replace(OVERVIEW, hosting=hosting)
-
     result = run("projects", "show", "--project", "acme")
 
     assert ["Storage", "512", "B", "of", "0", "B"] in rows(result)
@@ -323,15 +317,18 @@ def with_production(build: odouche.TrackedBuild | None) -> odouche.ProjectOvervi
 def with_storage(used: int, quota: int = 1000) -> odouche.ProjectOverview:
     assert OVERVIEW.hosting is not None
     hosting = dataclasses.replace(OVERVIEW.hosting, storage_used_bytes=used, storage_quota_bytes=quota)
+
     return dataclasses.replace(OVERVIEW, hosting=hosting)
 
 
 def checked(result: Result) -> dict[str, tuple[str, str]]:
     """Each check's result and fact, by its name."""
     found: dict[str, tuple[str, str]] = {}
+
     for line in result.stdout.splitlines()[1:]:
         name, verdict, fact = line.split(maxsplit=2)
         found[name] = (verdict, fact)
+
     return found
 
 
@@ -353,7 +350,6 @@ def test_check_of_a_healthy_project_passes_every_check(client: type[StubClient])
 
 def test_check_of_a_failed_production_build_exits_30(client: type[StubClient]):
     client.overview = with_production(tracked(88002, odouche.BuildResult.FAILED))
-
     result = run("projects", "check", "--project", "acme")
 
     assert result.exit_code == 30
@@ -410,7 +406,6 @@ def test_check_judges_the_production_build_by_its_result(
     client: type[StubClient], build: odouche.TrackedBuild | None, verdict: str, fact: str
 ):
     client.overview = with_production(build)
-
     result = run("projects", "check", "--project", "acme")
 
     assert result.exit_code == (0 if verdict == "pass" else 31)
@@ -419,7 +414,6 @@ def test_check_judges_the_production_build_by_its_result(
 
 def test_check_with_no_production_branch_warns(client: type[StubClient]):
     client.overview = dataclasses.replace(OVERVIEW, branches=(FEATURE,))
-
     result = run("projects", "check", "--project", "acme")
 
     assert result.exit_code == 31
@@ -433,7 +427,6 @@ def test_check_takes_the_worst_of_several_production_branches(client: type[StubC
         tracked(88004, odouche.BuildResult.FAILED),
     )
     client.overview = dataclasses.replace(OVERVIEW, branches=(PRODUCTION, other))
-
     result = run("projects", "check", "--project", "acme")
 
     assert result.exit_code == 30
@@ -459,7 +452,6 @@ def test_check_judges_the_storage_against_the_margin(
     client: type[StubClient], used: int, options: tuple[str, ...], verdict: str, code: int
 ):
     client.overview = with_storage(used)
-
     result = run("projects", "check", "--project", "acme", *options)
 
     assert result.exit_code == code
@@ -476,7 +468,6 @@ def test_check_refuses_a_margin_out_of_range_before_asking(client: type[StubClie
 
 def test_check_below_admin_skips_the_storage_and_exits_0(client: type[StubClient]):
     client.overview = dataclasses.replace(OVERVIEW, access_level="developer", hosting=None)
-
     result = run("projects", "check", "--project", "acme")
 
     assert result.exit_code == 0
@@ -485,7 +476,6 @@ def test_check_below_admin_skips_the_storage_and_exits_0(client: type[StubClient
 
 def test_check_skips_a_quota_of_nothing(client: type[StubClient]):
     client.overview = with_storage(512, quota=0)
-
     result = run("projects", "check", "--project", "acme")
 
     assert result.exit_code == 0
@@ -499,7 +489,6 @@ def test_check_fails_the_branches_on_a_failed_development_build(client: type[Stu
         tracked(88011, odouche.BuildResult.WARNING),
     )
     client.overview = dataclasses.replace(OVERVIEW, branches=(PRODUCTION, failed, warned))
-
     result = run("projects", "check", "--project", "acme")
 
     assert result.exit_code == 30
@@ -510,7 +499,6 @@ def test_check_fails_the_branches_on_a_failed_development_build(client: type[Stu
 def test_check_warns_on_a_development_build_whose_result_is_unknown(client: type[StubClient]):
     unknown = dataclasses.replace(FEATURE, last_build=tracked(88010, odouche.BuildResult.UNKNOWN, "flaky"))
     client.overview = dataclasses.replace(OVERVIEW, branches=(PRODUCTION, unknown))
-
     result = run("projects", "check", "--project", "acme")
 
     assert result.exit_code == 31
@@ -520,7 +508,6 @@ def test_check_warns_on_a_development_build_whose_result_is_unknown(client: type
 def test_check_ignores_a_development_build_with_warnings(client: type[StubClient]):
     warned = dataclasses.replace(FEATURE, last_build=tracked(88010, odouche.BuildResult.WARNING))
     client.overview = dataclasses.replace(OVERVIEW, branches=(PRODUCTION, warned))
-
     result = run("projects", "check", "--project", "acme")
 
     assert result.exit_code == 0
@@ -537,7 +524,6 @@ def test_check_ignores_a_development_build_with_warnings(client: type[StubClient
 )
 def test_check_exits_with_the_worst_result(client: type[StubClient], overview: odouche.ProjectOverview, code: int):
     client.overview = overview
-
     result = run("projects", "check", "--project", "acme")
 
     assert result.exit_code == code
@@ -557,7 +543,6 @@ def test_check_as_json_is_the_checks():
 
 def test_check_as_json_keeps_the_exit_code(client: type[StubClient]):
     client.overview = with_production(tracked(88002, odouche.BuildResult.FAILED))
-
     result = run("--format", "json", "projects", "check", "--project", "acme")
 
     assert result.exit_code == 30
@@ -577,7 +562,6 @@ def test_check_that_cannot_read_the_project_prints_nothing(
     client: type[StubClient], error: odouche.OdoucheError, code: int
 ):
     client.error = error
-
     result = run("projects", "check", "--project", "acme")
 
     assert result.exit_code == code
@@ -588,7 +572,6 @@ def test_check_strips_control_characters_from_a_branch_name(client: type[StubCli
     branch = odouche.Branch(51046, "evil\x1b[2Jname", odouche.Stage.DEVELOPMENT, "dev")
     failed = odouche.BranchSummary(branch, tracked(88012, odouche.BuildResult.FAILED))
     client.overview = dataclasses.replace(OVERVIEW, branches=(PRODUCTION, failed))
-
     result = run("projects", "check", "--project", "acme")
 
     assert "\x1b" not in result.stdout
@@ -608,7 +591,6 @@ def test_check_colours_the_result_on_a_terminal(
     client: type[StubClient], overview: odouche.ProjectOverview, verdict: str, colour: str
 ):
     client.overview = overview
-
     result = run("projects", "check", "--project", "acme")
 
     assert f"{colour}{verdict}" in result.stdout

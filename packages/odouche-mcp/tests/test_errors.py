@@ -36,6 +36,7 @@ def test_a_library_error_is_its_message_and_the_next_step(
     mapped = tool_error(error)
 
     assert isinstance(mapped, ToolError)
+
     if step is None:
         assert str(mapped) == str(error)
     else:
@@ -68,6 +69,7 @@ def test_an_unexpected_error_reaches_the_client_without_its_text():
         async with Client(server) as client:
             result = await client.call_tool("break_things")
             assert result.is_error
+
             return result.model_dump_json()
 
     dumped = asyncio.run(call())

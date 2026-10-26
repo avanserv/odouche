@@ -13,6 +13,7 @@ PACKAGES = Path(__file__).parents[2]
 def private_imports(source):
     """Return the modules and names under `odouche` that a source imports and that are private."""
     found = []
+
     for node in ast.walk(ast.parse(source)):
         if isinstance(node, ast.Import):
             names = [alias.name for alias in node.names]
@@ -20,10 +21,13 @@ def private_imports(source):
             names = [f"{node.module}.{alias.name}" for alias in node.names]
         else:
             continue
+
         for name in names:
             root, *parts = name.split(".")
+
             if root == "odouche" and any(part.startswith("_") and not part.startswith("__") for part in parts):
                 found.append(name)
+
     return found
 
 

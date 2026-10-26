@@ -50,6 +50,7 @@ def give(upstream, number, access):
     for user in users(upstream):
         if user["id"] == number:
             user["access_level"] = access
+
     if number == OCTO.id:
         upstream.bodies[INFO]["result"]["user"]["access"] = access
 
@@ -61,6 +62,7 @@ def sets(upstream):
     def answer(request):
         number = int(request.url.path.split("/")[3])
         give(upstream, number, json.loads(request.content)["params"]["access_level"])
+
         return httpx2.Response(200, json=upstream.load("set_access_level.json"))
 
     for number in (61001, 61002, 61003):
@@ -94,7 +96,6 @@ def test_a_member_with_that_role_already_is_returned_and_nothing_is_sent(client,
 
 def test_a_member_read_earlier_with_another_role_is_changed_by_the_role_read_now(client, upstream):
     stale = replace(JANE, role=MemberRole.DEVELOPER)
-
     changed = client.set_member_role("acme-shop", stale, MemberRole.DEVELOPER)
 
     assert changed.role is MemberRole.DEVELOPER
@@ -239,6 +240,7 @@ def test_a_role_change_whose_member_cannot_be_read_back_is_unknown(client, upstr
             del users(upstream)[1]
         else:
             upstream.bodies[SETTINGS] = upstream.load(failure)
+
         return httpx2.Response(200, json=upstream.load("set_access_level.json"))
 
     upstream.bodies[SET] = answer
@@ -276,11 +278,15 @@ def test_a_check_refuses_what_a_role_change_refuses_and_asks_nothing(upstream, s
 
     assert client.check_member_role(listed, "Jane-Doe", MemberRole.ADMIN) == JANE
     assert client.check_member_role(listed, replace(JANE, role=MemberRole.ADMIN), MemberRole.TESTER) == JANE
+
     with pytest.raises(MemberRefusedError) as checked:
         client.check_member_role(listed, "octo-dev", MemberRole.TESTER)
+
     assert checked.value.operation == "member role change"
+
     with pytest.raises(NotFoundError):
         client.check_member_role(listed, "octo-cat", MemberRole.TESTER)
+
     with pytest.raises(ValueError, match="MemberRole"):
         client.check_member_role(listed, "jane-doe", "owner")  # pyright: ignore[reportArgumentType]
 

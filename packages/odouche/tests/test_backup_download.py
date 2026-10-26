@@ -64,6 +64,7 @@ def handed_over(location):
 def handover(request):
     """Send to the address asked for with a token first, as Odoo.sh does."""
     path, _, query = request.url.params["redirect"].partition("?")
+
     return httpx2.Response(302, headers={"Location": f"{request.url.params['base_url']}{path}?token={TOKEN}&{query}"})
 
 
@@ -95,6 +96,7 @@ def clock(monkeypatch):
 
     monkeypatch.setattr(backups, "_monotonic", lambda: now[0])
     monkeypatch.setattr(backups, "_sleep", sleep)
+
     return slept
 
 
@@ -107,6 +109,7 @@ def backup(client):
 def prepared(client, upstream, backup):
     prepared = client.prepare_download("acme-shop", backup)
     upstream.requests.clear()
+
     return prepared
 
 
@@ -199,8 +202,10 @@ def announces(upstream):
         def answer(_):
             nonlocal looks
             looks += 1
+
             if looks == look:
                 body["result"]["notifications"]["4217"]["items"][:0] = notified
+
             return httpx2.Response(200, json=body)
 
         upstream.bodies[INFO] = answer
@@ -373,9 +378,11 @@ def test_the_token_is_logged_nowhere(client, upstream, prepared, caplog):
         b"".join(file.chunks)
 
     assert caplog.records
+
     for record in caplog.records:
         assert TOKEN not in record.getMessage()
         assert TOKEN not in repr(record.args)
+
     assert TOKEN not in repr(prepared)
 
 

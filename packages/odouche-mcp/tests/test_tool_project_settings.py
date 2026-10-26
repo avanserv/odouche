@@ -61,6 +61,7 @@ class Upstream:
         if project != "acme":
             msg = f"The session's user can reach no project named {project!r}."
             raise odouche.NotFoundError(msg)
+
         return self.found
 
     check_project_settings_change = odouche.Client.check_project_settings_change
@@ -71,14 +72,19 @@ class Upstream:
         if self.read_only:
             msg = "This client is read-only: it does not send a change_settings."
             raise odouche.ReadOnlyError(msg)
+
         self.sent.append(change)
+
         if self.failure:
             raise self.failure
+
         after = replace(self.found, **change.given())  # pyright: ignore[reportArgumentType]
         moved: tuple[str, ...] = ()
+
         # As the page says Odoo.sh does: installing every module turns the test suite off.
         if after.module_install is odouche.ModuleInstall.ALL and after.tests is not odouche.BuildTests.OFF:
             after, moved = replace(after, tests=odouche.BuildTests.OFF), ("tests",)
+
         return odouche.SettingsOutcome(self.found, after, moved)
 
 
@@ -115,6 +121,7 @@ def _call(server: MCPServer, **arguments: Any) -> CallToolResult:
 def _error(server: MCPServer, **arguments: Any) -> str:
     result = _call(server, **arguments)
     assert result.is_error
+
     return result.model_dump()["content"][0]["text"].removeprefix(f"Error executing tool {TOOL}: ")
 
 
@@ -197,7 +204,6 @@ def test_a_setting_odoo_sh_moves_along_is_returned_with_its_values():
 
 def test_a_timeout_on_a_dedicated_server_is_sent_in_seconds():
     Upstream.found = replace(OWN, dedicated=True)
-
     content = _call(_allowed(), project="acme", http_timeout_seconds=1800).structured_content
 
     assert Upstream.sent == [odouche.ProjectSettingsChange(http_timeout_seconds=1800)]

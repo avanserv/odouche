@@ -16,7 +16,6 @@ import odouche
 
 PROJECT_ENV = "OSH_PROJECT"
 BRANCH_ENV = "OSH_BRANCH"
-
 _GIT_TIMEOUT = 5.0
 _RESULT_STYLES = {
     odouche.BuildResult.SUCCESS: "green",
@@ -66,24 +65,32 @@ def resolve_project(ctx: typer.Context, value: str | None, projects: Callable[[]
     if value is not None:
         _refuse_empty(ctx, value, "--project")
         _debug(ctx, f"Project {value}, from {_source(ctx, 'project', '--project', PROJECT_ENV)}.")
+
         return value
+
     repository = _checkout_repository()
+
     if repository is None:
         msg = (
             f"No project. Give one with --project or {PROJECT_ENV}, or run from a checkout whose "
             "remote is the project's GitHub repository."
         )
         raise ContextError(msg, ctx=ctx)
+
     names = [project.name for project in projects() if project.repository.casefold() == repository.casefold()]
+
     if not names:
         msg = f"No project you can reach builds {repository}."
         raise odouche.NotFoundError(msg)
+
     if len(names) > 1:
         msg = (
             f"{repository} is built by several projects: {', '.join(names)}. Pick one with --project or {PROJECT_ENV}."
         )
         raise ContextError(msg, ctx=ctx)
+
     _debug(ctx, f"Project {names[0]}, from the git checkout ({repository}).")
+
     return names[0]
 
 
@@ -95,12 +102,17 @@ def resolve_branch(ctx: typer.Context, value: str | None) -> str:
     if value is not None:
         _refuse_empty(ctx, value, "--branch")
         _debug(ctx, f"Branch {value}, from {_source(ctx, 'branch', '--branch', BRANCH_ENV)}.")
+
         return value
+
     branch = checkout_branch()
+
     if branch is None:
         msg = f"No branch. Give one with --branch or {BRANCH_ENV}, or run from a checkout that is on a branch."
         raise ContextError(msg, ctx=ctx)
+
     _debug(ctx, f"Branch {branch}, from the git checkout.")
+
     return branch
 
 
@@ -109,6 +121,7 @@ def project_branch(
 ) -> tuple[str, odouche.Branch]:
     """Return the project's name and its branch of that name."""
     project_name = resolve_project(ctx, project, client.projects)
+
     return project_name, client.branch(project_name, name)
 
 
@@ -118,12 +131,17 @@ def find_build(client: odouche.Client, project: str, branch: odouche.Branch, bui
         for build in client.builds(branch):
             if build.id == build_id:
                 return build
+
         msg = f"Build {build_id} is not among the latest builds of branch {branch.name} of {project}."
+
         raise odouche.NotFoundError(msg)
+
     latest = client.latest_build(branch)
+
     if latest is None:
         msg = f"Branch {branch.name} of {project} has no build."
         raise odouche.NotFoundError(msg)
+
     return latest
 
 
@@ -141,6 +159,7 @@ def result_of(build: odouche.Build | odouche.TrackedBuild) -> str | None:
     """Return the result's name, and what Odoo.sh calls it when the library does not know it."""
     if build.result is None or build.result is odouche.BuildResult.UNKNOWN:
         return build.result_name
+
     return build.result.value
 
 
@@ -151,12 +170,14 @@ def result_style(build: odouche.Build | odouche.TrackedBuild) -> str | None:
 def subject(message: str) -> str:
     """Return the first line of a commit message."""
     lines = message.strip().splitlines()
+
     return lines[0] if lines else ""
 
 
 def is_given(ctx: typer.Context, parameter: str) -> bool:
     """Tell whether the user gave that parameter, by a flag or a variable."""
     source = ctx.get_parameter_source(parameter)
+
     return source is not None and source.name != "DEFAULT"
 
 
@@ -170,6 +191,7 @@ def _refuse_empty(ctx: typer.Context, value: str, flag: str) -> None:
 def _source(ctx: typer.Context, parameter: str, flag: str, variable: str) -> str:
     """Name the source of a value the user gave: the flag or the variable."""
     source = ctx.get_parameter_source(parameter)
+
     return variable if source is not None and source.name == "ENVIRONMENT" else flag
 
 
@@ -195,8 +217,10 @@ def checkout_is_of(project: str, projects: Callable[[], Iterable[odouche.Project
     `projects` is called only from a checkout that has a GitHub remote.
     """
     repository = _checkout_repository()
+
     if repository is None:
         return False
+
     return any(found.name == project and found.repository.casefold() == repository.casefold() for found in projects())
 
 
@@ -204,16 +228,20 @@ def _checkout_repository() -> str | None:
     """Return the GitHub repository of the current branch's remote, or of `origin`, as `owner/name`."""
     branch = checkout_branch()
     remote = _git("config", "--get", f"branch.{branch}.remote") if branch else None
+
     # `.` is a branch that tracks a local one.
     if remote is None or remote == ".":
         remote = "origin"
+
     url = _git("remote", "get-url", remote)
+
     return _github_repository(url) if url else None
 
 
 def _github_repository(url: str) -> str | None:
     """Return `owner/name` from a GitHub remote, SSH or HTTPS, and nothing else of the address."""
     found = _GITHUB.fullmatch(url)
+
     return f"{found['owner']}/{found['name']}" if found else None
 
 
@@ -230,6 +258,8 @@ def _git(*args: str) -> str | None:
         )
     except (OSError, subprocess.SubprocessError):
         return None
+
     if done.returncode != 0:
         return None
+
     return done.stdout.strip() or None

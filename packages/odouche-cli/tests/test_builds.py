@@ -17,11 +17,9 @@ from odouche_cli.app import app
 
 
 NOW = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
-
 ACME = odouche.Project(id=1, name="acme", repository="acme/odoo", url="https://www.odoo.sh/project/acme")
 MAIN = Branch(id=1, name="main", stage=Stage.PRODUCTION, stage_name="production")
 FEATURE = Branch(id=4, name="feature-x", stage=Stage.DEVELOPMENT, stage_name="dev")
-
 ESCAPE = "\x1b[2J\x1b]0;owned\x07"
 
 
@@ -47,6 +45,7 @@ def build(number: int, *, age: timedelta, message: str, **changes: object) -> Bu
         started_at=NOW - age,
         url=f"https://acme-feature-x-{number}.dev.odoo.com",
     )
+
     return replace(made, **changes)  # pyright: ignore[reportArgumentType]
 
 
@@ -80,6 +79,7 @@ class StubClient:
 
     def __init__(self, *, read_only: bool = False) -> None:
         self.modes.append(read_only)
+
         if self.error is not None:
             raise self.error
 
@@ -102,8 +102,10 @@ class StubClient:
 
     def builds(self, branch: Branch, *, limit: int = 4) -> list[Build]:
         self.calls.append(f"builds {branch.name} {limit}")
+
         if self.refused is not None:
             raise self.refused
+
         return list(self.found[:limit])
 
     def latest_build(self, branch: Branch) -> Build | None:
@@ -119,6 +121,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
 
     monkeypatch.setattr(odouche, "Client", Client)
     monkeypatch.setattr(_time, "_now", lambda: NOW)
+
     return Client
 
 
@@ -183,7 +186,6 @@ def test_a_limit_under_one_is_a_usage_error(client: type[StubClient]):
 
 def test_the_list_as_json_is_the_whole_model_with_iso_times():
     result = run("--format", "json", "builds", "list", "--project", "acme", "--branch", "feature-x")
-
     listed = json.loads(result.stdout)
     assert [found["id"] for found in listed] == [104, 103, 102, 101]
     assert listed[1] == {
@@ -210,7 +212,6 @@ def test_the_list_as_json_is_the_whole_model_with_iso_times():
 
 def test_no_builds_is_a_line_on_stderr(client: type[StubClient]):
     client.found = ()
-
     result = run("builds", "list", "--project", "acme", "--branch", "feature-x")
 
     assert result.exit_code == 0
@@ -255,7 +256,6 @@ def test_an_unknown_status_and_result_show_what_odoo_sh_calls_them(client: type[
 
 def test_a_build_started_ahead_of_the_clock_is_not_said_to_be_past(client: type[StubClient]):
     client.found = (replace(RUNNING, started_at=NOW + timedelta(days=3)),)
-
     result = run("builds", "list", "--project", "acme", "--branch", "feature-x")
 
     assert rows(result)[1][-1] == "in 3 days"
@@ -263,7 +263,6 @@ def test_a_build_started_ahead_of_the_clock_is_not_said_to_be_past(client: type[
 
 def test_a_build_waiting_for_a_worker_has_no_age(client: type[StubClient]):
     client.found = (replace(RUNNING, started_at=None),)
-
     result = run("builds", "list", "--project", "acme", "--branch", "feature-x")
 
     assert rows(result)[1] == ["104", "progress", "aaaaaaa", "Add the report"]
@@ -305,7 +304,6 @@ def test_show_with_an_identifier_shows_that_build(client: type[StubClient]):
 
 def test_show_a_failed_latest_build_exits_0(client: type[StubClient]):
     client.found = (FAILED, WARNED)
-
     table = run("builds", "show", "--project", "acme", "--branch", "feature-x")
     as_json = run("--format", "json", "builds", "show", "--project", "acme", "--branch", "feature-x")
 
@@ -317,7 +315,6 @@ def test_show_a_failed_latest_build_exits_0(client: type[StubClient]):
 
 def test_show_as_json_is_the_whole_model():
     result = run("--format", "json", "builds", "show", "101", "--project", "acme", "--branch", "feature-x")
-
     shown = json.loads(result.stdout)
     assert shown["id"] == 101
     assert shown["url"] == "https://acme-feature-x-101.dev.odoo.com"
@@ -335,7 +332,6 @@ def test_show_a_build_that_is_not_among_the_latest_exits_4():
 
 def test_show_keeps_the_message_of_a_branch_out_of_reach(client: type[StubClient]):
     client.refused = odouche.NotFoundError("The session's user can reach no branch numbered 4.")
-
     result = run("builds", "show", "7", "--project", "acme", "--branch", "feature-x")
 
     assert result.exit_code == 4
@@ -345,7 +341,6 @@ def test_show_keeps_the_message_of_a_branch_out_of_reach(client: type[StubClient
 
 def test_show_on_a_branch_without_a_build_exits_4_and_says_so(client: type[StubClient]):
     client.found = ()
-
     result = run("builds", "show", "--project", "acme", "--branch", "feature-x")
 
     assert result.exit_code == 4
@@ -364,7 +359,6 @@ def test_an_identifier_that_is_not_a_number_is_a_usage_error(client: type[StubCl
 def test_an_escape_sequence_in_a_commit_is_not_emitted_by_the_table(client: type[StubClient], command: tuple[str, ...]):
     commit = replace(FAILED.commit, message=f"Fix{ESCAPE} the tax\x9b31m", author=f"Ann{ESCAPE}")
     client.found = (replace(FAILED, commit=commit),)
-
     result = run("builds", *command, "--project", "acme", "--branch", "feature-x")
 
     assert result.exit_code == 0
@@ -375,7 +369,6 @@ def test_an_escape_sequence_in_a_commit_is_not_emitted_by_the_table(client: type
 def test_an_escape_sequence_in_a_commit_is_escaped_as_json(client: type[StubClient]):
     commit = replace(FAILED.commit, message=f"Fix{ESCAPE}\x9b31m")
     client.found = (replace(FAILED, commit=commit),)
-
     result = run("--format", "json", "builds", "show", "--project", "acme", "--branch", "feature-x")
 
     assert "\x1b" not in result.stdout
@@ -401,7 +394,6 @@ def test_off_a_terminal_the_result_is_its_label_alone(command: tuple[str, ...]):
 
 def test_logged_out_exits_3_and_names_the_login(client: type[StubClient]):
     client.error = odouche.NoSessionError("Not logged in.")
-
     result = run("builds", "show", "--project", "acme", "--branch", "feature-x")
 
     assert result.exit_code == 3
@@ -415,7 +407,6 @@ def test_no_branch_while_logged_out_is_still_a_usage_error(
     client: type[StubClient], command: str, branch: tuple[str, ...]
 ):
     client.error = odouche.NoSessionError("Not logged in.")
-
     result = run("builds", command, "--project", "acme", *branch)
 
     assert result.exit_code == 2
@@ -433,7 +424,6 @@ def test_a_line_separator_in_a_printed_field_does_not_add_a_row(
     client: type[StubClient], command: str, changes: dict[str, object]
 ):
     client.found = (replace(FAILED, **changes),)  # pyright: ignore[reportArgumentType]
-
     clean = run("builds", command, "--project", "acme", "--branch", "feature-x")
     client.found = (FAILED,)
     plain = run("builds", command, "--project", "acme", "--branch", "feature-x")
@@ -445,7 +435,6 @@ def test_a_line_separator_in_a_printed_field_does_not_add_a_row(
 @pytest.mark.parametrize("command", [("builds", "--help"), ("builds", "list", "--help"), ("builds", "show", "--help")])
 def test_help_opens_neither_the_keyring_nor_the_network(client: type[StubClient], command: tuple[str, ...]):
     client.error = odouche.KeyringUnavailableError()
-
     result = run(*command)
 
     assert result.exit_code == 0

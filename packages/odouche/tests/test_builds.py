@@ -98,6 +98,7 @@ def test_a_build_is_immutable(client):
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         build.status = BuildStatus.DONE
+
     with pytest.raises(dataclasses.FrozenInstanceError):
         build.commit.author = "other"
 
@@ -111,7 +112,6 @@ def test_a_build_is_immutable(client):
 )
 def test_a_build_seen_in_each_status_knows_whether_it_is_finished(client, upstream, fixture, status, result, finished):
     upstream.bodies[PATH] = upstream.load(fixture)
-
     build = client.latest_build(BRANCH)
 
     assert (build.status, build.result, build.finished) == (status, result, finished)
@@ -130,7 +130,6 @@ def test_a_build_seen_in_each_status_knows_whether_it_is_finished(client, upstre
 )
 def test_finished_follows_the_status(client, upstream, name, status, finished):
     listed(upstream)[0]["status"] = name
-
     build = client.builds(BRANCH)[0]
 
     assert (build.status, build.status_name, build.finished) == (status, name, finished)
@@ -232,6 +231,7 @@ def test_a_branch_odoo_sh_refuses_without_a_reason_is_not_found(client, upstream
 @pytest.mark.parametrize("change", ["missing", "true", "number"])
 def test_names_the_field_that_changed_shape(client, upstream, field, change):
     build = listed(upstream)[1]
+
     if change == "missing":
         del build[field]
     else:
@@ -296,5 +296,6 @@ def test_a_changed_shape_error_shows_nothing_of_the_answer(client, upstream, ses
 
     assert raised.value.__context__ is None
     text = "".join(traceback.format_exception(raised.value))
+
     for value in ("Jane Doe", "invoicing", "yesterday", session):
         assert value not in text

@@ -34,6 +34,7 @@ class StubClient:
     def __init__(self, *, read_only: bool = False) -> None:
         self.modes.append(read_only)
         self._held = odouche.Secret(SENTINEL)
+
         if self.error is not None:
             raise self.error
 
@@ -49,8 +50,10 @@ class StubClient:
 
     def identity(self) -> odouche.Identity:
         type(self).asked += 1
+
         if self.rejected is not None:
             raise self.rejected
+
         return odouche.Identity(
             user_id=7, name="Ada Lovelace", username="ada", email="ada@example.com", session=self.info
         )
@@ -64,6 +67,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     monkeypatch.delenv(odouche.SESSION_ENV, raising=False)
     monkeypatch.setattr(odouche, "Client", Client)
     monkeypatch.setattr(_time, "_now", lambda: NOW)
+
     return Client
 
 
@@ -78,12 +82,15 @@ def log_in(monkeypatch: pytest.MonkeyPatch, *steps: odouche.LoginStep, error: od
     def login(*, ask: Callable[[], odouche.Secret], notify: Callable[[odouche.LoginStep], None]) -> None:
         for step in steps:
             notify(step)
+
             if step is odouche.LoginStep.PASTE:
                 pasted.append(ask())
+
         if error is not None:
             raise error
 
     monkeypatch.setattr(odouche, "login", login)
+
     return pasted
 
 
@@ -107,7 +114,6 @@ def test_login_says_the_session_is_stored_before_asking_who_it_belongs_to(
 ):
     log_in(monkeypatch)
     client.rejected = odouche.UpstreamUnavailableError("Odoo.sh cannot be reached.")
-
     result = run("auth", "login")
 
     assert result.exit_code == 7
@@ -124,7 +130,6 @@ def test_login_as_json_is_the_identity(monkeypatch: pytest.MonkeyPatch):
 
 def test_login_asks_for_a_pasted_session_without_echo(monkeypatch: pytest.MonkeyPatch):
     pasted = log_in(monkeypatch, odouche.LoginStep.PASTE)
-
     result = run("auth", "login", stdin=f"{SENTINEL}\n")
 
     assert result.exit_code == 0
@@ -167,7 +172,6 @@ def test_status_shows_the_source_the_age_and_the_time_left(client: type[StubClie
 
 def test_status_of_an_environment_session_has_no_age(client: type[StubClient]):
     client.info = GIVEN
-
     result = run("auth", "status")
 
     assert result.stdout.splitlines() == ["Source   environment", "Stored   unknown", "Expires  unknown"]
@@ -186,7 +190,6 @@ def test_status_as_json_is_the_session_info():
 @pytest.mark.parametrize("error", [odouche.NoSessionError("Not logged in."), odouche.SessionExpiredError("Too old.")])
 def test_status_without_a_usable_session_exits_3(client: type[StubClient], error: odouche.OdoucheError):
     client.error = error
-
     result = run("auth", "status")
 
     assert result.exit_code == 3
@@ -204,7 +207,6 @@ def test_status_check_asks_odoo_sh_who_the_session_belongs_to(client: type[StubC
 
 def test_status_check_as_json_is_the_identity():
     result = run("--format", "json", "auth", "status", "--check")
-
     found = json.loads(result.stdout)
     assert found["username"] == "ada"
     assert found["session"]["source"] == "keyring"
@@ -212,7 +214,6 @@ def test_status_check_as_json_is_the_identity():
 
 def test_status_check_of_a_rejected_session_exits_3(client: type[StubClient]):
     client.rejected = odouche.SessionExpiredError("Odoo.sh no longer accepts the session.")
-
     result = run("auth", "status", "--check")
 
     assert result.exit_code == 3
@@ -253,6 +254,7 @@ def test_logout_says_what_it_did(monkeypatch: pytest.MonkeyPatch, outcome: odouc
     result = run("auth", "logout")
 
     assert result.exit_code == 0
+
     for text in said:
         assert text in result.stdout
 
@@ -279,6 +281,7 @@ def test_the_session_is_in_neither_stream(
     log_in(monkeypatch, odouche.LoginStep.PASTE)
     given = source is odouche.SessionSource.ENVIRONMENT
     log_out(monkeypatch, LOGOUTS[4][0] if given else LOGOUTS[1][0])
+
     if given:
         monkeypatch.setenv(odouche.SESSION_ENV, SENTINEL)
 
@@ -291,7 +294,6 @@ def test_the_session_is_in_neither_stream(
 
 def test_no_option_takes_a_session():
     group: Any = typer.main.get_command(auth.app)
-
     names = [name for command in group.commands.values() for param in command.params for name in param.opts]
 
     assert set(group.commands) == {"login", "status", "logout"}
@@ -301,7 +303,6 @@ def test_no_option_takes_a_session():
 
 def test_help_opens_neither_the_keyring_nor_the_network(client: type[StubClient]):
     client.error = odouche.KeyringUnavailableError()
-
     result = run("auth", "--help")
 
     assert result.exit_code == 0

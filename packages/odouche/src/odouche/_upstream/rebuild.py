@@ -16,21 +16,25 @@ def rebuild(transport: Transport, branch_id: int, stage: Stage | None = None) ->
     """Start a new build of a branch and return it. `stage` is the one the caller holds, if any."""
     if stage is not None:
         allow(stage)
+
     before = builds.entry(transport, branch_id, 1)
     # The caller's branch may have changed stage since it was read.
     allow(branches.stage(before.child("branch_info").text("stage")))
     latest = max((build.integer("id") for build in before.items("builds")), default=0)
     transport.change(_OPERATION, f"/app/branch/{branch_id}/rebuild")
+
     try:
         after = builds.builds(transport, branch_id)
     except OdoucheError:
         after = []
+
     if not after or after[0].id <= latest:
         # Raised out of the handler, and as unknown: an error that reads as a failure invites a second rebuild.
         raise OutcomeUnknownError(
             f"The rebuild of branch {branch_id} was sent, and its build was not found. Look before trying again.",
             operation=_OPERATION,
         )
+
     return after[0]
 
 

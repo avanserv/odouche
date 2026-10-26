@@ -90,7 +90,6 @@ def test_only_a_staging_or_a_production_branch_has_a_monitor_whatever_its_build(
 )
 def test_the_branch_is_quoted_in_the_monitor(client, branch, done, name, segment):
     renamed = dataclasses.replace(staged(branch, Stage.STAGING), name=name)
-
     url = client.panel_url(PROJECT, renamed, done, Panel.MONITOR)
 
     assert url == f"https://www.odoo.sh/project/acme-shop/branches/{segment}/monitor"

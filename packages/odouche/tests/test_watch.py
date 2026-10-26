@@ -60,17 +60,23 @@ class Stream:
                 frame = self.bus.frames.get(timeout=0.01)
             except queue.Empty:
                 continue
+
             if frame is DROP:
                 break
+
             message = BytesMessage(frame) if isinstance(frame, bytes) else TextMessage(frame)
+
             return self.outgoing.send(message)
+
         return b""
 
     def write(self, data, *_):
         if self.bus.refused_writes:
             self.bus.refused_writes -= 1
             raise httpcore2.WriteError("refused")
+
         self.incoming.receive_data(data)
+
         for event in self.incoming.events():
             if isinstance(event, TextMessage):
                 self.bus.sent.append(json.loads(event.data))
@@ -101,11 +107,15 @@ class Bus:
     def __call__(self, request):
         self.requests.append(request)
         failure = self.failures.pop(0) if self.failures else None
+
         if isinstance(failure, type):
             raise failure(f"failed, Cookie: {request.headers['Cookie']}", request=request)
+
         if failure is not None:
             return httpx2.Response(failure)
+
         self.streams.append(self.wire or Stream(self))
+
         return httpx2.Response(101, extensions={"network_stream": self.streams[-1]})
 
     def push(self, *notifications):
@@ -142,9 +152,11 @@ def time(monkeypatch):
         started = real.monotonic()
         frame = receive(socket, min(timeout, 5))
         assert frame is not None or real.monotonic() - started < 5
+
         return frame
 
     monkeypatch.setattr(Socket, "receive", bounded)
+
     return time
 
 
@@ -163,6 +175,7 @@ def build(client):
 def asked(upstream, build):
     """The paths asked after the build was read."""
     upstream.requests.clear()
+
     return lambda: [request.url.path for request in upstream.requests]
 
 
@@ -183,6 +196,7 @@ def answer(upstream, **values):
 def reading(thread):
     """Tell whether a thread is in a read of the socket, which nothing but the peer would end."""
     frame = sys._current_frames().get(thread.ident)
+
     return any(caller.name in {"read", "recv"} for caller in traceback.extract_stack(frame)) if frame else False
 
 
@@ -219,7 +233,6 @@ def test_a_build_that_has_finished_is_yielded_once_and_opens_no_socket(client, u
 
 def test_opens_the_socket_as_the_page_does_and_subscribes_to_the_project(client, build, bus, time, session):
     bus.push(whole(7))
-
     list(client.watch_build(PROJECT, build, timeout=600))
 
     (request,) = bus.requests
@@ -235,7 +248,6 @@ def test_takes_a_project_without_asking_for_it(client, build, bus, time, asked):
     project = client.projects()[0]
     bus.push(whole(7))
     asked()
-
     list(client.watch_build(project, build, timeout=600))
 
     assert asked()[-3:] == [BUILDS, SOCKET, BUILDS]
@@ -560,8 +572,10 @@ def test_closing_early_closes_the_socket_and_leaves_no_thread(client, build, bus
     assert bus.streams[0].closed.is_set()
     assert asked() == requests
     left = set(threading.enumerate()) - before
+
     for thread in left:
         thread.join(1)
+
     assert not [thread.name for thread in left if thread.is_alive() and reading(thread)]
     assert client.build(BRANCH, BUILD) == build
 
@@ -574,12 +588,13 @@ def test_closing_leaves_no_thread_when_odoo_sh_stays_silent(client, upstream, bu
     next(watching)
     answer(upstream, status_info="Testing: invoicing")
     next(watching)
-
     watching.close()
 
     left = set(threading.enumerate()) - before
+
     for thread in left:
         thread.join(1)
+
     # A worker of the socket's pool can be left with nothing to do: it ends with the pool.
     stuck = [thread.name for thread in left if thread.is_alive() and reading(thread)]
     theirs.close()
@@ -591,11 +606,15 @@ def test_closing_does_not_wait_on_frames_nobody_read(client, upstream, build, bu
     next(watching)
     answer(upstream, status_info="Testing: invoicing")
     next(watching)
+
     for number in range(600):
         bus.push(event(number, build_id=88241, status="progress", result=False))
+
     patience = real.monotonic() + 5
+
     while not bus.frames.empty() and real.monotonic() < patience:
         real.sleep(0.01)
+
     assert bus.frames.empty()
 
     watching.close()
@@ -655,6 +674,7 @@ def test_an_error_and_the_library_log_hold_neither_the_session_nor_a_frame(
     shown = [str(raised.value), repr(raised.value), "".join(traceback.format_exception(raised.value))]
     shown += [f"{record.getMessage()} {record.args}" for record in caplog.records]
     assert f"GET {SOCKET}: " in "".join(shown)
+
     for text in shown:
         assert session not in text
         assert "not json" not in text

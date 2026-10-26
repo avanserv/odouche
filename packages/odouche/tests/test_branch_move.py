@@ -119,6 +119,7 @@ def test_a_branch_in_an_unknown_stage_is_refused_before_any_request(client, upst
 
     with pytest.raises(StageRefusedError, match="unknown stage is not moved"):
         client.move_branch(unknown, Stage.STAGING)
+
     with pytest.raises(StageRefusedError, match="to the unknown stage"):
         client.move_branch(DEVELOPMENT, Stage.UNKNOWN)
 
@@ -219,6 +220,7 @@ def test_a_move_whose_branch_cannot_be_read_back_is_unknown(client, upstream, bu
             upstream.failures[BUILDS] = builds
         else:
             upstream.bodies[BUILDS] = upstream.load(builds) if isinstance(builds, str) else builds
+
         return httpx2.Response(200, json=upstream.load("set_stage.json"))
 
     upstream.bodies[SET_STAGE] = answer
@@ -263,9 +265,11 @@ def test_a_check_refuses_what_a_move_refuses_and_asks_nothing(upstream, session,
 
     client.check_move(DEVELOPMENT, Stage.STAGING)
     client.check_move(STAGING, "development")  # pyright: ignore[reportArgumentType]
+
     for branch, to in [(PRODUCTION, Stage.STAGING), (DEVELOPMENT, Stage.PRODUCTION), (STAGING, Stage.STAGING)]:
         with pytest.raises(StageRefusedError) as checked:
             client.check_move(branch, to)
+
         assert checked.value.operation == "branch stage move"
 
     assert upstream.requests == []

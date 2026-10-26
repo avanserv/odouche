@@ -81,16 +81,20 @@ class StubClient:
     ) -> odouche.SettingsOutcome[ProjectSettings]:
         self.calls.append(f"change {project}")
         self.sent.append(change)
+
         if self.failure is not None:
             raise self.failure
+
         given = {name: value for name, value in change.given().items() if name not in {"allow_ips", "disallow_ips"}}
         removed = change.disallow_ips or ()
         listed = (*(entry for entry in self.found.ip_allow_list if entry not in removed), *(change.allow_ips or ()))
         after = replace(self.found, **given, ip_allow_list=listed)  # pyright: ignore[reportArgumentType]
         moved: tuple[str, ...] = ()
+
         # As the page says Odoo.sh does: installing every module turns the test suite off.
         if after.module_install is ModuleInstall.ALL and after.tests is not BuildTests.OFF:
             after, moved = replace(after, tests=BuildTests.OFF), ("tests",)
+
         return odouche.SettingsOutcome(self.found, after, moved)
 
 
@@ -109,6 +113,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     monkeypatch.setattr(odouche, "Client", Client)
     monkeypatch.setattr(_terminal, "stdin_is_terminal", lambda: True)
     monkeypatch.setattr(_terminal, "stderr_is_terminal", lambda: True)
+
     return Client
 
 
@@ -208,7 +213,6 @@ def test_a_removed_entry_is_said_to_need_the_one_hour_rule(client: type[StubClie
 def test_a_network_is_removed_as_show_lists_it(client: type[StubClient]):
     network = ipaddress.ip_network("203.0.113.0/24")
     client.found = replace(OWN, ip_allow_list=(OFFICE, network))
-
     result = run(*SET, "--yes", "--remove-ip", "203.0.113.0/24")
 
     assert result.exit_code == 0
@@ -309,7 +313,6 @@ def test_a_timeout_on_a_project_with_no_dedicated_server_is_a_usage_error_before
 
 def test_a_timeout_on_a_dedicated_server_is_sent_in_seconds(client: type[StubClient]):
     client.found = replace(OWN, dedicated=True)
-
     result = run(*SET, "--yes", "http_timeout_seconds=1800")
 
     assert result.exit_code == 0
@@ -331,7 +334,6 @@ def test_a_setting_odoo_sh_moves_along_is_said_and_the_change_succeeds(client: t
 def test_a_conflict_odoo_sh_was_not_asked_about_is_a_usage_error(client: type[StubClient]):
     client.failure = odouche.SettingsConflictError("`http_timeout_seconds` is a multiple of 60 seconds.")
     client.found = replace(OWN, dedicated=True)
-
     result = run(*SET, "--yes", "http_timeout_seconds=1830")
 
     assert result.exit_code == 2
@@ -340,7 +342,6 @@ def test_a_conflict_odoo_sh_was_not_asked_about_is_a_usage_error(client: type[St
 
 def test_a_user_who_is_not_an_admin_exits_5(client: type[StubClient]):
     client.failure = odouche.PermissionDeniedError("Odoo.sh lets only a project's admins change its settings.")
-
     result = run(*SET, "--yes", "public=yes")
 
     assert result.exit_code == 5
@@ -349,7 +350,6 @@ def test_a_user_who_is_not_an_admin_exits_5(client: type[StubClient]):
 
 def test_an_unknown_outcome_exits_10_and_says_where_to_look(client: type[StubClient]):
     client.failure = LOST
-
     result = run(*SET, "--yes", "public=yes")
 
     assert result.exit_code == 10
@@ -365,7 +365,6 @@ def test_an_unknown_outcome_exits_10_and_says_where_to_look(client: type[StubCli
 
 def test_json_is_the_settings_after(client: type[StubClient]):
     result = run("--format", "json", *SET, "--yes", "--add-ip", str(VPN))
-
     shown = json.loads(result.stdout)
     assert list(shown) == [field.name for field in fields(ProjectSettings)]
     assert shown["ip_allow_list"] == [str(OFFICE), str(HOME), str(VPN)]

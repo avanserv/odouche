@@ -55,6 +55,7 @@ def run(error: BaseException, *args: str) -> Result:
     def fail() -> None:  # pyright: ignore[reportUnusedFunction]
         session = odouche.Secret(SENTINEL)
         assert session.expose_secret() == SENTINEL
+
         raise error
 
     return runner.invoke(stub, [*args, "fail"])
@@ -108,7 +109,6 @@ def test_the_session_is_in_neither_stream(args: tuple[str, ...]):
 
 def test_an_unexpected_error_asks_for_a_report_and_hides_its_text():
     result = run(ValueError("the detail"))
-
     stderr = click.unstyle(result.stderr)
     assert result.exit_code == 1
     assert result.stdout == ""
@@ -142,7 +142,6 @@ def test_the_session_of_the_environment_is_masked_in_the_traceback(monkeypatch: 
 
 def test_the_traceback_has_no_control_character_and_keeps_its_lines():
     result = run(odouche.NotFoundError("Project \x07acme\x9b31m has no branch a\rb."), "--debug")
-
     lines = result.stderr.split("\n")
     assert result.exit_code == 4
     assert lines[0] == "Traceback (most recent call last):"
@@ -185,12 +184,11 @@ def test_a_closed_pipe_ends_in_silence_as_sigpipe_would():
 def test_after_a_closed_pipe_what_stdout_still_holds_is_flushed_without_an_error(monkeypatch: pytest.MonkeyPatch):
     reader, writer = os.pipe()
     os.close(reader)
+
     with os.fdopen(writer, "w") as stdout:
         monkeypatch.setattr(sys, "stdout", stdout)
         stdout.write("held")
-
         _errors._discard_stdout()
-
         stdout.flush()
 
 

@@ -30,10 +30,8 @@ OK = "pass"
 CHANGED = "changed"
 ERROR = "error"
 SKIPPED = "skipped"
-
 _FAILED = 1
 _REFUSED = 2
-
 _TAIL = 20
 
 
@@ -71,6 +69,7 @@ def run(client: Client, project: str) -> list[Step]:
         if build
         else _skip(steps, "logs", "a build")
     )
+
     if build and logs:
         _attempt(
             steps,
@@ -80,6 +79,7 @@ def run(client: Client, project: str) -> list[Step]:
         )
     else:
         _skip(steps, "log tail", "a log")
+
     return steps
 
 
@@ -89,6 +89,7 @@ def render(steps: Sequence[Step]) -> str:
     lines = [f"{step.name:<{width}}  {step.outcome:<{len(SKIPPED)}}  {step.detail}".rstrip() for step in steps]
     tally = Counter(step.outcome for step in steps)
     lines.append(f"{tally[OK]} passed, {tally[CHANGED] + tally[ERROR]} failed, {tally[SKIPPED]} skipped")
+
     return "\n".join(lines) + "\n"
 
 
@@ -97,17 +98,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     if "CI" in os.environ:
         sys.stderr.write("Refused: the live check never runs in CI.\n")
         return _REFUSED
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("project", help="the name of the project to check, as in the address of its page")
     arguments = parser.parse_args(argv)
+
     try:
         client = Client(read_only=True)
     except OdoucheError as error:
         sys.stderr.write(f"No session to check with: {type(error).__name__}.\n")
         return _FAILED
+
     with client:
         steps = run(client, arguments.project)
+
     sys.stdout.write(render(steps))
+
     return _FAILED if any(step.outcome in {CHANGED, ERROR} for step in steps) else 0
 
 
@@ -119,7 +125,9 @@ def _attempt[T](
     except OdoucheError as error:
         steps.append(_failure(name, error))
         return None
+
     steps.append(Step(name, OK, describe(value)))
+
     return value
 
 
@@ -131,7 +139,9 @@ def _skip(steps: list[Step], name: str, needs: str) -> None:
 def _failure(name: str, error: OdoucheError) -> Step:
     if isinstance(error, UpstreamChangedError):
         return Step(name, CHANGED, f"{error.operation} at {error.field}")
+
     status = f" {error.status}" if error.status else ""
+
     return Step(name, ERROR, f"{type(error).__name__}{status}")
 
 

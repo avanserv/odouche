@@ -69,29 +69,39 @@ def login(
 def _captured(browser: str, notify: Callable[[LoginStep], None], timeout: float) -> Secret:
     deadline = _monotonic() + timeout
     seen: Secret | None = None
+
     with _capture(browser) as capture:
         _logger.debug("login: browser launched")
         notify(LoginStep.BROWSER)
+
         while _monotonic() < deadline:
             candidate = capture.cookie()
+
             # Odoo.sh sets an anonymous session before the sign-in, and replaces it at the end.
             if candidate is not None and candidate != seen:
                 seen = candidate
+
                 if _accepted(candidate):
                     return candidate
+
             _sleep(_POLL)
+
     raise LoginTimeoutError(f"The login was not completed within {timeout:.0f} seconds.")
 
 
 def _pasted(ask: Callable[[], Secret] | None, notify: Callable[[LoginStep], None]) -> Secret:
     if ask is None:
         raise LoginError("No browser can be launched here, and there is no prompt to paste the session into.")
+
     notify(LoginStep.PASTE)
     session = ask()
+
     if not is_sendable(session):
         raise LoginError("The pasted value is not a session_id cookie value.")
+
     if not _accepted(session):
         raise LoginError("Odoo.sh did not accept the pasted session.")
+
     return session
 
 
@@ -99,6 +109,7 @@ def _accepted(session: Secret) -> bool:
     """Send the one request that tells whether Odoo.sh answers this session."""
     if not is_sendable(session):
         return False
+
     with _transport(session) as transport:
         try:
             transport.call("login", _PROJECTS, retry=True)
@@ -106,5 +117,7 @@ def _accepted(session: Secret) -> bool:
             accepted = False
         else:
             accepted = True
+
     _logger.debug("login: session %s", "accepted" if accepted else "not accepted")
+
     return accepted

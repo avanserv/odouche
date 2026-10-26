@@ -82,13 +82,17 @@ class StubClient:
     def change_branch_settings(self, branch: Branch, change: SettingsChange) -> odouche.SettingsOutcome:
         self.calls.append(f"change {branch.name}")
         self.sent.append(change)
+
         if self.lost is not None:
             raise self.lost
+
         after = replace(self.found, **change.given())  # pyright: ignore[reportArgumentType]
         moved: tuple[str, ...] = ()
+
         # As the page says Odoo.sh does: installing every module turns the test suite off.
         if after.module_install is ModuleInstall.ALL and after.tests is not BuildTests.OFF:
             after, moved = replace(after, tests=BuildTests.OFF), ("tests",)
+
         return odouche.SettingsOutcome(self.found, after, moved)
 
 
@@ -107,6 +111,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     monkeypatch.setattr(odouche, "Client", Client)
     monkeypatch.setattr(_terminal, "stdin_is_terminal", lambda: True)
     monkeypatch.setattr(_terminal, "stderr_is_terminal", lambda: True)
+
     return Client
 
 
@@ -251,7 +256,6 @@ def test_a_value_that_cannot_be_sent_is_a_usage_error_before_any_client(
 @pytest.mark.parametrize("text", ["yes", "YES", "true", "no", "False"])
 def test_a_yes_or_no_takes_its_usual_words(client: type[StubClient], text: str):
     client.found = replace(OWN, demo_data=text.lower() not in {"yes", "true"})
-
     result = run(*SET, "--yes", f"demo_data={text}")
 
     assert result.exit_code == 0
@@ -260,7 +264,6 @@ def test_a_yes_or_no_takes_its_usual_words(client: type[StubClient], text: str):
 
 def test_the_project_defaults_left_on_are_a_usage_error_before_the_change(client: type[StubClient]):
     client.found = replace(OWN, project_defaults=True)
-
     result = run(*SET, "--yes", "ai_agent=opencode")
 
     assert result.exit_code == 2
@@ -270,7 +273,6 @@ def test_the_project_defaults_left_on_are_a_usage_error_before_the_change(client
 
 def test_another_value_error_once_sent_is_no_usage_error(client: type[StubClient]):
     client.lost = ValueError("Raised after the change was sent.")
-
     result = run(*SET, "--yes", "ai_agent=opencode")
 
     assert result.exit_code == 1
@@ -291,7 +293,6 @@ def test_a_production_branch_exits_9_before_the_question(client: type[StubClient
 
 def test_an_unknown_outcome_exits_10_and_says_where_to_look(client: type[StubClient]):
     client.lost = LOST
-
     result = run(*SET, "--yes", "ai_agent=opencode")
 
     assert result.exit_code == 10
@@ -328,7 +329,6 @@ def test_an_escape_sequence_in_the_branch_name_is_not_emitted(client: type[StubC
 
 def test_json_is_the_settings_after(client: type[StubClient]):
     result = run("--format", "json", *SET, "--yes", "ai_agent=opencode")
-
     shown = json.loads(result.stdout)
     assert list(shown) == [field.name for field in fields(BranchSettings)]
     assert shown["ai_agent"] == "opencode"

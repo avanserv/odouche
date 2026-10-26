@@ -57,8 +57,10 @@ class StubClient:
 
     def members(self, project: str) -> list[ProjectMember]:
         self.calls.append(f"members {project}")
+
         if self.error is not None:
             raise self.error
+
         return list(self.found)
 
 
@@ -69,6 +71,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
         calls: list[str] = []
 
     monkeypatch.setattr(odouche, "Client", Client)
+
     return Client
 
 
@@ -98,7 +101,6 @@ def test_lists_the_members_highest_role_first_then_by_login(client: type[StubCli
 
 def test_as_json_is_the_list_of_members_in_the_same_order():
     result = run("--format", "json")
-
     read = json.loads(result.stdout)
     assert result.exit_code == 0
     assert [entry["login"] for entry in read] == ["octo-dev", "jane-doe", "Ada-Dev", "build-bot1"]
@@ -117,7 +119,6 @@ def test_no_member_is_a_line_on_stderr_or_an_empty_list(
     client: type[StubClient], args: tuple[str, ...], stdout: str, stderr: str
 ):
     client.found = ()
-
     result = run("--format", "json") if args else run()
 
     assert result.exit_code == 0
@@ -136,13 +137,13 @@ def test_a_login_and_a_name_are_printed_on_one_line_without_their_control_charac
     result = run()
 
     assert rows(result)[1] == ["jane-doe", "Jane Doe", "tester", "yes"]
+
     for control in ("\x1b", "\u202e", "]8;;", "[2J"):
         assert control not in result.stdout
 
 
 def test_a_user_who_is_not_an_admin_exits_5_with_the_message(client: type[StubClient]):
     client.error = odouche.PermissionDeniedError("Odoo.sh shows a project's members to its admins only.")
-
     result = run()
 
     assert result.exit_code == 5
@@ -152,7 +153,6 @@ def test_a_user_who_is_not_an_admin_exits_5_with_the_message(client: type[StubCl
 
 def test_help_says_who_may_list_them_and_names_the_example():
     result = runner.invoke(app, ["projects", "members", "list", "--help"])
-
     shown = " ".join(click.unstyle(result.output).split())
     assert result.exit_code == 0
     assert "admin of the project only" in shown

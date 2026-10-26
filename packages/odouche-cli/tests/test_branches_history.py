@@ -107,6 +107,7 @@ class StubClient:
     def history(self, branch: Branch, *, limit: int = 20, timeout: float) -> list[Tracking]:
         assert timeout > 0
         self.calls.append(f"history {branch.name} {limit}")
+
         return list(self.found[:limit])
 
 
@@ -118,6 +119,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
 
     monkeypatch.setattr(odouche, "Client", Client)
     monkeypatch.setattr(_time, "_now", lambda: NOW)
+
     return Client
 
 
@@ -191,7 +193,6 @@ def test_commits_prints_each_in_full_under_its_event():
 def test_a_commit_message_is_printed_without_its_control_characters(client: type[StubClient]):
     escaped = PushedCommit(hash=FIRST, message="Fix\x1b[2J it", url="https://github.com/\x1b[2J")
     client.found = (tracking(1, TrackingKind.PUSH, timedelta(hours=1), commits=(escaped,), pusher="octo\x1b[2J"),)
-
     table = run()
     full = run("--commits")
 
@@ -233,7 +234,6 @@ def vars_of(event: Tracking) -> dict[str, object]:
 @pytest.mark.parametrize("flags", [(), ("--commits",)])
 def test_no_history_is_a_line_on_stderr(client: type[StubClient], flags: tuple[str, ...]):
     client.found = ()
-
     result = run(*flags)
 
     assert result.exit_code == 0

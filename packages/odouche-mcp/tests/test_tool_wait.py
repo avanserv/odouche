@@ -92,21 +92,27 @@ class Upstream:
         if project != "acme":
             msg = f"No project {project} among those you can reach."
             raise odouche.NotFoundError(msg)
+
         return [FEATURE, EMPTY]
 
     def builds(self, branch: odouche.Branch, *, limit: int = 4) -> list[odouche.Build]:
         if branch != FEATURE:
             return []
+
         listing = self.listings[0]
+
         if len(self.listings) > 1:
             self.listings.pop(0)
+
         return listing[:limit]
 
     def build(self, branch: odouche.Branch, build_id: int) -> odouche.Build:
         for build in self.builds(branch):
             if build.id == build_id:
                 return build
+
         msg = f"Build {build_id} is not among the latest builds of branch {branch.id}."
+
         raise odouche.NotFoundError(msg)
 
     def latest_build(self, branch: odouche.Branch) -> odouche.Build | None:
@@ -116,10 +122,12 @@ class Upstream:
         self, project: str, build: odouche.Build, *, timeout: float, pulse: float | None = None
     ) -> Iterator[odouche.Build]:
         self.watched.append((project, build.id, timeout, pulse))
+
         try:
             for step in self.scripts[0]():
                 if isinstance(step, odouche.OdoucheError):
                     raise step
+
                 yield step
         finally:
             self.closed.append(True)
@@ -147,6 +155,7 @@ def upstream(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
     monkeypatch.setattr(Upstream, "listings", [[RUNNING, PREVIOUS]])
     monkeypatch.setattr(Upstream, "watched", [])
     monkeypatch.setattr(Upstream, "closed", [])
+
     return monkeypatch
 
 
@@ -155,6 +164,7 @@ def time(monkeypatch: pytest.MonkeyPatch) -> Time:
     time = Time()
     monkeypatch.setattr(_wait, "_monotonic", time.monotonic)
     monkeypatch.setattr(_wait, "_sleep", time.sleep)
+
     return time
 
 
@@ -182,12 +192,14 @@ def _answer(notified: list[tuple[float, str | None]] | None = None, **arguments:
     result = _call(notified, **arguments)
     assert not result.is_error
     assert result.structured_content is not None
+
     return result.structured_content
 
 
 def _error(**arguments: Any) -> str:
     result = _call(**arguments)
     assert result.is_error
+
     return result.model_dump()["content"][0]["text"]
 
 
@@ -196,6 +208,7 @@ def test_the_tool_is_listed_as_read_only():
         async with Client(create_server()) as client:
             tools = {tool.name: tool for tool in (await client.list_tools()).tools}
             annotations = tools["wait_for_build"].annotations
+
             return annotations and annotations.read_only_hint
 
     assert asyncio.run(hint()) is True
@@ -349,6 +362,7 @@ def _abandoned(let_go: threading.Event, **arguments: Any) -> None:
         async with Client(create_server()) as client:
             with anyio.move_on_after(0.2) as scope:
                 await client.call_tool("wait_for_build", {"project": "acme", "branch": "feature-x", **arguments})
+
             assert scope.cancelled_caught
             assert await anyio.to_thread.run_sync(let_go.wait, 5)
 
@@ -364,6 +378,7 @@ def test_a_call_the_client_gives_up_closes_the_watch(upstream: pytest.MonkeyPatc
 
     def pulses() -> Iterator[odouche.Build]:
         end = real.monotonic() + KEPT
+
         try:
             while real.monotonic() < end:
                 real.sleep(0.01)
@@ -373,7 +388,6 @@ def test_a_call_the_client_gives_up_closes_the_watch(upstream: pytest.MonkeyPatc
             raise
 
     upstream.setattr(Upstream, "scripts", [pulses])
-
     _abandoned(closed)
 
 
@@ -384,6 +398,7 @@ def test_a_call_the_client_gives_up_stops_asking_for_the_commit(upstream: pytest
 
     def sleep(_: float) -> None:
         real.sleep(0.01)
+
         if real.monotonic() > end:
             time.now += MAX_WAIT
 
@@ -396,7 +411,6 @@ def test_a_call_the_client_gives_up_stops_asking_for_the_commit(upstream: pytest
 
     upstream.setattr(_wait, "_sleep", sleep)
     upstream.setattr(anyio.from_thread, "check_cancelled", checked)
-
     _abandoned(stopped, commit="c" * 7)
 
     assert Upstream.watched == []

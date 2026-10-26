@@ -32,6 +32,7 @@ _LOGIN = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}")
 def members(transport: Transport, name: str) -> list[ProjectMember]:
     """Return the members of the project named `name`, in the order Odoo.sh answers them."""
     technical = projects.admin(transport, name, _OPERATION, "Odoo.sh shows a project's members to its admins only.")
+
     return _listed(transport, name, technical)
 
 
@@ -44,17 +45,22 @@ def member_addition(transport: Transport, name: str, login: str, role: MemberRol
     allow_addition(login, role, current)
     spelled, github_id = _github_user(transport, login)
     renamed = next((member for member in current if member.github_id == github_id), None)
+
     if renamed is not None:
         msg = f"{spelled} is already a member, as {renamed.login}, with the role {renamed.role.value}."
         raise MemberRefusedError(msg, operation=_OPERATION_ADD)
+
     # `send_invitation` is what the page sends: its dialog has no control for it.
     params = {"github_username": spelled, "access_level": _ROLES_SENT[role], "send_invitation": False}
     transport.change(_OPERATION_ADD, f"/app/project/{projects.segment(technical)}/add_collaborator", params)
+
     try:
         after = _listed(transport, name, technical)
     except OdoucheError:
         after = None
+
     added = next((member for member in after or () if member.github_id == github_id), None)
+
     if added is None or added.role is not role:
         if after is None:
             found = "the members could not be read back"
@@ -62,11 +68,13 @@ def member_addition(transport: Transport, name: str, login: str, role: MemberRol
             found = "they are not listed"
         else:
             found = f"they read back as {added.role.value}"
+
         # As unknown: an error that reads as a failure invites a second addition.
         raise OutcomeUnknownError(
             f"The addition of {spelled} to {name} as {role.value} was sent, and {found}. Look before trying again.",
             operation=_OPERATION_ADD,
         )
+
     return added
 
 
@@ -75,17 +83,21 @@ def allow_addition(login: str, role: MemberRole, current: Sequence[ProjectMember
     if type(login) is not str:
         msg = f"A login is a string, not {type(login).__name__}."
         raise TypeError(msg)
+
     if not _LOGIN.fullmatch(login):
         msg = (
             f"{login!r} is not a GitHub login: 1 to 39 letters, digits and single hyphens, "
             "not starting or ending with a hyphen."
         )
         raise ValueError(msg)
+
     role = MemberRole(role)
     listed = _by_login(current, login)
+
     if listed is not None:
         msg = f"{listed.login} is already a member, with the role {listed.role.value}. `members role` changes it."
         raise MemberRefusedError(msg, operation=_OPERATION_ADD)
+
     return role
 
 
@@ -99,17 +111,21 @@ def role_change(transport: Transport, name: str, member: ProjectMember | str, ro
     caller = info.child("user").text("username")
     current = _listed(transport, name, technical)
     found = find(current, member)
+
     if not allow_role(current, found, role):
         return found
+
     transport.change(
         _OPERATION_ROLE, f"/app/user_access/{found.id}/set_access_level", {"access_level": _ROLES_SENT[role]}
     )
     # An admin who lowers their own role can no longer read the members: their info says their role.
     own = found.login.casefold() == caller.casefold()
+
     try:
         after = _own_role(transport, name, found) if own else find(_listed(transport, name, technical), found)
     except OdoucheError:
         after = None
+
     if after is None or after.role is not role:
         said = "could not be read back" if after is None else f"reads back as {after.role.value}"
         # As unknown: an error that reads as a failure invites a second change.
@@ -118,6 +134,7 @@ def role_change(transport: Transport, name: str, member: ProjectMember | str, ro
             "Look before trying again.",
             operation=_OPERATION_ROLE,
         )
+
     return after
 
 
@@ -130,37 +147,46 @@ def find(current: Sequence[ProjectMember], member: ProjectMember | str) -> Proje
         if type(member) is not str:
             msg = f"A member is a ProjectMember or a login, not {type(member).__name__}."
             raise TypeError(msg)
+
         found, named = _by_login(current, member), member
+
     if found is None:
         raise NotFoundError(f"{named} is not a member of the project.", operation=_OPERATION_ROLE)
+
     return found
 
 
 def allow_role(current: Sequence[ProjectMember], member: ProjectMember, role: MemberRole) -> bool:
     """Tell whether giving `member` the role `role` changes it, and raise for a change that is not sent."""
     role = MemberRole(role)
+
     if member.role is role:
         return False
+
     # An invitee who never logs in leaves nobody to administer the project.
     others = [
         listed
         for listed in current
         if listed.role is MemberRole.ADMIN and not listed.pending_login and listed.id != member.id
     ]
+
     if member.role is MemberRole.ADMIN and not others:
         msg = (
             f"{member.login} is the last admin of the project who has logged in to Odoo.sh. "
             "Give another member the admin role first."
         )
         raise MemberRefusedError(msg, operation=_OPERATION_ROLE)
+
     return True
 
 
 def _listed(transport: Transport, name: str, technical: str) -> list[ProjectMember]:
     answer = projects.settings_answer(transport, technical)
     repo = answer.child("repository")
+
     if repo.text("project_name") != name:
         raise repo.changed("project_name")
+
     return [_member(item) for item in answer.items("users")]
 
 
@@ -173,12 +199,15 @@ def _by_login(current: Sequence[ProjectMember], login: str) -> ProjectMember | N
 def _github_user(transport: Transport, login: str) -> tuple[str, int]:
     """Return the login as GitHub spells it and the user's number, by the page's own way from a typed login."""
     body = transport.call(_OPERATION_FIND, "/app/github/find_users", {"query": login}, retry=True, grant=_GRANT)
+
     for item in Reader(_OPERATION_FIND, body).items("result"):
         spelled, github_id, kind = item.text("login"), item.integer("id"), item.text("type")
+
         # Checked as a login too: a letter outside ASCII can lower to one inside it. An organisation is
         # found too, and is no member.
         if kind == "User" and _LOGIN.fullmatch(spelled) and spelled.lower() == login.lower():
             return spelled, github_id
+
     raise NotFoundError(f"GitHub has no user {login} that Odoo.sh finds.", operation=_OPERATION_ADD)
 
 
@@ -190,11 +219,15 @@ def _member(item: Reader) -> ProjectMember:
     # Only the absence of `user_id` is kept: the pair is Odoo.sh's own user and a name that repeats the login.
     # `avatar_url` and `hosting_user_id` are not read.
     login = item.text("username")
+
     if not login:
         raise item.changed("username")
+
     github_id = item.text("hosting_identifier")
+
     if not _DIGITS.fullmatch(github_id):
         raise item.changed("hosting_identifier")
+
     return ProjectMember(
         id=item.integer("id"),
         login=login,

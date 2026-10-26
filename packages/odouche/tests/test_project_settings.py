@@ -349,6 +349,7 @@ def test_a_submodule_url_is_read_without_its_credentials_query_or_fragment(clien
 @pytest.mark.parametrize("change", ["missing", "null", "list"])
 def test_names_the_field_that_changed_shape(client, upstream, body, key, field, change):
     fields = body(upstream)
+
     if change == "missing":
         del fields[key]
     else:
@@ -460,7 +461,6 @@ def test_the_settings_are_read_without_their_token_codes_and_upsells(upstream, s
     with_secrets(upstream)
 
     answer = projects.settings_answer(upstream.connect(Secret(session)), "acme-corp-odoo-addons-4217")
-
     read = answer.child("repository")
     assert [read.has(key) for key in ("ci_token", "subscription_code", "subscription_code_display")] == [False] * 3
     assert (answer.has("upsells"), answer.has("session_lifetime"), read.has("ip_whitelist")) == (False, True, True)
@@ -481,6 +481,7 @@ def test_the_settings_are_frozen_and_named_as_documented(client):
 
     with pytest.raises(dataclasses.FrozenInstanceError):
         read.public = True  # pyright: ignore[reportAttributeAccessIssue]
+
     assert [field.name for field in dataclasses.fields(read)] == [
         "name",
         "odoo_domain_blocked",

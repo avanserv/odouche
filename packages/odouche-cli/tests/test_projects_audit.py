@@ -77,11 +77,13 @@ class StubClient:
     def audit_log(self, project: str, *, limit: int = 25, timeout: float) -> Generator[AuditEntry]:
         assert timeout > 0
         self.calls.append(f"audit_log {project} {limit}")
+
         return self._entries(limit)
 
     def _entries(self, limit: int) -> Generator[AuditEntry]:
         if self.error is not None:
             raise self.error
+
         for found in self.found[:limit]:
             self.drawn[0] += 1
             yield found
@@ -95,6 +97,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
         drawn: list[int] = [0]
 
     monkeypatch.setattr(odouche, "Client", Client)
+
     return Client
 
 
@@ -130,7 +133,6 @@ def test_lists_the_entries_newest_first_with_their_date_in_utc(client: type[Stub
 
 def test_the_limit_is_passed_and_bounds_what_is_printed(client: type[StubClient]):
     client.found = tuple(entry(timedelta(minutes=minutes)) for minutes in range(200))
-
     result = run("--limit", "10")
 
     assert result.exit_code == 0
@@ -161,9 +163,7 @@ def test_since_prints_only_what_is_newer_and_reads_one_entry_past_it(client: typ
 )
 def test_since_cut_by_the_limit_says_so_on_stderr(client: type[StubClient], args: tuple[str, ...], hint: str):
     client.found = tuple(entry(timedelta(minutes=minutes)) for minutes in range(300))
-
     result = run("--since", "2026-10-01", *args)
-
     shown = 200 if args else 20
     assert result.exit_code == 0
     assert client.calls == [f"audit_log acme {shown + 1}"]
@@ -207,7 +207,6 @@ def test_a_date_it_cannot_read_is_a_usage_error(client: type[StubClient], since:
 
 def test_as_json_is_the_list_of_entries_with_iso_dates():
     result = run_json()
-
     read = json.loads(result.stdout)
     assert read[0] == {
         "logged_at": "2026-10-23T20:21:27+00:00",
@@ -226,7 +225,6 @@ def test_no_entry_is_a_line_on_stderr_or_an_empty_list(
     client: type[StubClient], args: tuple[str, ...], stdout: str, stderr: str
 ):
     client.found = ()
-
     result = run_json() if args else run()
 
     assert result.exit_code == 0
@@ -247,6 +245,7 @@ def test_text_others_wrote_is_printed_without_its_control_characters(client: typ
     result = run()
 
     assert "Open shell using SSH client" in result.stdout
+
     for control in ("\x1b", "\u202e", "]8;;", "[2J"):
         assert control not in result.stdout
 
@@ -260,7 +259,6 @@ def test_text_others_wrote_is_printed_without_its_control_characters(client: typ
 )
 def test_an_error_exits_with_its_code_and_message(client: type[StubClient], error: odouche.OdoucheError, code: int):
     client.error = error
-
     result = run()
 
     assert result.exit_code == code

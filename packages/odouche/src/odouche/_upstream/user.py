@@ -13,6 +13,7 @@ def identity(transport: Transport, session: SessionInfo) -> Identity:
     """Return the user the session belongs to."""
     operation = "identity"
     user = Reader(operation, transport.call(operation, _PROFILE, retry=True)).child("result")
+
     return Identity(
         user_id=user.integer("id"),
         name=user.optional_text("name"),

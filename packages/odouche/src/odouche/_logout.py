@@ -35,14 +35,17 @@ def logout(session: Secret | None = None, *, invalidate_given: bool = False) -> 
     """
     store = SessionStore(session)
     given = store.given()
+
     try:
         resolved = given or store.load()
     except (UnreadableError, SessionExpiredError):
         return LogoutResult(source=SessionSource.KEYRING, deleted=True, invalidated=False, failure=None)
     except NoSessionError:
         return LogoutResult(source=None, deleted=False, invalidated=False, failure=None)
+
     stored = resolved.source is SessionSource.KEYRING
     invalidated, failure = False, None
+
     try:
         if stored or invalidate_given:
             failure = _end(resolved.session)
@@ -51,13 +54,16 @@ def logout(session: Secret | None = None, *, invalidate_given: bool = False) -> 
         # An unreachable Odoo.sh is waited for long enough to be interrupted.
         store.discard()
         raise
+
     if stored:
         try:
             store.delete()
         except KeyringUnavailableError as error:
             ended = "was" if invalidated else "was not"
             raise KeyringUnavailableError(f"{error} The session {ended} ended on Odoo.sh.") from None
+
     _logger.debug("logout: session %s", "deleted" if stored else "left where it is")
+
     return LogoutResult(source=resolved.source, deleted=stored, invalidated=invalidated, failure=failure)
 
 
@@ -70,4 +76,5 @@ def _end(session: Secret) -> OdoucheError | None:
             return None
         except OdoucheError as error:
             return error
+
     return None

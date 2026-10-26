@@ -238,5 +238,6 @@ def test_the_settings_are_frozen_and_named_as_documented(client):
         "domains",
         "dns_target",
     ]
+
     with pytest.raises(dataclasses.FrozenInstanceError):
         read.demo_data = False

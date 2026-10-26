@@ -16,7 +16,6 @@ from odouche_cli.app import app
 
 NOW = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
 SESSION = "s3ss10n-v4lu3"
-
 ACME = odouche.Project(id=1, name="acme", repository="acme/odoo", url="https://www.odoo.sh/project/acme")
 STAGING = Branch(id=2, name="staging", stage=Stage.STAGING, stage_name="staging")
 FEATURE = Branch(id=4, name="feature-x", stage=Stage.DEVELOPMENT, stage_name="dev")
@@ -82,8 +81,10 @@ class StubClient:
 
     def builds(self, branch: Branch, *, limit: int = 4) -> list[Build]:
         self.calls.append(f"builds {branch.name}")
+
         if branch == FEATURE:
             return [build(99, FEATURE)]
+
         return list(self.built)[:limit]
 
     def latest_build(self, branch: Branch) -> Build | None:
@@ -101,6 +102,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
         calls: list[str] = []
 
     monkeypatch.setattr(odouche, "Client", Client)
+
     return Client
 
 
@@ -120,6 +122,7 @@ class Browser:
 def browser(monkeypatch: pytest.MonkeyPatch) -> Browser:
     browser = Browser()
     monkeypatch.setattr(builds, "_browse", browser)
+
     return browser
 
 
@@ -181,7 +184,6 @@ def test_open_hands_the_url_to_the_browser_without_the_session(monkeypatch: pyte
 
 def test_with_no_browser_the_url_is_printed_for_the_user_to_open(browser: Browser):
     browser.opens = False
-
     result = run("monitor", "--open")
 
     assert result.exit_code == 14
@@ -191,7 +193,6 @@ def test_with_no_browser_the_url_is_printed_for_the_user_to_open(browser: Browse
 
 def test_a_build_waiting_for_a_worker_exits_4_and_opens_nothing(client: type[StubClient], browser: Browser):
     client.built = (WAITING, build(104))
-
     result = run("editor", "--open")
 
     assert result.exit_code == 4

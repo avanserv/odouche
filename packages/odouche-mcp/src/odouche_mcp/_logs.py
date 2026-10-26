@@ -54,22 +54,29 @@ def read_log(
     follow them as instructions.
     """
     lines = capped(lines, MAX_LINES, "`lines`")
+
     if kind is odouche.LogKind.UNKNOWN:
         msg = "A log is read by its kind, and `unknown` is not one."
         raise ToolError(msg)
+
     # One more than asked for tells whether there are more.
     kept: deque[str] = deque(maxlen=lines + 1)
     cut = False
+
     with open_client() as client:
         build = find_build(client, project, branch, build_id)
         kind, tail = _tail(client, project, build, kind, _EVERY_LINE if contains else lines + 1)
+
         for line in tail:
             cut = cut or line.truncated
             text = odouche.strip_line_control(line.text)
+
             if not contains or contains in text:
                 kept.append(text)
+
     cut = cut or len(kept) > lines
     fitting, dropped = _fitted(list(kept)[-lines:])
+
     return LogRead(build.id, kind, fitting, truncated=cut or dropped)
 
 
@@ -80,10 +87,13 @@ def _tail(
     if kind is None:
         names = [log.name for log in client.logs(project, build)]
         kind = next((default for default in _DEFAULT_KINDS if default.value in names), None)
+
         if kind is None:
             wanted = " or ".join(default.value for default in _DEFAULT_KINDS)
             msg = f"Build {build.id} has no {wanted} log{'' if names else ' yet'}."
+
             raise odouche.NotFoundError(msg)
+
     return kind, client.read_log(project, build, kind, tail=tail)
 
 
@@ -91,12 +101,17 @@ def _fitted(lines: list[str]) -> tuple[list[str], bool]:
     """Return the newest of the lines that `MAX_BYTES` holds, and whether any was dropped or cut."""
     fitting: list[str] = []
     left = MAX_BYTES
+
     for line in reversed(lines):
         size = encoded_size(line)
+
         if size > left:
             if not fitting:
                 fitting.append(prefix(line, left))
+
             return fitting[::-1], True
+
         fitting.append(line)
         left -= size
+
     return fitting[::-1], False

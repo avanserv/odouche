@@ -20,6 +20,7 @@ class Secret:
     def __init__(self, value: str) -> None:
         if not isinstance(value, str):
             raise TypeError("Secret wraps a str")
+
         self.__value = value
 
     def expose_secret(self) -> str:
@@ -38,6 +39,7 @@ class Secret:
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, Secret):
             return NotImplemented
+
         return hmac.compare_digest(self.__value.encode(), other.__value.encode())
 
     # A hash of a secret is a fingerprint of it.

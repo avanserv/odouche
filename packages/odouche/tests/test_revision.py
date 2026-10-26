@@ -41,6 +41,7 @@ def listed(upstream):
 def answer(upstream, path=LATEST):
     """Replace the answer of `path` with a copy, and return its result to change."""
     upstream.bodies[path] = copy.deepcopy(upstream.bodies[path])
+
     return upstream.bodies[path]["result"]
 
 
@@ -87,7 +88,6 @@ def test_a_pinned_revision_is_asked_by_its_number(client, upstream):
 def test_the_branch_s_own_version_is_the_one_asked_for(client, upstream):
     branch_info(upstream)["odoo_branch"] = "18.0"
     answer(upstream)["branch"] = "18.0"
-
     read = revision(client)
 
     assert asked(upstream)[-2:] == [(BUILDS, {"build_limit": 4}), (LATEST, {"odoo_branch": "18.0"})]
@@ -101,7 +101,6 @@ def test_a_branch_without_a_version_follows_the_project_s_not_the_build_s(client
         "odoo_branch"
     ] = "20.0"
     answer(upstream)["branch"] = "20.0"
-
     read = revision(client)
 
     assert asked(upstream)[-1] == (LATEST, {"odoo_branch": "20.0"})
@@ -131,6 +130,7 @@ def test_no_revision_is_none(client, upstream, value):
 def pinned(upstream):
     """Pin revision 2206 on the branch, and return the result of its answer to change."""
     branch_info(upstream)["odoo_revision_id"] = 2206
+
     return answer(upstream, PINNED)
 
 

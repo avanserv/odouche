@@ -71,7 +71,9 @@ def changing_tool(*, allow_changes: bool) -> Callable[[str, str], Rebuilt]:
         except Exception as error:
             _audit("rebuild_branch", _target(project, branch), type(error).__name__)
             raise
+
         _audit("rebuild_branch", _target(project, branch), f"build {started.id} started")
+
         return Rebuilt(started)
 
     return rebuild_branch
@@ -110,21 +112,25 @@ def settings_tool(*, allow_changes: bool) -> Callable[..., SettingsChanged]:
                 )
             except ValueError as error:
                 raise ToolError(str(error)) from None
+
             with open_client(changes=allow_changes) as client:
                 found = client.branch(project, branch)
                 current = client.branch_settings(found)
                 narrowed = _refused(partial(client.check_settings_change, found, current, change))
                 outcome = odouche.SettingsOutcome(current, current, ())
+
                 if narrowed is not None:
                     # Sent once: an error is reported, never retried.
                     outcome = _refused(partial(client.change_branch_settings, found, narrowed))
         except Exception as error:
             _audit("change_branch_settings", _target(project, branch), type(error).__name__)
             raise
+
         changed = [] if narrowed is None else list(narrowed.given())
         unchanged = [name for name in change.given() if name not in changed]
         # The names alone: a value, such as the tags, is the caller's text.
         _audit("change_branch_settings", _target(project, branch), f"changed {', '.join(changed) or 'nothing'}")
+
         return SettingsChanged(found, changed, unchanged, _moved(outcome), outcome.after)
 
     return change_branch_settings
@@ -166,20 +172,24 @@ def project_settings_tool(*, allow_changes: bool) -> Callable[..., ProjectSettin
                 )
             except ValueError as error:
                 raise ToolError(str(error)) from None
+
             with open_client(changes=allow_changes) as client:
                 current = client.project_settings(project)
                 narrowed = _refused(partial(client.check_project_settings_change, current, change))
                 outcome = odouche.SettingsOutcome(current, current, ())
+
                 if narrowed is not None:
                     # Sent once: an error is reported, never retried.
                     outcome = _refused(partial(client.change_project_settings, project, narrowed))
         except Exception as error:
             _audit("change_project_settings", _target(project), type(error).__name__)
             raise
+
         changed = [] if narrowed is None else list(narrowed.given())
         unchanged = [name for name in change.given() if name not in changed]
         # The names alone: a value, such as the tags, is the caller's text.
         _audit("change_project_settings", _target(project), f"changed {', '.join(changed) or 'nothing'}")
+
         return ProjectSettingsChanged(project, changed, unchanged, _moved(outcome), outcome.after)
 
     return change_project_settings
@@ -201,11 +211,15 @@ def _plain(value: object) -> SettingValue:
     """Return a setting's value as its JSON has it."""
     if isinstance(value, tuple):
         return [str(name) for name in value]
+
     if isinstance(value, bool | int) or value is None:
         return value
+
     if isinstance(value, str):
         return str(value)
+
     msg = f"No setting holds a {type(value).__name__}."
+
     raise TypeError(msg)
 
 

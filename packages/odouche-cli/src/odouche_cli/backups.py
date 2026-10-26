@@ -64,6 +64,7 @@ def _branch(value: str | None) -> str | None:
     if value == "":
         msg = "A branch is not empty."
         raise typer.BadParameter(msg)
+
     return value
 
 
@@ -186,10 +187,13 @@ def list_(ctx: typer.Context, project: ProjectOption = None, branch: BranchFilte
     Odoo.sh keeps a daily backup off-site as well, under the same time: that copy is `remote`, and cannot be downloaded.
     """
     output: Output = ctx.obj
+
     with open_client() as client:
         found = client.backups(resolve_project(ctx, project, client.projects))
+
     if branch is not None:
         found = [backup for backup in found if backup.branch_name == branch]
+
     output.rows(found, _columns(), empty="No backups.")
 
 
@@ -209,23 +213,29 @@ def create(
     Only a staging or a production branch is backed up. It asks first, unless `--yes` is given.
     """
     output: Output = ctx.obj
+
     if is_given(ctx, "timeout") and not wait:
         msg = "--timeout goes with --wait only."
         raise typer.BadParameter(msg, ctx=ctx)
+
     name = resolve_branch(ctx, branch)
+
     if not yes and not _terminal.can_ask():
         msg = (
             "Stdin or stderr is not a terminal, so the backup cannot be confirmed. "
             "Give --yes to take it without being asked."
         )
         raise ContextError(msg, ctx=ctx)
+
     with open_client(writes=True) as client:
         project_name, found = project_branch(ctx, client, project, name)
         client.check_backup(found)
         latest = client.latest_build(found)
+
         if latest is None:
             msg = f"Branch {found.name} of {project_name} has no build to back up."
             raise odouche.NotFoundError(msg)
+
         for line in (
             f"Project: {project_name}",
             f"Branch: {found.name} ({stage_of(found)})",
@@ -233,23 +243,29 @@ def create(
             "Odoo.sh keeps a manual backup for 3 days.",
         ):
             typer.echo(strip_control(line), err=True)
+
         if not yes and not _terminal.confirmed("Take a backup of this build?"):
             typer.echo("Nothing was sent.", err=True)
             raise typer.Exit(EXIT_DECLINED)
+
         # Sent once: an error is reported, never retried.
         request = client.create_backup(project_name, found, comment=comment or "")
         typer.echo(f"A backup of build {request.build.id} was asked for.", err=True)
         listed = f"osh backups list --branch {found.name}"
+
         if not wait:
             typer.echo(strip_control(f"Odoo.sh lists it about a minute later: `{listed}`."), err=True)
             return
+
         typer.echo("Waiting for Odoo.sh to finish it.", err=True)
+
         try:
             with closing(client.wait_for_backup(project_name, request, timeout=timeout)) as waited:
                 backup = next(listed_now for listed_now in waited if listed_now is not None)
         except odouche.OdoucheError:
             typer.echo(strip_control(f"The backup may still be coming. Look with `{listed}`."), err=True)
             raise
+
     output.one(backup, _columns())
 
 
@@ -276,18 +292,22 @@ def download(
     """
     taken = _download_usage(ctx, backup, output, link=link, new=new)
     name = resolve_branch(ctx, branch)
+
     if not yes and not _terminal.can_ask():
         msg = (
             "Stdin or stderr is not a terminal, so the change cannot be confirmed. "
             "Give --yes to make it without being asked."
         )
         raise ContextError(msg, ctx=ctx)
+
     neutralized, filestore = not exact, not no_filestore
+
     with open_client(writes=True) as client:
         project_name, found = project_branch(ctx, client, project, name)
         chosen, ready, described = _download_source(
             client, project_name, found, taken, new=new, choices=(neutralized, filestore)
         )
+
         for line in (
             f"Project: {project_name}",
             f"Branch: {found.name} ({stage_of(found)})",
@@ -300,13 +320,17 @@ def download(
             + (" It keeps a manual backup for 3 days." if new else ""),
         ):
             typer.echo(strip_control(line), err=True)
+
         prepared = ready or _prepare(
             client, project_name, found, chosen, yes=yes, timeout=timeout, choices=(neutralized, filestore)
         )
+
         if output is None:
             typer.echo(strip_control(prepared.link))
             return
+
         _write(client, prepared, output)
+
     typer.echo(strip_control(f"Wrote {output}. It holds customer data: delete it once you are done with it."), err=True)
 
 
@@ -329,35 +353,45 @@ def pull(
     if output is None:
         msg = "Give --output PATH to write the file to: there is no default place."
         raise ContextError(msg, ctx=ctx)
+
     _check_output(ctx, output)
     taken = None if manual is None else _taken(ctx, manual, "--manual")
+
     with open_client() as client:
         project_name = resolve_project(ctx, project, client.projects)
         production = _production(ctx, client.branches(project_name), project_name, branch)
         backup = _pulled(client.backups(project_name), taken)
         target = client.ssh_target(find_build(client, project_name, production, None))
+
     source = f"{target.user}@{target.host}:{_FOLDER}/{_file_name(backup)}"
     # Absolute, so that a colon in it is never read as a host.
     destination = str(output.absolute())
     copier = shutil.which("rsync")
+
     if copier is not None:
         progress = ["--progress"] if _terminal.stdout_is_terminal() else []
         command = ["rsync", *progress, "--", source, destination]
     else:
         copier = shutil.which("scp")
         command = ["scp", "--", source, destination]
+
     if sys.platform == "win32":
         ssh.refuse(f"`osh` does not hand over to `{command[0]}` on Windows.", subprocess.list2cmdline(command))
+
     program = shutil.which("ssh")
+
     if copier is None or program is None:
         missing = "No `rsync` or `scp` to hand over to." if copier is None else "No `ssh` to connect with."
         ssh.refuse(missing, shlex.join(command))
+
     ssh.reach(ctx, production, target, program, yes=yes, again="osh backups pull")
+
     for line in (
         f"Copying {backup.kind_name} backup {backup.taken_at.strftime(_TAKEN)} UTC, of build {backup.build_name}.",
         f"To: {output}. It holds customer data: delete it once you are done with it.",
     ):
         typer.echo(strip_control(line), err=True)
+
     _umask(_PRIVATE_UMASK)
     ssh.hand_over(copier, command)
 
@@ -366,20 +400,26 @@ def _production(ctx: typer.Context, branches: list[odouche.Branch], project: str
     """Return the project's production branch, whose build holds every stage's backups, or refuse `name` when it is not."""
     if name is not None:
         named = next((branch for branch in branches if branch.name == name), None)
+
         if named is None:
             msg = f"Project {project} has no branch {name}."
             raise odouche.NotFoundError(strip_control(msg))
+
         if named.stage is not odouche.Stage.PRODUCTION:
             msg = (
                 f"Branch {name} is {stage_of(named)}: the backups are copied from the production build. "
                 "Leave --branch out to use it."
             )
             raise ContextError(strip_control(msg), ctx=ctx)
+
         return named
+
     production = next((branch for branch in branches if branch.stage is odouche.Stage.PRODUCTION), None)
+
     if production is None:
         msg = f"Project {project} has no production branch."
         raise odouche.NotFoundError(strip_control(msg))
+
     return production
 
 
@@ -394,12 +434,16 @@ def _pulled(listed: list[odouche.Backup], taken: datetime | None) -> odouche.Bac
             None,
         )
         missing = f"No manual backup was taken at {taken.strftime(_TAKEN)} UTC. `osh backups list` lists them."
+
         if any(backup.kind is odouche.BackupKind.DAILY and backup.taken_at == taken for backup in listed):
             missing = f"Backup {taken.strftime(_TAKEN)} is the daily one: leave --manual out to copy it."
+
     if found is None:
         raise odouche.NotFoundError(missing)
+
     if not _BUILD_NAME.fullmatch(found.build_name):
         raise odouche.UpstreamChangedError("backups", "build_name")
+
     return found
 
 
@@ -407,6 +451,7 @@ def _file_name(backup: odouche.Backup) -> str:
     """Return the name the production build gives the backup's SQL, as seen in its folder."""
     if backup.kind is odouche.BackupKind.DAILY:
         return f"{backup.build_name}_daily.sql.gz"
+
     return f"{backup.taken_at.strftime(_FILE_TAKEN)}-{backup.build_name}_manual.sql.gz"
 
 
@@ -422,17 +467,22 @@ def _prepare(
 ) -> odouche.PreparedDownload:
     """Ask, then have Odoo.sh prepare the file, of a new backup when none is `chosen`, and wait for it."""
     question = "Take a backup and prepare its file?" if chosen is None else "Prepare the file of this backup?"
+
     if not yes and not _terminal.confirmed(question):
         typer.echo("Nothing was sent.", err=True)
         raise typer.Exit(EXIT_DECLINED)
+
     if chosen is None:
         chosen = _new_backup(client, project, branch, timeout)
+
     neutralized, filestore = choices
     prepared = client.prepare_download(project, chosen, neutralized=neutralized, filestore=filestore)
     typer.echo("Waiting for Odoo.sh to prepare the file.", err=True)
+
     with closing(client.wait_for_download(project, prepared, timeout=timeout)) as waited:
         for _ in waited:
             pass
+
     return prepared
 
 
@@ -443,16 +493,21 @@ def _download_usage(
     if output is None and not link:
         msg = "Give --output PATH to write the file to, or --link to print its link: there is no default place."
         raise ContextError(msg, ctx=ctx)
+
     if output is not None and link:
         msg = "--output and --link do not go together."
         raise ContextError(msg, ctx=ctx)
+
     if output is not None:
         _check_output(ctx, output)
+
     if new and backup is not None:
         msg = "BACKUP and --new do not go together: --new downloads the backup it takes."
         raise ContextError(msg, ctx=ctx)
+
     if backup is None or backup == _LATEST:
         return None
+
     return _taken(ctx, backup, "BACKUP", f", or {_LATEST!r}")
 
 
@@ -461,9 +516,11 @@ def _check_output(ctx: typer.Context, output: Path) -> None:
     if output.exists() or output.is_symlink():
         msg = f"{output} already exists, and is never written over."
         raise ContextError(strip_control(msg), ctx=ctx)
+
     if not output.parent.is_dir():
         msg = f"{output.parent} is not a directory."
         raise ContextError(strip_control(msg), ctx=ctx)
+
     if not os.access(output.parent, os.W_OK):
         msg = f"You cannot write to {output.parent}."
         raise ContextError(strip_control(msg), ctx=ctx)
@@ -493,13 +550,17 @@ def _download_source(
     if new:
         client.check_backup(branch)
         latest = client.latest_build(branch)
+
         if latest is None:
             msg = f"Branch {branch.name} of {project} has no build to back up."
             raise odouche.NotFoundError(msg)
+
         return None, None, f"Backup: a new one of build {latest.id}, {latest.name}"
+
     chosen = _chosen(client.backups(project), branch, taken)
     neutralized, filestore = choices
     ready = client.find_download(project, chosen, neutralized=neutralized, filestore=filestore)
+
     return (
         chosen,
         ready,
@@ -510,12 +571,16 @@ def _download_source(
 def _chosen(listed: list[odouche.Backup], branch: odouche.Branch, taken: datetime | None) -> odouche.Backup:
     """Return the branch's backup taken at `taken`, or its newest that can be downloaded."""
     mine = [backup for backup in listed if backup.branch_name == branch.name]
+
     if taken is not None:
         mine = [backup for backup in mine if backup.taken_at == taken]
+
     # A `remote` backup shares its time with the `daily` one it is a copy of.
     downloadable = [backup for backup in mine if backup.downloadable]
+
     if downloadable:
         return downloadable[0]
+
     raise odouche.NotFoundError(strip_control(_none_downloadable(mine, branch, taken)))
 
 
@@ -526,10 +591,12 @@ def _none_downloadable(mine: list[odouche.Backup], branch: odouche.Branch, taken
             f"Backup {mine[0].taken_at.strftime(_TAKEN)} of branch {branch.name} is {mine[0].kind_name}: "
             "Odoo.sh does not let it be downloaded."
         )
+
     if taken is not None:
         return (
             f"Branch {branch.name} has no backup taken at {taken.strftime(_TAKEN)} UTC. `osh backups list` lists them."
         )
+
     return f"Branch {branch.name} has no backup that can be downloaded."
 
 
@@ -537,12 +604,14 @@ def _new_backup(client: odouche.Client, project: str, branch: odouche.Branch, ti
     # Sent once: an error is reported, never retried.
     request = client.create_backup(project, branch)
     typer.echo(f"A backup of build {request.build.id} was asked for. Waiting for Odoo.sh to finish it.", err=True)
+
     try:
         with closing(client.wait_for_backup(project, request, timeout=timeout)) as waited:
             return next(listed for listed in waited if listed is not None)
     except odouche.OdoucheError:
         listed = f"osh backups list --branch {branch.name}"
         typer.echo(strip_control(f"The backup may still be coming. Look with `{listed}`."), err=True)
+
         raise
 
 
@@ -556,8 +625,10 @@ def _write(client: odouche.Client, prepared: odouche.PreparedDownload, path: Pat
     except OSError as error:
         msg = f"{path} cannot be created: {error.strerror}."
         raise ContextError(strip_control(msg)) from None
+
     console = Console(file=sys.stderr, highlight=False)
     written = 0
+
     try:
         with os.fdopen(descriptor, "wb") as file, client.download(prepared) as body:
             if _terminal.redraws(console):
@@ -570,9 +641,12 @@ def _write(client: odouche.Client, prepared: odouche.PreparedDownload, path: Pat
     # An interrupt too: a partial file is never left behind.
     except BaseException as error:
         path.unlink(missing_ok=True)
+
         if not isinstance(error, OSError):
             raise
+
         typer.echo(strip_control(f"{path} could not be written: {error.strerror}. Nothing of it is left."), err=True)
+
         raise typer.Exit(EXIT_NOT_WRITTEN) from None
 
 

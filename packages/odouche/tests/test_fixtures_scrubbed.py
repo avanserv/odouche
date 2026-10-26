@@ -4,7 +4,6 @@ from pathlib import Path
 
 
 PACKAGES = Path(__file__).parents[2]
-
 EMAIL = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)")
 SCRUBBED_DOMAIN = "example.com"
 IPV4 = re.compile(r"(?<![\d.])(?:\d{1,3}\.){3}\d{1,3}(?![\d.])")
@@ -14,20 +13,26 @@ DOCUMENTATION = tuple(ipaddress.ip_network(net) for net in ("192.0.2.0/24", "198
 
 def unscrubbed_addresses(directory: Path) -> list[str]:
     findings: list[str] = []
+
     for path in sorted(directory.rglob("*")):
         if not path.is_file():
             continue
+
         lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+
         for number, line in enumerate(lines, start=1):
             for match in EMAIL.finditer(line):
                 domain = match.group(1).lower()
+
                 if domain != SCRUBBED_DOMAIN and not domain.endswith(f".{SCRUBBED_DOMAIN}"):
                     findings.append(f"{path}:{number}: {match.group(0)}")
+
             findings.extend(
                 f"{path}:{number}: {match.group(0)}"
                 for match in IPV4.finditer(line)
                 if not _documentation(match.group(0))
             )
+
     return findings
 
 
@@ -36,6 +41,7 @@ def _documentation(text: str) -> bool:
         address = ipaddress.IPv4Address(text)
     except ValueError:
         return False
+
     return any(address in network for network in DOCUMENTATION)
 
 

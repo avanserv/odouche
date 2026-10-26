@@ -70,6 +70,7 @@ def test_server_exposes_the_tool_that_changes_state_only_when_allowed():
 def _attributes() -> set[str]:
     """Return every attribute the server's code names, such as the client calls it makes."""
     package = Path(odouche_mcp.__file__).parent
+
     return {
         node.attr
         for path in package.rglob("*.py")
@@ -98,7 +99,6 @@ def test_no_tool_adds_a_member_or_changes_a_role_even_when_changes_are_allowed()
 def test_main_serves_over_stdio(monkeypatch: pytest.MonkeyPatch, argv: list[str], tools: list[str]):
     served: list[tuple[list[str], str]] = []
     monkeypatch.setattr(MCPServer, "run", lambda self, transport: served.append((_names(self), transport)))
-
     main(argv)
 
     assert served == [(tools, "stdio")]
@@ -120,7 +120,6 @@ def test_main_reads_the_arguments_of_the_process(monkeypatch: pytest.MonkeyPatch
     served: list[list[str]] = []
     monkeypatch.setattr(MCPServer, "run", lambda self, transport: served.append(_names(self)))
     monkeypatch.setattr("sys.argv", ["odouche-mcp", "--allow-changes"])
-
     main()
 
     assert served == [[*READS, *CHANGES]]

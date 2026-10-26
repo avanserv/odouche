@@ -51,6 +51,7 @@ def _memory():
             """Answer the dialog and let the calls it blocked end."""
             if cls.dialog is not None:
                 cls.dialog.set()
+
             for thread in threading.enumerate():
                 if thread.name == _session._WORKER:
                     thread.join()
@@ -58,7 +59,9 @@ def _memory():
         def _call(self):
             if self.dialog is not None:
                 self.dialog.wait()
+
             type(self).calls += 1
+
             if self.failure is not None:
                 raise self.failure(f"failed, entry: {self.entries}")
 
@@ -68,18 +71,23 @@ def _memory():
 
         def set_password(self, service, username, password):
             self._call()
+
             if self.failing_writes:
                 type(self).failing_writes -= 1
                 raise self.write_failure(f"failed, entry: {password}")
+
             # As Credential Locker does with the entry it overwrites.
             if (service, username) in self.entries:
                 self.entries[f"{username}@{service}", username] = self.entries[service, username]
+
             self.entries[service, username] = password
 
         def delete_password(self, service, username):
             self._call()
+
             if self.refuses_deletion or (service, username) not in self.entries:
                 raise PasswordDeleteError("No such password!")
+
             del self.entries[service, username]
 
     return Memory
@@ -89,6 +97,7 @@ def _memory():
 def backend(monkeypatch):
     backend = _memory()
     monkeypatch.setattr(_session, "_accepted", lambda: backend)
+
     return backend
 
 
@@ -98,6 +107,7 @@ def no_backend(monkeypatch):
         viable = False  # pyright: ignore[reportAssignmentType]
 
     monkeypatch.setattr(_session, "_accepted", lambda: NotViable)
+
     return NotViable
 
 
@@ -144,22 +154,30 @@ class Upstream:
     def connect(self, session, **options):
         options.setdefault("sleep", lambda _: None)
         self.transports.append(Transport(session, transport=httpx2.MockTransport(self._answer), **options))
+
         return self.transports[-1]
 
     def _answer(self, request):
         self.requests.append(request)
         failure = self.failures.get(request.url.path)
+
         if failure is KeyboardInterrupt:
             raise failure
+
         if isinstance(failure, type):
             raise failure(f"failed, Cookie: {request.headers.get('Cookie')}", request=request)
+
         if failure is not None:
             return httpx2.Response(failure)
+
         if request.url.path == LOGOUT:
             return httpx2.Response(303, headers={"Location": "/"})
+
         body = self.bodies[request.url.path]
+
         if isinstance(body, dict):
             return httpx2.Response(200, json=body)
+
         return body(request)
 
 
@@ -169,7 +187,9 @@ def upstream(monkeypatch):
     monkeypatch.setattr(_client, "_transport", upstream.connect)
     monkeypatch.setattr(_logout, "_transport", upstream.connect)
     monkeypatch.delenv(SESSION_ENV, raising=False)
+
     yield upstream
+
     for transport in upstream.transports:
         transport.close()
 

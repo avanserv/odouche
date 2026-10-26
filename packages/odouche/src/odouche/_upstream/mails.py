@@ -44,13 +44,17 @@ def mails(transport: Transport, project: str, branch: Branch, build: Build, limi
     """List the mails a build caught, newest first and at most `limit` of them. The worker answers them all at once."""
     if builds.number("limit", limit) < 1:
         raise ValueError("A limit is at least 1")
+
     _check(branch, build)
     box = _mailbox(transport, project, build)
+
     if box is None:
         return []
+
     listed = [_summary(item) for item in _listed(transport, box)]
     # Stable: mails of the same date keep the worker's order.
     newest = sorted(listed, key=lambda mail: (mail.date is not None, mail.date or _UNDATED), reverse=True)
+
     return newest[:limit]
 
 
@@ -58,22 +62,29 @@ def mail(transport: Transport, project: str, branch: Branch, build: Build, mail_
     """Return one mail a build caught, with its body. Its id is sent only once the worker has listed it."""
     _check(branch, build)
     box = _mailbox(transport, project, build)
+
     if box is None:
         raise NotFoundError(f"Build {build.id} has caught no mail: it waits for a worker.", operation=_OPERATION)
+
     for item in _listed(transport, box):
         listed_id = item.identifier("id")
+
         if _name(listed_id) != mail_id:
             continue
+
         if _name(listed_id) != str(listed_id):
             msg = f"Build {build.id} caught mail {mail_id!r} under a name that cannot be sent back to the worker."
             raise NotFoundError(msg, operation=_OPERATION)
+
         return _content(transport, box, _summary(item), listed_id)
+
     raise NotFoundError(f"Build {build.id} caught no mail {mail_id!r}.", operation=_OPERATION)
 
 
 def _check(branch: Branch, build: Build) -> None:
     if build.branch_id != branch.id:
         raise ValueError(f"Build {build.id} is not of branch {branch.name}")
+
     if branch.stage not in _STAGES:
         msg = (
             f"Branch {branch.name} is {branch.stage_name}: "
@@ -84,8 +95,10 @@ def _check(branch: Branch, build: Build) -> None:
 
 def _mailbox(transport: Transport, project: str, build: Build) -> _Mailbox | None:
     worker = builds.worker(transport, build.branch_id, build.id)
+
     if worker is None:
         return None
+
     return _Mailbox(worker, projects.access_token(transport, project), build.id)
 
 
@@ -95,6 +108,7 @@ def _listed(transport: Transport, box: _Mailbox) -> list[Reader]:
     except TooLargeError:
         msg = f"The mails build {box.build_id} caught are over {MAX_MESSAGE // 1048576} MiB as the worker lists them, which the library does not read."
         raise OdoucheError(msg, operation=_OPERATION) from None
+
     return Reader(_OPERATION, listed).items("result")
 
 
@@ -132,8 +146,10 @@ def _when(text: str) -> datetime | None:
             return datetime.strptime(text, _STAMP).replace(tzinfo=UTC)
         except ValueError:
             return None
+
     if moment.tzinfo is None:
         return moment.replace(tzinfo=UTC)
+
     try:
         return moment.astimezone(UTC)
     except OverflowError:
@@ -151,7 +167,9 @@ def _content(transport: Transport, box: _Mailbox, summary: Mail, listed_id: int 
         )
     except TooLargeError:
         return MailContent(mail=summary, cc="", body="", attachments=(), truncated=True)
+
     parsed = _mime.parse(Reader(_OPERATION, answer).child("result").text("source"))
+
     return MailContent(
         mail=summary, cc=parsed.cc, body=parsed.body, attachments=parsed.attachments, truncated=parsed.truncated
     )

@@ -59,6 +59,7 @@ SHOWN = [
 def blocks(path):
     """Return the Python examples of a page, each with the line it starts at."""
     text = path.read_text(encoding="utf-8")
+
     return [(text.count("\n", 0, match.start(1)) + 1, match.group(1)) for match in BLOCK.finditer(text)]
 
 
@@ -74,6 +75,7 @@ def log(request):
     asked = request.headers["Range"]
     first = max(len(LOG) - int(asked[7:]), 0) if asked.startswith("bytes=-") else int(asked[6:-1])
     headers = {"Content-Range": f"bytes {first}-{len(LOG) - 1}/{len(LOG)}"}
+
     return httpx2.Response(206, headers=headers, content=LOG[first:])
 
 
@@ -103,13 +105,16 @@ def changing_members(upstream):
         body = upstream.load("add_collaborator.json")
         body["result"]["access_level"] = json.loads(request.content)["params"]["access_level"]
         users.append(body["result"])
+
         return httpx2.Response(200, json=body)
 
     def give(request):
         number = int(request.url.path.split("/")[3])
+
         for user in users:
             if user["id"] == number:
                 user["access_level"] = json.loads(request.content)["params"]["access_level"]
+
         return httpx2.Response(200, json=upstream.load("set_access_level.json"))
 
     upstream.bodies["/app/project/acme-corp-odoo-addons-4217/add_collaborator"] = add
@@ -125,8 +130,10 @@ def odoo_sh(upstream, backend, session, monkeypatch, tmp_path):
     # A finished build on a worker: a watch of it ends, and it has logs.
     listed[0].update(listed[1] | {"id": listed[0]["id"]})
     upstream.bodies[f"/paas/build/{listed[0]['id']}/logs/list"] = upstream.load("build_logs_list.json")
+
     for name in ("install", "odoo"):
         upstream.bodies[f"/paas/build/{listed[0]['id']}/logs/{name}"] = log
+
     # And caught mails.
     upstream.bodies[f"/paas/{listed[0]['id']}/mail/json/fetch"] = upstream.load("mails.json")
     upstream.bodies[f"/paas/{listed[0]['id']}/mail/json/message"] = upstream.load("mail_message.json")
@@ -159,6 +166,7 @@ def odoo_sh(upstream, backend, session, monkeypatch, tmp_path):
     def dump(_):
         new = {"name": listed[0]["name"], "backup_datetime_utc": "2026-10-14 13:05:41"}
         backups.insert(0, copy.deepcopy(backups[0]) | new)
+
         return httpx2.Response(200, json=upstream.load("dump.json"))
 
     upstream.bodies[f"/app/build/{listed[0]['id']}/dump"] = dump
@@ -193,6 +201,7 @@ def odoo_sh(upstream, backend, session, monkeypatch, tmp_path):
     # As after a login: the session is the stored one.
     odouche.login(ask=lambda: Secret(session))
     upstream.requests.clear()
+
     return upstream
 
 

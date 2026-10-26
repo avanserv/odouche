@@ -88,15 +88,21 @@ def ssh(
     for up to ten minutes.
     """
     name = resolve_branch(ctx, branch)
+
     with open_client() as client:
         project_name, found = project_branch(ctx, client, project, name)
         target = client.ssh_target(find_build(client, project_name, found, None))
+
     command = ["ssh", "-l", target.user, target.host, *(args or [])]
+
     if sys.platform == "win32":
         refuse("`osh` does not hand over to `ssh` on Windows.", subprocess.list2cmdline(command))
+
     program = shutil.which("ssh")
+
     if program is None:
         refuse("No `ssh` to hand over to.", shlex.join(command))
+
     reach(ctx, found, target, program, yes=yes, again="osh ssh")
     hand_over(program, command)
 
@@ -110,6 +116,7 @@ def reach(
     """
     forget_session_env()
     kept_out = _kept_out(program, target)
+
     if kept_out is not None:
         _allow(ctx, branch, target, program, kept_out, yes=yes, again=again)
 
@@ -128,6 +135,7 @@ def _kept_out(program: str, target: odouche.SshTarget) -> str | None:
     last line `ssh` printed, which is shown and nothing else is.
     """
     tried = [program, *_TRY, "-l", target.user, target.host, "true"]
+
     try:
         done = _run(
             tried,
@@ -141,11 +149,15 @@ def _kept_out(program: str, target: odouche.SshTarget) -> str | None:
         )
     except subprocess.TimeoutExpired:
         return f"no answer within {_TRY_BOUND:.0f} s"
+
     if done.returncode == 0:
         return None
+
     lines = done.stderr.strip().splitlines()
+
     if lines and _NOT_THE_ADDRESS in lines[-1]:
         return None
+
     return lines[-1] if lines else f"`ssh` exited with {done.returncode}"
 
 
@@ -161,19 +173,24 @@ def _allow(
 ) -> None:
     """Ask Odoo.sh to let this machine's address in on the branch, once agreed, and wait until `ssh` gets in."""
     said = f"Your `ssh` does not get into build {target.user} from this machine's address: {kept_out}"
+
     if not yes and not _terminal.can_ask():
         msg = (
             f"{said} Stdin or stderr is not a terminal, so allowing the address cannot be confirmed. "
             "Give --yes to allow it without being asked, or use Allow my IP on the branch's page."
         )
         raise ContextError(strip_control(msg), ctx=ctx)
+
     typer.echo(strip_control(said), err=True)
+
     if not yes:
         line = f"Odoo.sh can allow the address it sees from here on branch {branch.name}, for one hour."
         typer.echo(strip_control(line), err=True)
+
         if not _terminal.confirmed("Allow it?"):
             typer.echo("Nothing was sent.", err=True)
             raise typer.Exit(EXIT_DECLINED)
+
     with open_client(writes=True) as client:
         # Sent once: an error is reported, never retried.
         try:
@@ -181,15 +198,19 @@ def _allow(
         except odouche.OutcomeUnknownError as unknown:
             typer.echo(strip_control(str(unknown)), err=True)
             typer.echo(f"Run `{again}` again: it asks only if `ssh` still does not get in.", err=True)
+
             raise typer.Exit(EXIT_OUTCOME_UNKNOWN) from None
+
     typer.echo(f"Odoo.sh allowed {address} for one hour. It takes up to five minutes to apply.", err=True)
     still = _wait(program, target)
+
     if still is not None:
         line = (
             f"`ssh` still does not get into build {target.user}: {still}. "
             f"Odoo.sh may not have applied the rule yet: run `{again}` again in a few minutes."
         )
         typer.echo(strip_control(line), err=True)
+
         raise typer.Exit(EXIT_TIMEOUT)
 
 
@@ -203,6 +224,7 @@ def _wait(program: str, target: odouche.SshTarget) -> str | None:
         return strip_control(f"Waiting for the rule to apply to build {target.user} ({waited:.0f} s).")
 
     console = Console(file=sys.stderr, highlight=False)
+
     try:
         if _terminal.redraws(console):
             with Live(Text(line(0)), console=console, transient=True) as live:
@@ -210,12 +232,14 @@ def _wait(program: str, target: odouche.SshTarget) -> str | None:
                     live.update(Text(line(waited)))
         else:
             reported = -_REPORT_EVERY
+
             for waited in _tries(program, target):
                 if waited - reported >= _REPORT_EVERY:
                     typer.echo(line(waited), err=True)
                     reported = waited
     except _WaitOverError as over:
         return over.kept_out
+
     return None
 
 
@@ -231,17 +255,23 @@ def _tries(program: str, target: odouche.SshTarget) -> Iterator[float]:
     """Yield the seconds waited after each try the address kept `ssh` out, and end once it does not."""
     start = _monotonic()
     last = "no try"
+
     while (waited := _monotonic() - start) < _RULE_WAIT:
         _sleep(min(_INTERVAL, _RULE_WAIT - waited))
         kept_out = _kept_out(program, target)
+
         if kept_out is None:
             return
+
         last = kept_out
+
         yield _monotonic() - start
+
     raise _WaitOverError(last)
 
 
 def refuse(reason: str, command: str) -> NoReturn:
     """Say why `osh` does not hand over, with the command to run by hand, and exit."""
     typer.echo(strip_control(f"{reason} Run it yourself: {command}"), err=True)
+
     raise typer.Exit(EXIT_NO_SSH)

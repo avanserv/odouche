@@ -22,12 +22,10 @@ from odouche_cli.app import app
 
 
 NOW = datetime(2026, 3, 10, 12, 0, tzinfo=UTC)
-
 ACME = odouche.Project(id=1, name="acme", repository="acme/odoo", url="https://www.odoo.sh/project/acme")
 MAIN = Branch(id=1, name="main", stage=Stage.PRODUCTION, stage_name="production")
 FEATURE = Branch(id=4, name="feature-x", stage=Stage.DEVELOPMENT, stage_name="dev")
 SESSION = odouche.SessionInfo(odouche.SessionSource.KEYRING, NOW - timedelta(days=3), NOW + timedelta(days=27))
-
 ESCAPE = "\x1b[2J\x1b]0;owned\x07"
 URL = "https://acme-feature-x-105.dev.odoo.com"
 ON_FEATURE = ("--project", "acme", "--branch", "feature-x")
@@ -114,6 +112,7 @@ class StubClient:
 
     def __init__(self, *, read_only: bool = False) -> None:
         self.modes.append(read_only)
+
         if self.error is not None:
             raise self.error
 
@@ -254,8 +253,10 @@ class StubClient:
 
     def rebuild(self, branch: Branch | int) -> Build:
         self.calls.append(f"rebuild {branch.name if isinstance(branch, Branch) else branch}")
+
         if self.lost is not None:
             raise self.lost
+
         return STARTED
 
     def change_branch_settings(
@@ -263,6 +264,7 @@ class StubClient:
     ) -> odouche.SettingsOutcome[odouche.BranchSettings]:
         self.calls.append(f"settings {branch.name}")
         before = self.branch_settings(branch)
+
         return odouche.SettingsOutcome(before, replace(before, **change.given()), ())  # pyright: ignore[reportArgumentType]
 
     def move_branch(self, branch: Branch, to: Stage) -> Branch:
@@ -278,6 +280,7 @@ class StubClient:
     ) -> odouche.SettingsOutcome[odouche.ProjectSettings]:
         self.calls.append(f"project settings {project}")
         before = self.project_settings(project)
+
         return odouche.SettingsOutcome(before, replace(before, **change.given()), ())  # pyright: ignore[reportArgumentType]
 
     def create_backup(self, project: str, branch: Branch, *, comment: str = "") -> odouche.BackupRequest:
@@ -348,6 +351,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     # The usual case. A test of a script's run turns one off.
     monkeypatch.setattr(_terminal, "stdin_is_terminal", lambda: True)
     monkeypatch.setattr(_terminal, "stderr_is_terminal", lambda: True)
+
     return Client
 
 
@@ -465,7 +469,6 @@ def test_the_question_comes_after_what_is_rebuilt(client: type[StubClient]):
 
 def test_a_stage_the_library_does_not_know_exits_9_and_sends_nothing(client: type[StubClient]):
     client.on_branch = replace(FEATURE, stage=Stage.UNKNOWN, stage_name="preview")
-
     result = run(*REBUILD, *ON_FEATURE, "--yes")
 
     assert result.exit_code == 9
@@ -474,7 +477,6 @@ def test_a_stage_the_library_does_not_know_exits_9_and_sends_nothing(client: typ
 
 def test_a_branch_with_no_build_is_rebuilt_too(client: type[StubClient]):
     client.latest = None
-
     result = run(*REBUILD, *ON_FEATURE, "--yes")
 
     assert result.exit_code == 0
@@ -485,7 +487,6 @@ def test_a_branch_with_no_build_is_rebuilt_too(client: type[StubClient]):
 def test_an_escape_sequence_in_the_subject_is_not_emitted(client: type[StubClient]):
     commit = replace(LATEST.commit, message=f"Add{ESCAPE} the report\x9b31m")
     client.latest = replace(LATEST, commit=commit)
-
     result = run(*REBUILD, *ON_FEATURE, stdin="n\n")
 
     assert not re.search(r"[\x00-\x09\x0b-\x1f\x7f-\x9f]", result.output)
@@ -547,7 +548,6 @@ def test_a_watch_that_fails_names_the_build_to_watch_and_does_not_rebuild_again(
 )
 def test_watch_exits_with_the_code_of_the_watch(client: type[StubClient], result_of_build: BuildResult, code: int):
     client.changes = (STARTED, done(STARTED, result_of_build))
-
     result = run(*REBUILD, *ON_FEATURE, "--yes", "--watch")
 
     assert result.exit_code == code
@@ -560,6 +560,7 @@ def test_watch_that_times_out_exits_23_and_does_not_rebuild_again(
     def late(*_: object, **__: object) -> Iterator[Build]:
         yield STARTED
         msg = "Still running."
+
         raise odouche.StreamTimeoutError(msg)
 
     monkeypatch.setattr(client, "watch_build", late)
@@ -597,7 +598,6 @@ def test_json_is_the_new_build(client: type[StubClient]):
 
 def test_json_with_watch_is_one_build_per_change(client: type[StubClient]):
     client.changes = (STARTED, done(STARTED, BuildResult.FAILED))
-
     result = run("--format", "json", *REBUILD, *ON_FEATURE, "--yes", "--watch")
 
     assert result.exit_code == 20
@@ -607,7 +607,6 @@ def test_json_with_watch_is_one_build_per_change(client: type[StubClient]):
 
 def test_an_unknown_outcome_exits_10_names_the_builds_to_check_and_is_not_sent_again(client: type[StubClient]):
     client.lost = LOST
-
     result = run(*REBUILD, *ON_FEATURE, "--yes", "--watch")
 
     assert result.exit_code == 10
@@ -625,7 +624,6 @@ def test_a_production_branch_exits_9_with_the_message_of_the_library_and_no_ques
     client: type[StubClient], arguments: tuple[str, ...]
 ):
     client.on_branch = MAIN
-
     result = run(*REBUILD, "--project", "acme", "--branch", "main", *arguments, stdin="y\n")
 
     assert result.exit_code == 9
@@ -642,7 +640,6 @@ def test_the_client_is_one_that_writes(client: type[StubClient]):
 
 def test_logged_out_exits_3_and_names_the_login(client: type[StubClient]):
     client.error = odouche.NoSessionError("Not logged in.")
-
     result = run(*REBUILD, *ON_FEATURE, "--yes")
 
     assert result.exit_code == 3
@@ -652,7 +649,6 @@ def test_logged_out_exits_3_and_names_the_login(client: type[StubClient]):
 
 def test_a_missing_branch_while_logged_out_is_a_usage_error(client: type[StubClient]):
     client.error = odouche.NoSessionError("Not logged in.")
-
     result = run(*REBUILD, "--project", "acme", "--yes")
 
     assert result.exit_code == 2
@@ -662,7 +658,6 @@ def test_a_missing_branch_while_logged_out_is_a_usage_error(client: type[StubCli
 
 def test_help_opens_no_client_and_its_first_line_says_it_changes_state(client: type[StubClient]):
     client.error = odouche.KeyringUnavailableError()
-
     result = run(*REBUILD, "--help")
 
     assert result.exit_code == 0
@@ -673,7 +668,6 @@ def test_help_opens_no_client_and_its_first_line_says_it_changes_state(client: t
 
 def test_the_help_of_the_group_says_it_changes_state(client: type[StubClient]):
     result = run("builds", "--help")
-
     listed = [line for line in click.unstyle(result.output).splitlines() if " rebuild " in line]
     assert len(listed) == 1
     assert "Change state on Odoo.sh" in listed[0]
@@ -682,9 +676,11 @@ def test_the_help_of_the_group_says_it_changes_state(client: type[StubClient]):
 def commands(command: Any, path: tuple[str, ...] = ()) -> Iterator[tuple[str, ...]]:
     """Walk a command's tree down to the commands that run something."""
     children: dict[str, Any] | None = getattr(command, "commands", None)
+
     if children is None:
         yield path
         return
+
     for name, child in children.items():
         yield from commands(child, (*path, name))
 
@@ -722,10 +718,12 @@ def test_only_the_writers_build_a_client_that_writes(
     monkeypatch.setenv(BRANCH_ENV, "feature-x")
     # Rebuilt and backed up both.
     client.on_branch = replace(FEATURE, stage=Stage.STAGING, stage_name="staging")
+
     if path == PULL:
         # Copied from production alone.
         client.on_branch = replace(FEATURE, stage=Stage.PRODUCTION, stage_name="production")
         client.listed = (DAILY,)
+
     monkeypatch.delenv(odouche.SESSION_ENV, raising=False)
     monkeypatch.setattr(odouche, "login", lambda **_: None)
     monkeypatch.setattr(ssh, "_exec", lambda *_: None)
@@ -738,6 +736,7 @@ def test_only_the_writers_build_a_client_that_writes(
 
     # A command that did not run to its end shows nothing: a new one may need a row in `ARGUMENTS`.
     assert result.exit_code == 0, result.output
+
     if path in CLIENTLESS:
         assert client.modes == []
     else:

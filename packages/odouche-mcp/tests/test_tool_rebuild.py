@@ -18,7 +18,6 @@ SENTINEL = "sentinel-session-value"
 SWITCH = ("allow", "change", "write", "read_only", "readonly")
 # The verb of the tools that change state, which is left out of their names alone.
 VERB = "change_"
-
 MAIN = odouche.Branch(id=3, name="main", stage=odouche.Stage.PRODUCTION, stage_name="production")
 FEATURE = odouche.Branch(id=4, name="feature-x", stage=odouche.Stage.DEVELOPMENT, stage_name="dev")
 ODD = odouche.Branch(id=5, name="odd\x1b[2J\nname", stage=odouche.Stage.DEVELOPMENT, stage_name="dev")
@@ -69,18 +68,23 @@ class Upstream:
         if project != "acme":
             msg = f"No project {project} among those you can reach."
             raise odouche.NotFoundError(msg)
+
         return [MAIN, FEATURE, ODD]
 
     def rebuild(self, branch: odouche.Branch) -> odouche.Build:
         if self.read_only:
             msg = "This client is read-only: it does not send a rebuild."
             raise odouche.ReadOnlyError(msg)
+
         if branch.stage is odouche.Stage.PRODUCTION:
             msg = "A branch in the production stage is not rebuilt."
             raise odouche.StageRefusedError(msg)
+
         self.rebuilt.append(branch)
+
         if self.failure:
             raise self.failure
+
         return STARTED
 
 
@@ -116,6 +120,7 @@ def _call(server: MCPServer, **arguments: Any) -> CallToolResult:
 def _error(server: MCPServer, **arguments: Any) -> str:
     result = _call(server, **arguments)
     assert result.is_error
+
     return result.model_dump()["content"][0]["text"].removeprefix("Error executing tool rebuild_branch: ")
 
 
@@ -207,7 +212,6 @@ def test_a_rebuild_that_fails_writes_one_line_with_the_kind_of_error(
     outcome: str,
 ):
     monkeypatch.setattr(Upstream, "failure", failure)
-
     _error(_allowed(), project="acme", branch=branch)
 
     err = capsys.readouterr().err

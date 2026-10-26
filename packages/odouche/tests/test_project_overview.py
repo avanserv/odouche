@@ -164,7 +164,6 @@ def test_the_info_is_read_without_its_token_and_codes(upstream, session):
     with_secrets(upstream)
 
     result = projects.info(upstream.connect(Secret(session)), "acme-shop")
-
     active = result.child("active_repo")
     assert (result.has("access_token"), active.has("subscription_code")) == (False, False)
     assert active.child("production_build_id").has("enterprise_code") is False
@@ -219,7 +218,6 @@ def test_a_changed_shape_in_the_info_sends_nothing_more(client, upstream):
 @pytest.mark.parametrize("access", ["developer", "tester"])
 def test_the_settings_are_not_asked_below_admin(client, upstream, access):
     info(upstream)["user"]["access"] = access
-
     read = client.project_overview("acme-shop")
 
     assert read == dataclasses.replace(OVERVIEW, access_level=access, hosting=None)
@@ -247,7 +245,6 @@ def test_an_access_the_map_does_not_hold_is_a_changed_shape(client, upstream):
 )
 def test_reads_each_subscription_the_page_names(client, upstream, name, subscription):
     repo(upstream)["subscription_validity"] = name
-
     read = client.project_overview("acme-shop")
 
     assert (read.subscription, read.subscription_name) == (subscription, name)
@@ -313,6 +310,7 @@ def test_a_branch_with_no_build_has_no_last_build(client, upstream):
 @pytest.mark.parametrize("change", ["missing", "null", "list"])
 def test_names_the_field_that_changed_shape(client, upstream, body, key, field, change):
     fields = body(upstream)
+
     if change == "missing":
         del fields[key]
     else:

@@ -60,12 +60,14 @@ def login(ctx: typer.Context) -> None:
     output: Output = ctx.obj
     odouche.login(ask=_ask, notify=lambda step: typer.echo(_STEPS[step], err=True))
     typer.echo("The session is stored in the keyring.", err=True)
+
     if os.environ.get(odouche.SESSION_ENV):
         typer.echo(f"{odouche.SESSION_ENV} is set and is used instead of it until it is unset.", err=True)
         identity = None
     else:
         with open_client() as client:
             identity = client.identity()
+
     output.stream([Login(identity)], _login_line)
 
 
@@ -80,11 +82,14 @@ def status(
 ) -> None:
     """Show where the session comes from and how long it lasts, without asking Odoo.sh. Exits 3 when there is none."""
     output: Output = ctx.obj
+
     with open_client() as client:
         if not check:
             output.one(client.session, _session_columns(_itself))
             return
+
         identity = client.identity()
+
     output.one(
         identity,
         [
@@ -140,14 +145,19 @@ def _login_line(result: Login) -> str:
 def _logout_line(result: Logout) -> str:
     if result.source is None:
         return "Not logged in."
+
     if not result.deleted:
         return (
             f"The session comes from {odouche.SESSION_ENV}, which osh cannot unset. "
             "Nothing was changed: unset it yourself."
         )
+
     removed = "The stored session was removed from the keyring"
+
     if result.invalidated:
         return f"{removed} and ended on Odoo.sh."
+
     if result.failure is None:
         return f"{removed}. It was not ended on Odoo.sh."
+
     return f"{removed}. Odoo.sh could not be asked to end it, so a copy of it works until it expires: {result.failure}"

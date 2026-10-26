@@ -70,6 +70,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
         calls: list[str] = []
 
     monkeypatch.setattr(odouche, "Client", Client)
+
     return Client
 
 
@@ -138,7 +139,6 @@ def test_an_empty_branch_is_a_usage_error(client: type[StubClient]):
 )
 def test_a_size_is_in_binary_units(client: type[StubClient], size: int, shown: str):
     client.found = (backup(BackupKind.REMOTE, datetime(2026, 10, 1, tzinfo=UTC), "main", size),)
-
     result = run("backups", "list", "--project", "acme")
 
     assert " ".join(rows(result)[1][-3:-1]) == shown
@@ -147,7 +147,6 @@ def test_a_size_is_in_binary_units(client: type[StubClient], size: int, shown: s
 @pytest.mark.parametrize(("found", "args"), [((), ()), (BACKUPS, ("--branch", "nope"))])
 def test_none_is_a_line_on_stderr(client: type[StubClient], found: tuple[Backup, ...], args: tuple[str, ...]):
     client.found = found
-
     result = run("backups", "list", "--project", "acme", *args)
 
     assert result.exit_code == 0
@@ -157,7 +156,6 @@ def test_none_is_a_line_on_stderr(client: type[StubClient], found: tuple[Backup,
 
 def test_none_as_json_is_an_empty_list(client: type[StubClient]):
     client.found = ()
-
     result = run("--format", "json", "backups", "list", "--project", "acme")
 
     assert json.loads(result.stdout) == []

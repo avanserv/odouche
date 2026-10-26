@@ -57,8 +57,10 @@ def render(server: MCPServer[Any] | None = None) -> str:
         for tool, (_, lines) in described
     ]
     blocks = [_HEADER.rstrip("\n"), _reference.table(("Tool", "Changes Odoo.sh", TOUCHES), rows)]
+
     for tool, (summary, lines) in described:
         blocks.extend(_tool(tool, summary, lines))
+
     return "\n\n".join(blocks) + "\n"
 
 
@@ -74,21 +76,27 @@ def _described(tool: Tool) -> tuple[str, dict[str, str]]:
     text = (tool.description or "").split("\n")
     summary, last = text[: -len(_LABELS)], text[-len(_LABELS) :]
     lines: dict[str, str] = {}
+
     for label in _LABELS:
         line = next((line for line in last if line.startswith(f"{label}: ")), None)
+
         if line is None:
             msg = f"The description of `{tool.name}` does not end with its `{label}:` line."
             raise UnsupportedError(msg)
+
         lines[label] = _checked(line.removeprefix(f"{label}: "), f"The `{label}:` line of `{tool.name}`")
+
     return _checked(" ".join(" ".join(summary).split()), f"The description of `{tool.name}`"), lines
 
 
 def _hints(tool: Tool) -> list[bool]:
     given: dict[str, Any] = tool.annotations.model_dump(by_alias=True) if tool.annotations else {}
     hints = [hint for name in _HINTS if isinstance(hint := given.get(name), bool)]
+
     if len(hints) != len(_HINTS):
         msg = f"`{tool.name}` does not set all four hints."
         raise UnsupportedError(msg)
+
     return hints
 
 
@@ -106,11 +114,14 @@ def _tool(tool: Tool, summary: str, lines: dict[str, str]) -> list[str]:
         (f"`{name}`", *_argument(argument, schema, f"`{name}` of `{tool.name}`", required=name in required))
         for name, argument in properties.items()
     ]
+
     if rows:
         blocks.append(_reference.table(("Argument", "Type", "Default"), rows))
+
     blocks.append("\n".join(f"- **{label}**: {lines[label]}" for label in _LABELS))
     hints = [(f"`{hint}`", str(value).lower()) for hint, value in zip(_HINTS, _hints(tool), strict=True)]
     blocks.append(_reference.table(("Hint", "Value"), hints))
+
     return blocks
 
 
@@ -126,9 +137,11 @@ def _argument(argument: dict[str, Any], schema: dict[str, Any], where: str, *, r
         "one of " + ", ".join(f"`{choice}`" for choice in choices) if choices else str(kind["type"]),
         "Required." if required else "" if default is None else f"`{json.dumps(default)}`",
     )
+
     if not all(map(_fits, cells)):
         msg = f"{where} has a choice or a default a table cell cannot hold."
         raise UnsupportedError(msg)
+
     return cells
 
 
@@ -136,16 +149,21 @@ def _kind(argument: dict[str, Any], schema: dict[str, Any], where: str, *, requi
     """Return the schema of the one scalar an argument is, its reference followed, failing on any other argument."""
     kinds: list[dict[str, Any]] = argument.get("anyOf", [argument])
     scalars = [kind for kind in kinds if kind != _NULL]
+
     if argument.keys() - _SHOWN or len(scalars) != 1 or (required and len(kinds) > 1):
         msg = f"{where} has a schema the page cannot show."
         raise UnsupportedError(msg)
+
     kind = scalars[0]
     reference: str = kind.get("$ref", "")
+
     if reference.startswith(_REFERENCE):
         kind = schema.get("$defs", {}).get(reference.removeprefix(_REFERENCE), {})
+
     if kind.get("type") not in _SCALARS or "const" in kind:
         msg = f"{where} has a schema the page cannot show."
         raise UnsupportedError(msg)
+
     return kind
 
 
@@ -159,9 +177,11 @@ def _checked(text: str, what: str) -> str:
     if _CONTROL.search(text):
         msg = f"{what} has a control character, which the page cannot show."
         raise UnsupportedError(msg)
+
     if re.search("[<>]", _CODE.sub("", text)):
         msg = f"{what} has `<` or `>` outside backticks, which Markdown reads as HTML."
         raise UnsupportedError(msg)
+
     return text
 
 

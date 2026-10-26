@@ -109,6 +109,7 @@ class StubClient:
         assert branch == MAIN
         assert self.modes[-1] is False
         self.events.append("allowed")
+
         return ipaddress.IPv4Address("203.0.113.7")
 
 
@@ -116,6 +117,7 @@ class StubClient:
 def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     made = type("Made", (StubClient,), {"modes": [], "events": []})
     monkeypatch.setattr(odouche, "Client", made)
+
     return made
 
 
@@ -136,6 +138,7 @@ def tries(monkeypatch: pytest.MonkeyPatch, client: type[StubClient]) -> list[str
         assert command == [SSH, *ssh._TRY, "-l", "101", HOST, "true"]
         client.events.append(("tried", os.environ.get(odouche.SESSION_ENV)))
         said = outcomes.pop(0) if len(outcomes) > 1 else outcomes[0]
+
         return subprocess.CompletedProcess(command, 255 if said is not None else 0, stderr=said or "")
 
     def sleep(seconds: float) -> None:
@@ -144,6 +147,7 @@ def tries(monkeypatch: pytest.MonkeyPatch, client: type[StubClient]) -> list[str
     monkeypatch.setattr(ssh, "_run", run)
     monkeypatch.setattr(ssh, "_monotonic", lambda: now[0])
     monkeypatch.setattr(ssh, "_sleep", sleep)
+
     return outcomes
 
 
@@ -163,6 +167,7 @@ def executed(monkeypatch: pytest.MonkeyPatch, client: type[StubClient]) -> list[
     monkeypatch.setattr(_terminal, "stdout_is_terminal", lambda: False)
     programs = {"ssh": SSH, "rsync": RSYNC, "scp": SCP}
     monkeypatch.setattr(shutil, "which", programs.get)
+
     return client.events
 
 
@@ -218,7 +223,6 @@ def test_without_rsync_scp_copies_it(monkeypatch: pytest.MonkeyPatch, executed: 
 def test_no_flag_keeps_the_remote_mode(monkeypatch: pytest.MonkeyPatch, executed: list[object], program: str):
     monkeypatch.setattr(shutil, "which", {"ssh": SSH, Path(program).name: program}.get)
     monkeypatch.setattr(_terminal, "stdout_is_terminal", lambda: True)
-
     run()
 
     _, command, _ = executed[-1]  # pyright: ignore[reportGeneralTypeIssues]
@@ -245,7 +249,6 @@ def test_a_build_name_that_is_not_lower_case_letters_digits_and_dashes_executes_
     client: type[StubClient], executed: list[object], name: str
 ):
     client.listed = (replace(DAILY, build_name=name),)
-
     result = run()
 
     assert result.exit_code == 6
@@ -292,7 +295,6 @@ def test_what_is_not_there_executes_nothing(
     client: type[StubClient], executed: list[object], args: tuple[str, ...], listed: tuple[Backup, ...], said: str
 ):
     client.listed = listed
-
     result = run(*args)
 
     assert result.exit_code == 4
@@ -302,7 +304,6 @@ def test_what_is_not_there_executes_nothing(
 
 def test_a_project_with_no_production_branch_executes_nothing(client: type[StubClient], executed: list[object]):
     client.branches_ = (STAGING,)
-
     result = run()
 
     assert result.exit_code == 4
@@ -391,6 +392,7 @@ def blocked(tries: list[str | None], monkeypatch: pytest.MonkeyPatch) -> list[st
     tries[:] = [REFUSED, None]
     monkeypatch.setattr(_terminal, "stdin_is_terminal", lambda: True)
     monkeypatch.setattr(_terminal, "stderr_is_terminal", lambda: True)
+
     return tries
 
 

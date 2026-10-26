@@ -90,6 +90,7 @@ def test_cannot_be_copied(wrapped, duplicate):
 def test_has_no_state_to_read(wrapped):
     with pytest.raises(TypeError):
         vars(wrapped)
+
     with pytest.raises(TypeError):
         wrapped.__getstate__()
 

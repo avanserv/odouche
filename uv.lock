@@ -873,6 +873,7 @@ dev = [
     { name = "pytest-cov" },
     { name = "pytest-randomly" },
     { name = "ruff" },
+    { name = "spacify" },
     { name = "vulture" },
     { name = "zensical" },
     { name = "zizmor" },
@@ -896,6 +897,7 @@ dev = [
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "pytest-randomly", specifier = ">=5.0.0" },
     { name = "ruff", specifier = ">=0.16.9" },
+    { name = "spacify", specifier = ">=0.2.0" },
     { name = "vulture", specifier = ">=2.16" },
     { name = "zensical", specifier = ">=0.0.67" },
     { name = "zizmor", specifier = ">=1.30.1" },
@@ -1450,6 +1452,21 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031, upload-time = "2024-12-04T17:35:28.174Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050, upload-time = "2024-12-04T17:35:26.475Z" },
+]
+
+[[package]]
+name = "spacify"
+version = "0.2.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/92/e0/a210f6a16aa902eade24fbc6ce9221042a923db9e1565647b56a2172207a/spacify-0.2.0.tar.gz", hash = "sha256:5b89f2e73ff9f1de3529f84f60b26400be06eaf07a3fc6a3ad443aa7fab9b67c", size = 25114, upload-time = "2026-10-19T21:16:17.764Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6c/d3/2c7fa78f9582925bc28aac04aefff2dfc2b8b577e1378e81367a51939258/spacify-0.2.0-py3-none-macosx_10_12_x86_64.whl", hash = "sha256:99910246fdf5c5991bbf3ee2ff56ffff996f578bc41458626ca4598668212a97", size = 1216438, upload-time = "2026-10-19T21:16:08.624Z" },
+    { url = "https://files.pythonhosted.org/packages/c3/b9/a9a8d6ff4cce6218666d179f3ea490366c1b189406828299d93d19a0e8c1/spacify-0.2.0-py3-none-macosx_11_0_arm64.whl", hash = "sha256:9a47ea5539053cb1589f264252bf6e843898ccc5f97d8a00b0a47f047a507cc9", size = 1116062, upload-time = "2026-10-19T21:16:09.831Z" },
+    { url = "https://files.pythonhosted.org/packages/ba/42/ffb19c222a8d933d719022b87f9dbd196436c4f958e4a48006f08fafaa5c/spacify-0.2.0-py3-none-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c0aebdfe5a7d3887d7d89ef8310dd49bd865343bd816dbb8c475f4eb9ecc98af", size = 1213482, upload-time = "2026-10-19T21:16:11.28Z" },
+    { url = "https://files.pythonhosted.org/packages/ed/e4/615eb25a43eedfe48df8aaefc46ef6e80cce4edc49ed9f5abf9416460ccc/spacify-0.2.0-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:343646acf8fbb2dccba41d33d575262df456cbcb8a57e2d034f4bebe4220bd02", size = 1290114, upload-time = "2026-10-19T21:16:12.465Z" },
+    { url = "https://files.pythonhosted.org/packages/df/91/b48ffd6e3a83d0dfac21af4b586828871c4ab3a3e9f88c334d9bbaa7c624/spacify-0.2.0-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:b3415c0aae405268a510a748527a64bd4e79b87e4b6897d28eb08899812fe16e", size = 1232428, upload-time = "2026-10-19T21:16:13.823Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/44/65145047dbc4bfe0abb19ebb9e4bc4cfd61f2e6c05e6a7a6bb3edf8eae00/spacify-0.2.0-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:62c5d62d856be5719cca7922ce3a336a2b7c87d31499d6e692b8fbfba584abf9", size = 1356321, upload-time = "2026-10-19T21:16:15.192Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/c6/2eb39ca095025f76cb5a5c68963a054426ca1d50dbe58dbf8a69f059b858/spacify-0.2.0-py3-none-win_amd64.whl", hash = "sha256:a8878890d86c382c384bc99b4f5feddefa0cc551e67394c58854d257e95e24ea", size = 1165688, upload-time = "2026-10-19T21:16:16.741Z" },
 ]
 
 [[package]]

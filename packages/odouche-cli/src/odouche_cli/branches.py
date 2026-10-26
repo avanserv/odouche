@@ -47,7 +47,6 @@ settings_app = typer.Typer(
 app.add_typer(settings_app)
 
 _STAGE_ORDER = {odouche.Stage.PRODUCTION: 0, odouche.Stage.STAGING: 1, odouche.Stage.DEVELOPMENT: 2}
-
 _DEFAULT_LIMIT = 10
 _MAX_LIMIT = 200
 # For the history pages, one request each: ten at most.
@@ -104,10 +103,13 @@ def list_(ctx: typer.Context, project: ProjectOption = None, stage: StageOption 
     A stage `osh` does not know is shown as Odoo.sh names it, after the others. In the table, `*` marks the branch checked out, when the project comes from the git checkout.
     """
     output: Output = ctx.obj
+
     with open_client() as client:
         found = client.branches(resolve_project(ctx, project, client.projects))
+
     if stage:
         found = [branch for branch in found if branch.stage in stage]
+
     found.sort(key=lambda branch: (_STAGE_ORDER.get(branch.stage, len(_STAGE_ORDER)), branch.name))
     # A project given by name may not be the checkout's.
     current = checkout_branch() if project is None and output.format is Format.TABLE else None
@@ -143,9 +145,11 @@ def history(
     """
     output: Output = ctx.obj
     name = resolve_branch(ctx, branch)
+
     with open_client() as client:
         _, found = project_branch(ctx, client, project, name)
         events = list(client.history(found, limit=limit, timeout=_TIMEOUT))
+
     if output.format is Format.JSON:
         output.rows(events, [], empty="No history.")
     elif commits and events:
@@ -192,9 +196,11 @@ def show(ctx: typer.Context, project: ProjectOption = None, branch: BranchOption
     """
     output: Output = ctx.obj
     name = resolve_branch(ctx, branch)
+
     with open_client() as client:
         _, found = project_branch(ctx, client, project, name)
         read = client.branch_settings(found)
+
     output.one(read, _SETTINGS)
 
 
@@ -215,23 +221,30 @@ def set_(
     change = _settings.built(ctx, lambda: odouche.SettingsChange(**_settings.given(ctx, settings, _READS)))  # pyright: ignore[reportArgumentType]
     name = resolve_branch(ctx, branch)
     _settings.can_ask(ctx, yes=yes)
+
     with open_client(writes=True) as client:
         project_name, found = project_branch(ctx, client, project, name)
         current = client.branch_settings(found)
         narrowed = _settings.checked(ctx, lambda: client.check_settings_change(found, current, change))
+
         for line in _changing(project_name, found, current, change, narrowed):
             _settings.say(line)
+
         if narrowed is None:
             typer.echo("Nothing was sent: every setting already has that value.", err=True)
             output.one(current, _SETTINGS)
+
             return
+
         if not yes and not _terminal.confirmed("Change these settings of this branch?"):
             typer.echo("Nothing was sent.", err=True)
             raise typer.Exit(EXIT_DECLINED)
+
         # Sent once: an error is reported, never retried.
         outcome = _settings.checked(ctx, lambda: client.change_branch_settings(found, narrowed))
         typer.echo("The settings were changed.", err=True)
         _settings.say_moved(outcome)
+
     output.one(outcome.after, _SETTINGS)
 
 
@@ -261,9 +274,11 @@ def _changing(
     """
     sent = {} if narrowed is None else narrowed.given()
     lines = [f"Project: {project}", f"Branch: {branch.name} ({stage_of(branch)})"]
+
     for name, value in change.given().items():
         before, after = quoted(getattr(current, name)), quoted(value)
         lines.append(f"{name}: {before} → {after}" if name in sent else f"{name} is already {after}.")
+
     return lines
 
 
@@ -294,9 +309,11 @@ def move(
     target = odouche.Stage(to.value)
     name = resolve_branch(ctx, branch)
     _settings.can_ask(ctx, yes=yes)
+
     with open_client(writes=True) as client:
         project_name, found = project_branch(ctx, client, project, name)
         client.check_move(found, target)
+
         for line in (
             f"Project: {project_name}",
             f"Branch: {found.name} ({stage_of(found)})",
@@ -304,14 +321,19 @@ def move(
             _MOVED[target],
         ):
             _settings.say(line)
+
         if not yes and not _terminal.confirmed(f"Move this branch to {target.value}?"):
             typer.echo("Nothing was sent.", err=True)
             raise typer.Exit(EXIT_DECLINED)
+
         # Sent once: an error is reported, never retried.
         moved = client.move_branch(found, target)
+
     said = f"Branch {moved.name} is now in {moved.stage.value}."
+
     if moved.stage is odouche.Stage.STAGING:
         said += f" Follow its new build with `osh builds watch --branch {moved.name}`."
+
     _settings.say(said)
     output.one(moved, _BRANCH)
 
@@ -340,9 +362,11 @@ def revision(
     """
     output: Output = ctx.obj
     name = resolve_branch(ctx, branch)
+
     with open_client() as client:
         project_name, found = project_branch(ctx, client, project, name)
         read = client.build_revision(project_name, find_build(client, project_name, found, build_id))
+
     output.one(read, _revision_columns(read))
     typer.echo("Submodule commits are not available: Odoo.sh does not give them.", err=True)
 
@@ -360,8 +384,10 @@ def _ref_column(ref: odouche.OdooRef) -> Column[odouche.BuildRevision]:
 def _selection(selected: odouche.OdooRevision | None) -> str:
     if selected is None:
         return "none"
+
     if selected.pinned:
         return f"{selected.id}, pinned, {selected.version}"
+
     return f"{selected.id}, latest of {selected.version}"
 
 
@@ -369,6 +395,7 @@ def _rows(events: list[odouche.Tracking]) -> Iterator[_Row]:
     for tracking in events:
         if not tracking.commits:
             yield _Row(tracking, None, first=True)
+
         for at, commit in enumerate(tracking.commits):
             yield _Row(tracking, commit, first=at == 0)
 
@@ -386,16 +413,20 @@ def _build[T](row: _Row, value: Callable[[odouche.TrackedBuild], T]) -> T | None
 def _change(row: _Row) -> str | None:
     if row.commit is not None:
         return f"{row.commit.hash[:_HASH_LENGTH]} {subject(row.commit.message)}".rstrip()
+
     return _moved(row.tracking)
 
 
 def _moved(tracking: odouche.Tracking) -> str | None:
     """Say how a branch moved between stages, or `None` for an event that moved it nowhere."""
     source, target = tracking.source_stage, tracking.target_stage
+
     if target is None:
         return None
+
     if source is None:
         return f"created in {target.value}"
+
     return f"{source.value} → {target.value}"
 
 
@@ -404,19 +435,30 @@ def _full(events: list[odouche.Tracking]) -> Iterator[str]:
     for at, tracking in enumerate(events):
         if at:
             yield ""
+
         said = [_kind(tracking), ago(tracking.created_at)]
+
         if tracking.pusher is not None:
             said.append(f"by {tracking.pusher}")
+
         if tracking.build is not None:
             outcome = " ".join(filter(None, [status_of(tracking.build), result_of(tracking.build)]))
             said.append(f"build {tracking.build.id} {outcome}")
+
         moved = _moved(tracking)
+
         if moved is not None:
             said.append(moved)
+
         yield ", ".join(said)
+
         for commit in tracking.commits:
             yield ""
+
             yield f"{_INDENT}commit {commit.hash}"
+
             yield f"{_INDENT}{commit.url}"
+
             yield ""
+
             yield from (f"{_INDENT * 2}{line}".rstrip() for line in commit.message.strip().splitlines())

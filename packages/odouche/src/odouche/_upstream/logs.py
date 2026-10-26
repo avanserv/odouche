@@ -21,7 +21,6 @@ from odouche.secret import Secret
 # What the page asks for when it opens a log.
 TAIL_BYTES = 1048576
 MAX_LINE = 65536
-
 _OPERATION = "logs"
 _KINDS = {kind.value: kind for kind in LogKind if kind is not LogKind.UNKNOWN}
 _NAME = re.compile(r"[a-z0-9_-]+")
@@ -75,14 +74,18 @@ class _Lines:
 
     def feed(self, chunk: bytes) -> Iterator[LogLine]:
         *ended, rest = chunk.split(b"\n")
+
         for piece in ended:
             self.consumed += len(piece) + 1
+
             if self._skipping:
                 self._skipping = False
             else:
                 self._hold(piece)
                 yield self._line()
+
         self.consumed += len(rest)
+
         if not self._skipping:
             self._hold(rest)
 
@@ -99,12 +102,14 @@ class _Lines:
         text = bytes(self._held[:MAX_LINE]).decode("utf-8", errors="replace")
         line = LogLine(text=text, offset=self.consumed, truncated=len(self._held) > MAX_LINE)
         self._held.clear()
+
         return line
 
 
 def logs(transport: Transport, project: str, build: Build) -> list[Log]:
     """List the logs a build has, which is none while it waits for a worker."""
     source = _source(transport, project, build)
+
     return [] if source is None else _logs(transport, source)
 
 
@@ -112,6 +117,7 @@ def read(transport: Transport, project: str, build: Build, kind: LogKind | str, 
     """Yield the lines of a log, or the last `tail` of them that its last mebibyte holds."""
     if tail is not None and builds.number("tail", tail) < 1:
         raise ValueError("A tail is at least 1")
+
     return _read(_locate(transport, project, build, kind), tail)
 
 
@@ -128,18 +134,24 @@ def follow(
     """Yield the lines of a log as they are written, from `offset` or after the last `tail` lines."""
     if timeout <= 0:
         raise ValueError("A timeout is more than 0")
+
     if builds.number("tail", tail) < 0:
         raise ValueError("A tail is at least 0")
+
     if offset is not None and builds.number("offset", offset) < 0:
         raise ValueError("An offset is at least 0")
+
     deadline = _monotonic() + timeout
+
     return _follow(_locate(transport, project, build, kind), deadline, tail, offset)
 
 
 def _source(transport: Transport, project: str, build: Build) -> _Source | None:
     worker = builds.worker(transport, build.branch_id, build.id)
+
     if worker is None:
         return None
+
     return _Source(worker, projects.access_token(transport, project), build.id)
 
 
@@ -160,19 +172,25 @@ def _locate(transport: Transport, project: str, build: Build, kind: LogKind | st
     """Return where a log is read. Its name goes into the address, so it is one the worker listed."""
     name = kind.value if isinstance(kind, LogKind) else kind
     source = _source(transport, project, build)
+
     if source is None:
         raise NotFoundError(f"Build {build.id} has no log yet: it waits for a worker.", operation=_OPERATION)
+
     if name not in [log.name for log in _logs(transport, source)]:
         raise NotFoundError(f"Build {build.id} has no log named {name!r}.", operation=_OPERATION)
+
     if _NAME.fullmatch(name) is None:
         raise UpstreamChangedError(_OPERATION, "result.name")
+
     return _File(transport, source, source.path(name))
 
 
 def _read(file: _File, tail: int | None) -> Generator[LogLine]:
     if tail is None:
         lines = _Lines()
+
         yield from _fetch(file, lines)
+
         yield from lines.flush()
     else:
         yield from _last(*_tail(file, tail), tail, _Lines(), ended=True)
@@ -180,16 +198,21 @@ def _read(file: _File, tail: int | None) -> Generator[LogLine]:
 
 def _follow(file: _File, deadline: float, tail: int, offset: int | None) -> Generator[LogLine]:
     lines = _Lines()
+
     if offset is None:
         yield from _last(*_tail(file, tail), tail, lines, ended=False)
     else:
         lines.restart(offset)
         yield from _fetch(file, lines)
+
     while True:
         remaining = deadline - _monotonic()
+
         if remaining <= 0:
             raise StreamTimeoutError("The log was still being followed at the timeout.", operation=_OPERATION)
+
         _sleep(min(_INTERVAL, remaining))
+
         yield from _fetch(file, lines)
 
 
@@ -201,25 +224,32 @@ def _tail(file: _File, count: int) -> tuple[bytes, int]:
         except UpstreamUnavailableError:
             if delay is None:
                 raise
+
             _sleep(delay)
+
     raise AssertionError
 
 
 def _suffix(file: _File, count: int) -> tuple[bytes, int]:
     # With no line to keep, the last byte tells where the log ends.
     byte_range = f"bytes=-{TAIL_BYTES if count else 1}"
+
     with file.open(byte_range) as part:
         if part is None:
             return b"", 0
+
         held = bytearray()
         first = part.first
+
         for chunk in part.chunks:
             held += chunk
             # A part longer than asked for is held to its end.
             extra = len(held) - TAIL_BYTES
+
             if extra > 0:
                 del held[:extra]
                 first += extra
+
     return bytes(held), first
 
 
@@ -229,14 +259,17 @@ def _last(held: bytes, first: int, count: int, lines: _Lines, *, ended: bool) ->
     The lines are made one at a time: an end of only newlines is a mebibyte of them.
     """
     total = sum(1 for _ in _cut(held, first, _Lines(), ended=ended))
+
     return islice(_cut(held, first, lines, ended=ended), max(total - count, 0), None)
 
 
 def _cut(held: bytes, first: int, lines: _Lines, *, ended: bool) -> Iterator[LogLine]:
     # An end that starts inside the log starts inside a line.
     lines.restart(first, skipping=first > 0)
+
     for start in range(0, len(held), MAX_LINE):
         yield from lines.feed(held[start : start + MAX_LINE])
+
     if ended:
         yield from lines.flush()
 
@@ -244,15 +277,19 @@ def _cut(held: bytes, first: int, lines: _Lines, *, ended: bool) -> Iterator[Log
 def _fetch(file: _File, lines: _Lines) -> Iterator[LogLine]:
     """Yield what the log holds past `lines`, starting again where a failed request stopped."""
     failures = 0
+
     while True:
         before = lines.consumed
+
         try:
             yield from _part(file, lines)
         except UpstreamUnavailableError:
             if lines.consumed > before:
                 failures = 0
+
             if failures == len(_RETRIES):
                 raise
+
             _sleep(_RETRIES[failures])
             failures += 1
         else:
@@ -263,12 +300,16 @@ def _part(file: _File, lines: _Lines) -> Iterator[LogLine]:
     # As the page does, ask from the last byte held, not the one after.
     first = max(lines.consumed - 1, 0)
     held = lines.consumed - first
+
     with file.open(f"bytes={first}-") as part:
         if part is None:
             return
+
         if part.first != first:
             raise UpstreamChangedError(_OPERATION, "Content-Range")
+
         for chunk in part.chunks:
             new = chunk[held:]
             held -= len(chunk) - len(new)
+
             yield from lines.feed(new)

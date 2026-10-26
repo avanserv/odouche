@@ -14,7 +14,6 @@ from odouche.models import Build, BuildResult, BuildStatus, Commit
 
 # What the page asks for, and the most Odoo.sh has been seen to answer.
 DEFAULT_LIMIT = 4
-
 _OPERATION = "builds"
 _STATUSES = {status.value: status for status in BuildStatus if status is not BuildStatus.UNKNOWN}
 _RESULTS = {result.value: result for result in BuildResult if result is not BuildResult.UNKNOWN}
@@ -31,24 +30,29 @@ def builds(
 ) -> list[Build]:
     """List the latest builds of a branch, newest first and at most `limit` of them."""
     listed = [whole(build) for build in _listed(transport, branch_id, limit, within)]
+
     return sorted(listed, key=lambda build: build.id, reverse=True)[:limit]
 
 
 def build(transport: Transport, branch_id: int, build_id: int, *, within: float | None = None) -> Build:
     """Return one of the latest builds of a branch. Odoo.sh has no request for a build by its number."""
     number("build", build_id)
+
     for listed in builds(transport, branch_id, within=within):
         if listed.id == build_id:
             return listed
+
     raise not_listed(branch_id, build_id)
 
 
 def worker(transport: Transport, branch_id: int, build_id: int) -> str | None:
     """Return the address of the worker that holds a build, or `None` while it waits for one."""
     number("build", build_id)
+
     for listed in _listed(transport, branch_id, DEFAULT_LIMIT):
         if listed.integer("id") == build_id:
             return listed.optional_text("worker_url")
+
     raise not_listed(branch_id, build_id)
 
 
@@ -60,9 +64,12 @@ def host(build: Build, operation: str) -> str | None:
     """
     if build.url is None:
         return None
+
     found = _HOST_URL.fullmatch(build.url) if type(build.url) is str else None
+
     if found is None:
         raise UpstreamChangedError(operation, "url")
+
     return found.group(1)
 
 
@@ -80,8 +87,10 @@ def _listed(transport: Transport, branch_id: int, limit: int, within: float | No
 def entry(transport: Transport, branch_id: int, limit: int, within: float | None = None) -> Reader:
     """Return what Odoo.sh answers for a branch: its `branch_info` and its latest `builds`."""
     number("branch", branch_id)
+
     if number("limit", limit) < 1:
         raise ValueError("A limit is at least 1")
+
     answer = Reader(
         _OPERATION,
         transport.call(
@@ -94,8 +103,10 @@ def entry(transport: Transport, branch_id: int, limit: int, within: float | None
         ),
     )
     branches = answer.items("result")
+
     if len(branches) != 1:
         raise answer.changed("result")
+
     return branches[0]
 
 
@@ -103,6 +114,7 @@ def number(what: str, value: int) -> int:
     """Refuse what is not an integer: a number goes into the address of the request as it is."""
     if type(value) is not int:
         raise TypeError(f"A {what} is given as an integer")
+
     return value
 
 
@@ -110,6 +122,7 @@ def whole(build: Reader) -> Build:
     """Read a build from all its fields, as the builds request and the bus give them."""
     branch_id, branch_name = build.pair("branch_id")
     started = build.optional_text("start_datetime")
+
     return Build(
         id=build.integer("id"),
         name=build.text("name"),
@@ -132,6 +145,7 @@ def whole(build: Reader) -> Build:
 def short(build: Build, values: Reader) -> Build:
     """Return `build` as the short form of a bus event says it is now."""
     info = values.optional_text("status_info") if values.has("status_info") else build.status_info
+
     return replace(build, **_outcome(values), status_info=info)
 
 
@@ -158,9 +172,11 @@ def outcome(status: str, result: str | None) -> _Outcome:
 
 def _known[T](known: dict[str, T], name: str, unknown: T, kind: str) -> T:
     member = known.get(name)
+
     if member is None:
         _logger.debug("Unknown build %s: %r", kind, name)
         return unknown
+
     return member
 
 
@@ -169,12 +185,15 @@ def timestamp(build: Reader, key: str, value: str) -> datetime:
         return datetime.strptime(value, _TIMESTAMP).replace(tzinfo=UTC)
     except ValueError:
         pass
+
     # Raised out of the handler: the exception handled there holds the value.
     raise build.changed(key)
 
 
 def _commit_hash(build: Reader) -> str:
     found = _COMMIT_HASH.search(build.text("head_commit_url"))
+
     if found is None:
         raise build.changed("head_commit_url")
+
     return found.group(1)

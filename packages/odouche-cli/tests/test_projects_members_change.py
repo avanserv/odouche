@@ -66,14 +66,18 @@ class StubClient:
 
     def add_member(self, project: str, login: str, role: MemberRole) -> ProjectMember:
         self.calls.append(f"add {login} {role.value}")
+
         if self.lost is not None:
             raise self.lost
+
         return ProjectMember(61004, "Octo-Cat", "Octo-Cat", role, 1000004, pending_login=True)
 
     def set_member_role(self, project: str, member: ProjectMember, role: MemberRole) -> ProjectMember:
         self.calls.append(f"role {member.login} {role.value}")
+
         if self.lost is not None:
             raise self.lost
+
         return replace(member, role=role)
 
 
@@ -91,6 +95,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
     monkeypatch.setattr(odouche, "Client", Client)
     monkeypatch.setattr(_terminal, "stdin_is_terminal", lambda: True)
     monkeypatch.setattr(_terminal, "stderr_is_terminal", lambda: True)
+
     return Client
 
 
@@ -205,7 +210,6 @@ def test_a_refusal_after_the_question_exits_with_its_code(
     client: type[StubClient], error: odouche.OdoucheError, code: int
 ):
     client.lost = error
-
     result = run(*ADD, "octo-cat", "--yes")
 
     assert result.exit_code == code
@@ -236,7 +240,6 @@ def test_an_unknown_outcome_exits_10_and_says_where_to_look(
     client: type[StubClient], command: tuple[str, ...], operation: str, hint: str
 ):
     client.lost = odouche.OutcomeUnknownError("It was sent. Look before trying again.", operation=operation)
-
     result = run(*command, "--yes")
 
     assert result.exit_code == 10
@@ -301,7 +304,6 @@ def test_the_last_admin_lowered_exits_9_before_the_question(client: type[StubCli
 
 def test_an_admin_lowering_themselves_is_told_they_cannot_change_it_back(client: type[StubClient]):
     client.listed = (OCTO, replace(JANE, role=MemberRole.ADMIN), BOT)
-
     result = run(*ROLE, "octo-dev", "tester", "--yes")
 
     assert result.exit_code == 0
@@ -311,7 +313,6 @@ def test_an_admin_lowering_themselves_is_told_they_cannot_change_it_back(client:
 
 def test_lowering_another_admin_does_not_say_it_is_you(client: type[StubClient]):
     client.listed = (OCTO, replace(JANE, role=MemberRole.ADMIN), BOT)
-
     result = run(*ROLE, "jane-doe", "tester", "--yes")
 
     assert result.exit_code == 0
@@ -329,7 +330,6 @@ def test_raising_a_member_asks_nobody_who_they_are(client: type[StubClient]):
 
 def test_an_escape_sequence_in_a_login_read_from_odoo_sh_is_not_emitted(client: type[StubClient]):
     client.listed = (OCTO, replace(JANE, login=f"jane{ESCAPE}"), BOT)
-
     result = run(*ROLE, f"jane{ESCAPE}", "developer", stdin="y\n")
 
     assert result.exit_code == 0

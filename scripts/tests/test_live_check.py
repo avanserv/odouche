@@ -82,8 +82,10 @@ class StandIn:
 
     def _answer(self, name, value):
         self.calls.append(name)
+
         if name in self.failures:
             raise self.failures[name]
+
         return value
 
     def identity(self):
@@ -129,6 +131,7 @@ def client(monkeypatch):
     client = StandIn()
     monkeypatch.setattr(live_check, "Client", client)
     monkeypatch.delenv("CI", raising=False)
+
     return client
 
 
@@ -137,7 +140,6 @@ def test_refuses_in_ci_before_anything_is_contacted(client, monkeypatch, capsys,
     monkeypatch.setenv("CI", value)
 
     assert live_check.main([PROJECT]) == 2
-
     assert client.options is None
     assert client.calls == []
     captured = capsys.readouterr()
@@ -155,7 +157,6 @@ def test_the_project_has_no_default(client):
 
 def test_walks_the_read_path_of_the_production_branch_on_a_read_only_client(client, capsys):
     assert live_check.main([PROJECT]) == 0
-
     assert client.options == {"read_only": True}
     assert client.calls == [
         "identity",
@@ -239,6 +240,7 @@ def test_the_report_holds_nothing_that_identifies_the_project(client, capsys):
     assert live_check.main([PROJECT]) == 0
 
     captured = capsys.readouterr()
+
     for value in IDENTIFYING:
         assert value not in captured.out + captured.err
 

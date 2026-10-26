@@ -243,6 +243,7 @@ class Client:
         """
         found = members.find(current, member)
         members.allow_role(current, found, role)
+
         return found
 
     def branches(self, project: Project | str) -> list[Branch]:
@@ -263,7 +264,9 @@ class Client:
         for found in self.branches(project):
             if found.name == name:
                 return found
+
         msg = f"Project {_project_name(project)} has no branch {name}."
+
         raise NotFoundError(msg, operation="branches")
 
     def backups(self, project: Project | str) -> list[Backup]:
@@ -290,6 +293,7 @@ class Client:
         read-only client, and `NotFoundError` when the branch has no build or is not the project's.
         """
         stage = branch.stage if isinstance(branch, Branch) else None
+
         return backups.backup(self._transport, _project_name(project), _branch_id(branch), stage, comment)
 
     def check_backup(self, branch: Branch) -> None:
@@ -387,6 +391,7 @@ class Client:
     def latest_build(self, branch: Branch | int) -> Build | None:
         """Return the newest build of a branch, or `None` when it has none."""
         latest = builds.builds(self._transport, _branch_id(branch), 1)
+
         return latest[0] if latest else None
 
     def history(self, branch: Branch | int, *, limit: int = history.PAGE, timeout: float) -> Generator[Tracking]:
@@ -449,6 +454,7 @@ class Client:
         that is not a number raises `TypeError`.
         """
         held = branch.stage if isinstance(branch, Branch) else None
+
         return branches.move(self._transport, _branch_id(branch), to, held)
 
     def check_move(self, branch: Branch, to: Stage) -> None:
@@ -518,6 +524,7 @@ class Client:
         A branch that is not a number raises `TypeError`.
         """
         stage = branch.stage if isinstance(branch, Branch) else None
+
         return rebuild.rebuild(self._transport, _branch_id(branch), stage)
 
     def check_rebuild(self, branch: Branch) -> None:

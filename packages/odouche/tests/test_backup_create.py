@@ -63,6 +63,7 @@ def clock(monkeypatch):
 
     monkeypatch.setattr(backups, "_monotonic", lambda: now[0])
     monkeypatch.setattr(backups, "_sleep", sleep)
+
     return slept
 
 
@@ -135,8 +136,8 @@ def test_a_check_refuses_the_stage_a_backup_refuses_and_asks_nothing(upstream, s
     client = Client(Secret(session), read_only=True)
     production, development = client.branches("acme-shop")[:2]
     upstream.requests.clear()
-
     client.check_backup(production)
+
     with pytest.raises(StageRefusedError):
         client.check_backup(development)
 
@@ -191,8 +192,10 @@ def appears(upstream):
         def answer(_):
             nonlocal looks
             looks += 1
+
             if looks == look:
                 manual(body["result"], taken)
+
             return httpx2.Response(200, json=body)
 
         upstream.bodies[BACKUPS] = answer
@@ -242,7 +245,6 @@ def test_the_wait_ignores_another_build_s_manual_backup(client, upstream, clock)
 def test_a_wait_that_has_not_started_sends_nothing_more(client, upstream, clock):
     request = client.create_backup("acme-shop", BRANCH)
     upstream.requests.clear()
-
     client.wait_for_backup("acme-shop", request, timeout=60).close()
 
     assert paths(upstream) == [PROJECTS]
@@ -268,6 +270,7 @@ def test_the_wait_ends_only_once_odoo_sh_has_finished_the_backup(client, upstrea
     def finished_at_the_third_look(_):
         nonlocal looks
         looks += 1
+
         return httpx2.Response(
             200,
             json=copy.deepcopy(info)
@@ -278,7 +281,6 @@ def test_the_wait_ends_only_once_odoo_sh_has_finished_the_backup(client, upstrea
         )
 
     upstream.bodies[INFO] = finished_at_the_third_look
-
     seen = list(client.wait_for_backup("acme-shop", request, timeout=60))
 
     assert seen[:2] == [None, None]

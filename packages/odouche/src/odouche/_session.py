@@ -31,14 +31,11 @@ KEYRING_ENTRY = "session"
 """The name of the keyring entry, which holds the session and the time it was stored."""
 
 MAX_AGE = timedelta(days=30)
-
 _WAIT = 10.0
 """Seconds a keyring call is waited for when nobody is known to be at its dialog."""
 
 _WORKER = "odouche-keyring"
-
 _LOCKED = "The keyring is waiting to be unlocked. Answer its dialog, or supply the session through the environment."
-
 _UNFINISHED = "The keyring has not finished writing, and the stored session may have changed. Log in again."
 
 # The calls left behind that have not ended: the next call waits for them, not beside them.
@@ -65,10 +62,12 @@ def _accepted() -> "type[KeyringBackend]":
         from keyring.backends.macOS import Keyring as Keychain  # noqa: PLC0415
 
         return Keychain
+
     if sys.platform == "win32":
         from keyring.backends.Windows import WinVaultKeyring  # noqa: PLC0415
 
         return WinVaultKeyring
+
     from keyring.backends.SecretService import Keyring as SecretService  # noqa: PLC0415
 
     return SecretService
@@ -85,12 +84,14 @@ class _Gate:
         with self._lock:
             if self._committed is None:
                 self._committed = True
+
             return self._committed
 
     def abandon(self) -> bool:
         with self._lock:
             if self._committed is None:
                 self._committed = False
+
             return not self._committed
 
 
@@ -106,8 +107,10 @@ def _use[T](action: "Callable[[KeyringBackend], T]", *, wait: float | None = Non
     caller binds the entry to a name either, since a frame's locals travel with its traceback.
     """
     backend = _accepted()
+
     if not backend.viable:
         raise KeyringUnavailableError
+
     deadline = time.monotonic() + (_WAIT if wait is None else wait)
     _wait_for_left(deadline)
     gate = _Gate()
@@ -118,10 +121,13 @@ def _use[T](action: "Callable[[KeyringBackend], T]", *, wait: float | None = Non
     def work() -> None:
         try:
             keyring = backend()
+
             if writes:
                 _unlock(keyring)
+
                 if not gate.commit():
                     return
+
             results.append(action(keyring))
         # Backends let through more than `KeyringError`: D-Bus, pywin32 and decoding errors.
         except Exception as error:  # noqa: BLE001
@@ -132,25 +138,33 @@ def _use[T](action: "Callable[[KeyringBackend], T]", *, wait: float | None = Non
             done.set()
 
     Thread(target=work, name=_WORKER, daemon=True).start()
+
     try:
         finished = done.wait(max(0.0, deadline - time.monotonic()))
     except BaseException:
         gate.abandon()
         _left.append(done)
+
         raise
+
     if not finished:
         _left.append(done)
+
         if gate.abandon():
             raise KeyringUnavailableError(_LOCKED)
+
         # The write has started, so the keyring is unlocked.
         if not done.wait(_WAIT):
             raise KeyringUnavailableError(_UNFINISHED)
+
     for failure in failures:
         if isinstance(failure, BaseException):
             raise failure
+
         raise KeyringUnavailableError(
             f"The keyring could not be used ({failure}). Unlock it, or supply the session through the environment."
         )
+
     return results[0]
 
 
@@ -159,6 +173,7 @@ def _wait_for_left(deadline: float) -> None:
     for left in list(_left):
         if not left.wait(max(0.0, deadline - time.monotonic())):
             raise KeyringUnavailableError(_LOCKED)
+
         with suppress(ValueError):
             _left.remove(left)
 
@@ -166,12 +181,14 @@ def _wait_for_left(deadline: float) -> None:
 def _get(backend: "KeyringBackend") -> tuple[bool, tuple[Secret, datetime] | None]:
     """Return whether there is an entry, and what it holds if it can be read."""
     entry = backend.get_password(KEYRING_SERVICE, KEYRING_ENTRY)
+
     return entry is not None, _read(entry)
 
 
 def _entry(backend: "KeyringBackend") -> Secret | None:
     """Return the entry as it is stored, wrapped."""
     entry = backend.get_password(KEYRING_SERVICE, KEYRING_ENTRY)
+
     return None if entry is None else Secret(entry)
 
 
@@ -197,14 +214,19 @@ def _read(entry: str | None) -> tuple[Secret, datetime] | None:
         stored = json.loads(entry or "")
     except ValueError:
         return None
+
     if not isinstance(stored, dict):
         return None
+
     fields = cast("dict[str, object]", stored)
     session, stored_at = fields.get("session"), fields.get("stored_at")
+
     if not isinstance(session, str) or not session or type(stored_at) is not int:
         return None
+
     if not is_sendable(Secret(session)):
         return None
+
     try:
         return Secret(session), datetime.fromtimestamp(stored_at, UTC)
     except (OverflowError, OSError, ValueError):
@@ -227,6 +249,7 @@ class SessionStore:
     ) -> None:
         if not timedelta(0) < max_age <= MAX_AGE:
             raise ValueError(f"max_age is positive and at most {MAX_AGE.days} days")
+
         self._session = session
         self._max_age = max_age
         self._environ = environ
@@ -238,19 +261,26 @@ class SessionStore:
         A stored session past the max age is deleted and raises `SessionExpiredError`.
         """
         given = self.given()
+
         if given is not None:
             return given
+
         found, stored = _use(_get)
+
         if not found:
             raise NoSessionError("Not logged in.")
+
         if stored is None:
             _use(_delete, writes=True)
             raise UnreadableError("The stored session could not be read and was deleted. Log in again.")
+
         session, stored_at = stored
+
         # A time in the future is a clock that moved or an entry that was edited.
         if not timedelta(0) <= self._clock() - stored_at <= self._max_age:
             _use(_delete, writes=True)
             raise SessionExpiredError("The stored session passed its max age and was deleted. Log in again.")
+
         return Resolved(session, SessionSource.KEYRING, stored_at, stored_at + self._max_age)
 
     def check(self, wait: float | None = None) -> None:
@@ -270,9 +300,11 @@ class SessionStore:
 
         def replace(backend: "KeyringBackend") -> None:
             previous = _entry(backend)
+
             if previous is not None:
                 # Credential Locker keeps the entry it overwrites under a second name.
                 _delete(backend)
+
             try:
                 backend.set_password(
                     KEYRING_SERVICE,
@@ -283,6 +315,7 @@ class SessionStore:
                 if previous is not None:
                     with suppress(Exception):
                         backend.set_password(KEYRING_SERVICE, KEYRING_ENTRY, previous.expose_secret())
+
                 raise
 
         _use(replace, wait=wait, writes=True)
@@ -301,13 +334,17 @@ class SessionStore:
         """Return the session passed or set in the environment, if there is one."""
         if self._session is not None:
             return Resolved(_sendable(self._session, "The session passed"), SessionSource.ARGUMENT)
+
         value = self._environ.get(SESSION_ENV)
+
         if not value:
             return None
+
         return Resolved(_sendable(Secret(value), f"The value of {SESSION_ENV}"), SessionSource.ENVIRONMENT)
 
 
 def _sendable(session: Secret, what: str) -> Secret:
     if not is_sendable(session):
         raise NoSessionError(f"{what} is not a session_id cookie value.")
+
     return session

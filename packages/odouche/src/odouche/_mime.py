@@ -61,7 +61,9 @@ def parse(source: str) -> Parsed:
     # The mail was written by the build's code: whatever `email` raises on it is not upstream changing.
     except Exception:  # noqa: BLE001
         return _UNREADABLE
+
     kept = text.encode("utf-8", "replace")
+
     return Parsed(
         cc=cc,
         body=kept[:MAX_BODY].decode("utf-8", "ignore"),
@@ -76,11 +78,14 @@ def html_text(html: str) -> str:
     reader.feed(html)
     reader.close()
     kept: list[str] = []
+
     for line in "".join(reader.pieces).split("\n"):
         stripped = " ".join(line.split())
+
         # At most one blank line in a row, and none first.
         if stripped or (kept and kept[-1]):
             kept.append(stripped)
+
     return "\n".join(kept).strip("\n")
 
 
@@ -122,12 +127,14 @@ class _Part(Message):
     def get_content_type(self) -> str:
         if self._type is None:
             self._type = super().get_content_type()
+
         return self._type
 
 
 def _body(leaves: list[Message]) -> Message | None:
     """Return the part shown as the mail's text: its first plain one not held as a file, else its first HTML one."""
     texts = [part for part in leaves if not _held(part)]
+
     return next(
         (part for kind in ("text/plain", "text/html") for part in texts if part.get_content_type() == kind), None
     )
@@ -137,11 +144,13 @@ def _attachments(leaves: list[Message], body: Message | None) -> tuple[list[Mail
     """Return the parts other than the body that are files, and whether a name was cut."""
     attachments: list[MailAttachment] = []
     cut = False
+
     for part in leaves:
         if part is not body and (_held(part) or part.get_filename()):
             name, name_cut = _header(part.get_filename() or "")
             attachments.append(MailAttachment(name=name, size=len(_content(part))))
             cut = cut or name_cut
+
     return attachments, cut
 
 
@@ -156,17 +165,21 @@ def _leaves(message: Message) -> tuple[list[Message], bool]:
     leaves: list[Message] = []
     waiting = [message]
     long = False
+
     for _ in range(_MAX_PARTS):
         if not waiting:
             return leaves, long
+
         part = waiting.pop()
         long = long or any(len(value) > _MAX_HEADER for _, value in part.raw_items())
+
         if part is not message and _held(part):
             leaves.append(part)
         elif part.is_multipart():
             waiting.extend(reversed(cast("list[Message]", part.get_payload())))
         else:
             leaves.append(part)
+
     return leaves, long or bool(waiting)
 
 
@@ -181,8 +194,10 @@ def _header(raw: str) -> tuple[str, bool]:
     text = raw.encode("utf-8", "surrogateescape").decode("utf-8", "replace")
     cut = len(text) > _MAX_HEADER
     text = text[:_MAX_HEADER]
+
     with suppress(LookupError, UnicodeError, HeaderParseError):
         text = str(make_header(decode_header(text)))
+
     return _clean(text), cut
 
 
@@ -194,13 +209,16 @@ def _content(part: Message) -> bytes:
 def _text(part: Message) -> tuple[str, bool]:
     """Return a part's text, from HTML when it is HTML, and whether it was cut before that."""
     content = _content(part)
+
     try:
         text = content.decode(part.get_content_charset() or "utf-8", "replace")
     except (LookupError, ValueError):
         # A charset Python does not know, or one that is not a name.
         text = content.decode("utf-8", "replace")
+
     if part.get_content_subtype() != "html":
         return _clean(text), False
+
     return html_text(_clean(text[:_MAX_HTML])), len(text) > _MAX_HTML
 
 
@@ -240,6 +258,7 @@ class _Reader(HTMLParser):
         elif tag == "a" and self._link is not None:
             href, start = self._link
             self._link = None
+
             if " ".join("".join(self.pieces[start:]).split()) != href:
                 self.pieces.append(f" <{href}>")
 

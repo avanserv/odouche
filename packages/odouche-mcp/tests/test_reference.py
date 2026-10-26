@@ -50,6 +50,7 @@ def sample() -> MCPServer:
     add_tool(
         server, paint_thing, returns="the thing.", touches="paints | coats it.", bounds="one.", annotations=CHANGING
     )
+
     return server
 
 
@@ -144,6 +145,7 @@ List the things of a shelf | rack.
 def unlabelled() -> MCPServer:
     server = MCPServer(name="sample")
     server.add_tool(paint_thing, description="Paint a thing.\n\nReturns: it.\nBounds: one.", annotations=READ_ONLY)
+
     return server
 
 
@@ -151,6 +153,7 @@ def unhinted() -> MCPServer:
     server = MCPServer(name="sample")
     description = "Paint a thing.\n\nReturns: it.\nTouches: it.\nBounds: one."
     server.add_tool(paint_thing, description=description, annotations=ToolAnnotations(read_only_hint=False))
+
     return server
 
 
@@ -161,6 +164,7 @@ def angled() -> MCPServer:
 
     server = MCPServer(name="sample")
     add_tool(server, see_thing, returns="it.", bounds="one.")
+
     return server
 
 
@@ -168,6 +172,7 @@ def controlled() -> MCPServer:
     server = MCPServer(name="sample")
     description = "Paint a thing.\n\nReturns: it.\nTouches: it\x1b.\nBounds: one."
     server.add_tool(paint_thing, description=description, annotations=CHANGING)
+
     return server
 
 
@@ -178,18 +183,21 @@ def listed() -> MCPServer:
 
     server = MCPServer(name="sample")
     add_tool(server, sort_things, returns="it.", bounds="one.")
+
     return server
 
 
 def _one(tool: Callable[..., Thing]) -> MCPServer:
     server = MCPServer(name="sample")
     add_tool(server, tool, returns="it.", bounds="one.")
+
     return server
 
 
 def short() -> MCPServer:
     server = MCPServer(name="sample")
     server.add_tool(paint_thing, description="Paint a thing.", annotations=READ_ONLY)
+
     return server
 
 
@@ -232,6 +240,7 @@ def mixed() -> MCPServer:
 
     server = MCPServer(name="sample")
     add_tool(server, pick_thing, returns="it.", bounds="one.")
+
     return server
 
 

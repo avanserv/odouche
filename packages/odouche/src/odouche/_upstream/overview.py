@@ -17,8 +17,10 @@ def overview(transport: Transport, name: str) -> ProjectOverview:
     """
     info = projects.info(transport, name)
     repo = info.child("active_repo")
+
     if repo.text("project_name") != name:
         raise repo.changed("project_name")
+
     technical_name = repo.text("technical_name")
     subscription, subscription_name = projects.subscription(repo)
     # Read whole before the next request, so that a changed shape sends nothing more.
@@ -40,15 +42,19 @@ def overview(transport: Transport, name: str) -> ProjectOverview:
     )
     admin = projects.is_admin(info)
     region = projects.region(transport, name)
+
     if region is None:
         raise NotFoundError(f"The session's user can reach no project named {name!r}.", operation="projects")
+
     summaries = tuple(branches.summary(row) for row in branches.listed(transport, technical_name))
     # The page shows the settings to an admin only: what they answer anyone else was never seen.
     hosting = projects.hosting(projects.settings_answer(transport, technical_name)) if admin else None
+
     return replace(read, region=region, hosting=hosting, stages=_stages(summaries), branches=summaries)
 
 
 def _stages(summaries: tuple[BranchSummary, ...]) -> tuple[StageCount, ...]:
     counts = Counter(summary.branch.stage_name for summary in summaries)
     known = [StageCount(stage, name, counts.pop(name, 0)) for stage, name in branches.NAMES.items()]
+
     return (*known, *(StageCount(Stage.UNKNOWN, name, counts[name]) for name in sorted(counts)))

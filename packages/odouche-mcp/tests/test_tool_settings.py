@@ -16,7 +16,6 @@ from odouche_mcp.server import create_server
 
 SENTINEL = "sentinel-session-value"
 TOOL = "change_branch_settings"
-
 MAIN = odouche.Branch(id=3, name="main", stage=odouche.Stage.PRODUCTION, stage_name="production")
 FEATURE = odouche.Branch(id=4, name="feature-x", stage=odouche.Stage.DEVELOPMENT, stage_name="dev")
 ODD = odouche.Branch(id=5, name="odd\x1b[2J\nname", stage=odouche.Stage.DEVELOPMENT, stage_name="dev")
@@ -64,6 +63,7 @@ class Upstream:
         if project != "acme":
             msg = f"No project {project} among those you can reach."
             raise odouche.NotFoundError(msg)
+
         return [MAIN, FEATURE, ODD]
 
     def branch_settings(self, branch: odouche.Branch) -> odouche.BranchSettings:
@@ -75,14 +75,19 @@ class Upstream:
         if self.read_only:
             msg = "This client is read-only: it does not send a change_settings."
             raise odouche.ReadOnlyError(msg)
+
         self.sent.append(change)
+
         if self.failure:
             raise self.failure
+
         after = replace(self.found, **change.given())  # pyright: ignore[reportArgumentType]
         moved: tuple[str, ...] = ()
+
         # As the page says Odoo.sh does: installing every module turns the test suite off.
         if after.module_install is odouche.ModuleInstall.ALL and after.tests is not odouche.BuildTests.OFF:
             after, moved = replace(after, tests=odouche.BuildTests.OFF), ("tests",)
+
         return odouche.SettingsOutcome(self.found, after, moved)
 
 
@@ -119,6 +124,7 @@ def _call(server: MCPServer, **arguments: Any) -> CallToolResult:
 def _error(server: MCPServer, **arguments: Any) -> str:
     result = _call(server, **arguments)
     assert result.is_error
+
     return result.model_dump()["content"][0]["text"].removeprefix(f"Error executing tool {TOOL}: ")
 
 

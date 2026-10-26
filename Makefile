@@ -12,8 +12,9 @@ install: ## Install the workspace and the git hooks
 	uv sync
 	uv run prek install
 
-format: ## Format the code (ruff)
+format: ## Format the code (ruff), then its blank lines (spacify)
 	uv run ruff format
+	uv run spacify packages scripts examples
 
 lint: ## Lint the code, applying safe fixes (ruff), and audit the workflows (zizmor)
 	uv run ruff check
@@ -72,6 +73,7 @@ hooks: ## Run every git hook over every tracked file (prek)
 # rewritten: `make format` and `make lint` are the ones that fix.
 check: ## Full gate: format, lint, types, dependencies, dead code, quality, tests with coverage, docs
 	uv run ruff format --check
+	uv run spacify --check packages scripts examples
 	uv run ruff check --no-fix
 	uv run zizmor --no-progress --config .github/zizmor.yml .github/workflows .github/dependabot.yml
 	$(MAKE) --no-print-directory type-check deps deadcode quality coverage docs

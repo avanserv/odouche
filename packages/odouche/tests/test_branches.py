@@ -49,6 +49,7 @@ def test_a_branch_is_immutable_and_holds_no_payload(client):
     branch = client.branches("acme-shop")[0]
 
     assert [field.name for field in dataclasses.fields(branch)] == ["id", "name", "stage", "stage_name"]
+
     with pytest.raises(dataclasses.FrozenInstanceError):
         branch.name = "other"
 
@@ -109,6 +110,7 @@ def test_the_name_odoo_sh_gives_cannot_change_the_address(client, upstream, tech
 @pytest.mark.parametrize("change", ["missing", "false", "true", "list"])
 def test_names_the_field_that_changed_shape(client, upstream, field, change):
     branch = upstream.bodies[PATH]["result"][2]
+
     if change == "missing":
         del branch[field]
     else:
@@ -155,5 +157,6 @@ def test_a_changed_shape_error_shows_nothing_of_the_answer(client, upstream, ses
         client.branches("acme-shop")
 
     text = "".join(traceback.format_exception(raised.value))
+
     for value in ("feature-invoicing", "Acme-Corp", session):
         assert value not in text

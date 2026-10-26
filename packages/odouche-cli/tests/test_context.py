@@ -24,7 +24,6 @@ from odouche_cli._errors import DebugOption, OshGroup
 ACME = odouche.Project(id=1, name="acme", repository="Acme/Odoo", url="https://www.odoo.sh/project/acme")
 ACME_TEST = odouche.Project(id=2, name="acme-test", repository="Acme/Odoo", url="https://www.odoo.sh/project/acme-test")
 GLOBEX = odouche.Project(id=3, name="globex", repository="globex/erp", url="https://www.odoo.sh/project/globex")
-
 SSH = "git@github.com:acme/odoo.git"
 TOKEN = "ghp_sentinel"
 
@@ -237,9 +236,12 @@ def test_outside_a_repository_exits_2_and_names_the_three_sources():
     assert project.exit_code == 2
     assert project.stdout == ""
     assert lookups == []
+
     for source in ("--project", PROJECT_ENV, "checkout"):
         assert source in click.unstyle(project.stderr)
+
     assert branch.exit_code == 2
+
     for source in ("--branch", BRANCH_ENV, "checkout"):
         assert source in click.unstyle(branch.stderr)
 
@@ -296,6 +298,7 @@ def test_debug_names_the_source_and_never_the_address(
     checkout: Callable[..., None],
 ):
     checkout("feature-x", origin=f"https://{TOKEN}@github.com/acme/odoo.git")
+
     for name, value in env.items():
         monkeypatch.setenv(name, value)
 

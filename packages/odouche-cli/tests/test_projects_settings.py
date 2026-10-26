@@ -68,8 +68,10 @@ class StubClient:
 
     def project_settings(self, project: str) -> ProjectSettings:
         self.calls.append(f"project_settings {project}")
+
         if self.error is not None:
             raise self.error
+
         return self.found
 
 
@@ -80,6 +82,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> type[StubClient]:
         calls: list[str] = []
 
     monkeypatch.setattr(odouche, "Client", Client)
+
     return Client
 
 
@@ -162,6 +165,7 @@ def test_a_submodule_s_url_is_printed_without_its_control_characters(client: typ
     result = run()
 
     assert rows(result)["Submodules"] == f"git@github.com:acme/theme ({FINGERPRINT})"
+
     for control in ("\x1b", "\u202e", "]8;;", "[2J"):
         assert control not in result.stdout
 
@@ -176,7 +180,6 @@ def test_a_submodule_s_url_is_printed_without_its_control_characters(client: typ
 )
 def test_an_error_exits_with_its_code_and_message(client: type[StubClient], error: odouche.OdoucheError, code: int):
     client.error = error
-
     result = run()
 
     assert result.exit_code == code

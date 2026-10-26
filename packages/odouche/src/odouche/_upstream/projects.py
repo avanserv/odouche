@@ -12,7 +12,6 @@ from odouche.secret import Secret
 
 
 PATH = "/app/projects"
-
 _OPERATION = "projects"
 _INFO = "project"
 _SETTINGS = "project settings"
@@ -53,6 +52,7 @@ def technical_name(transport: Transport, name: str) -> str | None:
     for repo in _repos(transport):
         if repo.text("project_name") == name:
             return repo.text("technical_name")
+
     return None
 
 
@@ -61,6 +61,7 @@ def project_id(transport: Transport, name: str, *, within: float | None = None) 
     for repo in _repos(transport, within):
         if repo.text("project_name") == name:
             return repo.integer("id")
+
     return None
 
 
@@ -69,6 +70,7 @@ def odoo_version(transport: Transport, name: str) -> str | None:
     for repo in _repos(transport):
         if repo.text("project_name") == name:
             return repo.text("odoo_branch")
+
     return None
 
 
@@ -81,8 +83,10 @@ def access_token(transport: Transport, name: str) -> Secret:
     """Return the token the workers of the project named `name` take. It opens every build's logs."""
     result = Reader(_INFO, _get_info(transport, name)).child("result")
     token = result.text("access_token")
+
     if not token:
         raise result.changed("access_token")
+
     return Secret(token)
 
 
@@ -91,6 +95,7 @@ def region(transport: Transport, name: str) -> str | None:
     for repo in _repos(transport):
         if repo.text("project_name") == name:
             return repo.text("geolocation")
+
     return None
 
 
@@ -98,6 +103,7 @@ def info(transport: Transport, name: str, *, within: float | None = None) -> Rea
     """Return the reader of a project's info. Its token and its codes are dropped unread."""
     body = _get_info(transport, name, within)
     _drop(body, ("result",), "access_token")
+
     return Reader(_INFO, body).child("result")
 
 
@@ -105,23 +111,28 @@ def subscription(repo: Reader) -> tuple[Subscription, str]:
     """Return the state of a project's subscription and what Odoo.sh calls it."""
     name = repo.text("subscription_validity")
     known = _SUBSCRIPTIONS.get(name)
+
     if known is None:
         _logger.debug("Unknown subscription state: %r", name)
         return Subscription.UNKNOWN, name
+
     return known, name
 
 
 def production_build(repo: Reader) -> ProductionBuild | None:
     """Return the build a project's production branch serves, or `None` when there is none."""
     build = repo.optional_child("production_build_id")
+
     if build is None:
         return None
+
     return ProductionBuild(id=build.integer("id"), branch_name=build.text("branch_name"), url=build.text("url"))
 
 
 def is_admin(info: Reader) -> bool:
     """Tell whether the session's user is an admin of the project, by the test its page makes."""
     levels = info.child("config").child("access_level_map")
+
     return levels.integer(info.child("user").text("access")) >= levels.integer("admin")
 
 
@@ -134,11 +145,14 @@ def admin_info(transport: Transport, name: str, operation: str, refusal: str) ->
     """Return what `admin` does, with the reader of the project's info it was read from."""
     read = info(transport, name)
     active = read.child("active_repo")
+
     if active.text("project_name") != name:
         raise active.changed("project_name")
+
     # The page's own test: what Odoo.sh answers anyone else was never seen.
     if not is_admin(read):
         raise PermissionDeniedError(refusal, operation=operation)
+
     return active.text("technical_name"), read
 
 
@@ -154,14 +168,17 @@ def settings_answer(transport: Transport, technical_name: str) -> Reader:
     _drop(body, ("result",), "upsells")
     result = body.get("result")
     submodules = result.get("submodules") if isinstance(result, dict) else None
+
     for submodule in submodules if isinstance(submodules, list) else []:
         _drop_credentials(submodule, "name")
+
     return Reader(_SETTINGS, body).child("result")
 
 
 def hosting(answer: Reader) -> ProjectHosting:
     """Return what the Settings page of a project shows of its storage and workers, from its settings' `result`."""
     repo = answer.child("repository")
+
     return ProjectHosting(
         storage_used_bytes=_bytes(repo, "used_storage"),
         storage_quota_bytes=_bytes(repo, "max_storage"),
@@ -180,14 +197,17 @@ def _get_info(transport: Transport, name: str, within: float | None = None) -> d
     )
     _drop(body, ("result", "active_repo"), "subscription_code")
     _drop(body, ("result", "active_repo", "production_build_id"), "enterprise_code")
+
     return body
 
 
 def _drop(body: object, path: tuple[str, ...], *keys: str) -> None:
     # Popped before anything is read, so that no reader, frame or error holds them.
     fields = body
+
     for step in path:
         fields = fields.get(step) if isinstance(fields, dict) else None
+
     if isinstance(fields, dict):
         for key in keys:
             fields.pop(key, None)
@@ -197,18 +217,24 @@ def _drop_credentials(fields: object, key: str) -> None:
     # Before anything is read. The user information ends at the last `@` before the path: the first `/`
     # after `//` in a URL, the first `/` at all in an scp-like `user@host:path`.
     url = fields.get(key) if isinstance(fields, dict) else None
+
     if not isinstance(fields, dict) or not isinstance(url, str):
         return
+
     url = re.split(r"[?#]", url, maxsplit=1)[0]
     scheme, separator, rest = url.partition("://")
+
     if not separator:
         scheme, rest = "", url
+
     head, slash, path = rest.partition("/")
     user, at, host = head.rpartition("@")
+
     if separator and (not _SCHEME.fullmatch(scheme) or not _AUTHORITY.fullmatch(host) or (":" in user and "@" in path)):
         # What is left could still hold part of a password, such as one with a `/`: the value goes whole.
         fields[key] = ""
         return
+
     # An scp-like `user@host:path` is SSH too.
     ssh = scheme.lower() in _SSH_SCHEMES if separator else True
     kept = f"{user}@" if at and ssh and _ssh_user(user) else ""
@@ -222,8 +248,10 @@ def _ssh_user(user: str) -> bool:
 def _bytes(repo: Reader, key: str) -> int:
     # Sizes are KiB: the page shows them with `humanSize(size * 1024)`.
     value = repo.number(key)
+
     if value < 0:
         raise repo.changed(key)
+
     return round(value * 1024)
 
 
@@ -231,6 +259,8 @@ def _repos(transport: Transport, within: float | None = None) -> list[Reader]:
     body = transport.call(_OPERATION, PATH, retry=True, within=within)
     result = body.get("result")
     repos = result.get("repos") if isinstance(result, dict) else None
+
     for repo in repos if isinstance(repos, list) else []:
         _drop(repo, (), "subscription_code")
+
     return Reader(_OPERATION, body).child("result").items("repos")

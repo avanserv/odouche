@@ -53,6 +53,7 @@ def paths(upstream):
 def row(at, action="Open Shell", **fields):
     """An invented entry, `at` seconds after a fixed moment."""
     moment = datetime(2026, 10, 1, tzinfo=UTC) + timedelta(seconds=at)
+
     return {
         "date": moment.strftime("%Y-%m-%d %H:%M:%S"),
         "action": action,
@@ -103,7 +104,6 @@ def test_a_development_branch_s_stage_is_read(client, upstream):
 @pytest.mark.parametrize(("action", "kind"), KINDS)
 def test_reads_each_action_the_page_names(client, upstream, action, kind):
     entries(upstream)[0]["action"] = action
-
     read = next(client.audit_log("acme-shop", timeout=10))
 
     assert (read.kind, read.kind_name) == (kind, action)
@@ -161,7 +161,6 @@ def test_the_log_is_asked_once_however_it_is_read(client, upstream, how):
 
 def test_a_long_log_yields_the_limit_newest_from_one_request(client, upstream):
     upstream.bodies[AUDIT]["result"] = [row(at) for at in range(200)]
-
     read = list(client.audit_log("acme-shop", limit=10, timeout=10))
 
     assert len(read) == 10
@@ -221,6 +220,7 @@ def test_a_refused_log_is_denied(client, upstream):
 def now(monkeypatch):
     now = [1000.0]
     monkeypatch.setattr(audit, "_monotonic", lambda: now[0])
+
     return now
 
 
@@ -230,8 +230,10 @@ def slowed(upstream, path, now, seconds, failure=None):
 
     def answer(request):
         now[0] += seconds
+
         if failure is not None:
             raise failure("timed out", request=request)
+
         return httpx2.Response(200, json=body)
 
     upstream.bodies[path] = answer
@@ -269,10 +271,10 @@ def test_each_request_has_what_the_deadline_leaves(upstream, session, now, monke
     def bounded(*args, **options):
         left.append(options["within"])
         now[0] += 2
+
         return call(*args, **options)
 
     monkeypatch.setattr(transport, "call", bounded)
-
     list(audit.audit_log(transport, "acme-shop", limit=10, timeout=5))
 
     assert left == [5, 3]
@@ -281,9 +283,11 @@ def test_each_request_has_what_the_deadline_leaves(upstream, session, now, monke
 def test_an_answer_still_arriving_at_the_deadline_is_the_timeout(client, upstream):
     def trickle():
         yield b'{"result": ['
+
         for _ in range(400):
             time.sleep(0.05)
             yield b" "
+
         yield b"]}"
 
     upstream.bodies[AUDIT] = lambda _: httpx2.Response(200, content=trickle())

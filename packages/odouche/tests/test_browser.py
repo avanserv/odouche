@@ -38,12 +38,14 @@ def alive(pid):
         os.kill(pid, 0)
     except ProcessLookupError:
         return False
+
     return True
 
 
 def signalled(capture, signum, times=1):
     for _ in range(times):
         os.kill(os.getpid(), signum)
+
     return capture.cookie()
 
 
@@ -54,6 +56,7 @@ def spawning_with(monkeypatch, signum):
     def spawned(*args, **kwargs):
         pid = spawn(*args, **kwargs)
         os.kill(os.getpid(), signum)
+
         return pid
 
     monkeypatch.setattr(os, "posix_spawn", spawned)
@@ -76,6 +79,7 @@ class Launched:
     def serves(self, *answers, mode=""):
         self._monkeypatch.setenv("FAKE_BROWSER_COOKIES", json.dumps(answers or [[]]))
         self._monkeypatch.setenv("FAKE_BROWSER_MODE", mode)
+
         return self.path
 
     @property
@@ -96,6 +100,7 @@ def launched(tmp_path, monkeypatch):
     launched = Launched(tmp_path, monkeypatch)
     descriptors = len(os.listdir("/dev/fd"))
     handlers = [signal.getsignal(signum) for signum in ENDING]
+
     yield launched
     assert list(launched.profiles.iterdir()) == []
     assert len(os.listdir("/dev/fd")) == descriptors
@@ -108,9 +113,12 @@ def host():
     """Handlers of the host program for the signals that end it, and what they were called with."""
     received = []
     previous = {signum: signal.getsignal(signum) for signum in ENDING}
+
     for signum in previous:
         signal.signal(signum, lambda signum, _: received.append(signum))
+
     yield received
+
     for signum, handler in previous.items():
         signal.signal(signum, handler)
 
@@ -195,8 +203,10 @@ def test_the_helpers_of_the_browser_are_killed_with_it(launched):
 
     with Capture(launched.serves(mode="helper")):
         deadline = time.monotonic() + 5
+
         while not beat.exists() and time.monotonic() < deadline:
             time.sleep(0.02)
+
         assert beat.exists()
 
     last = beat.read_text()
@@ -299,6 +309,7 @@ def test_a_program_that_is_terminated_dies_of_the_signal_with_the_profile_delete
         "        time.sleep(0.05)\n"
     )
     environ = {**os.environ, "TMPDIR": str(launched.profiles)}
+
     with subprocess.Popen(  # noqa: S603
         [sys.executable, "-c", program, launched.serves()], env=environ, stdout=subprocess.PIPE
     ) as process:
@@ -306,6 +317,7 @@ def test_a_program_that_is_terminated_dies_of_the_signal_with_the_profile_delete
         assert process.stdout.readline() == b"ready\n"
         assert list(launched.profiles.iterdir())
         process.terminate()
+
         try:
             process.wait(timeout=20)
         finally:
@@ -321,16 +333,20 @@ def test_a_browser_that_keeps_its_profile_elsewhere_is_refused(launched):
 
 def test_reads_the_pipe_whatever_its_descriptor_number(launched):
     soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+
     if 0 <= hard < 1200:
         pytest.skip("the limit on open files is too low to pass descriptor 1024")
+
     resource.setrlimit(resource.RLIMIT_NOFILE, (hard if 0 <= soft < 1200 else soft, hard))
     held = [os.open(os.devnull, os.O_RDONLY) for _ in range(1100)]
+
     try:
         with Capture(launched.serves([cookie()])) as capture:
             assert capture.cookie() == Secret(SESSION)
     finally:
         for fd in held:
             os.close(fd)
+
         resource.setrlimit(resource.RLIMIT_NOFILE, (soft, hard))
 
 

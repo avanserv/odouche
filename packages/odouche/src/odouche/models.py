@@ -623,9 +623,11 @@ class SettingsChange:
 
     def __post_init__(self) -> None:
         given = self.given()
+
         if not given:
             msg = "A change of settings names at least one setting."
             raise ValueError(msg)
+
         for name, value in given.items():
             _check_setting(name, value)
 
@@ -655,13 +657,16 @@ def _given(change: object) -> dict[str, object]:
 
 def _check_setting(name: str, value: object) -> None:
     kind = _KINDS[name]
+
     # `bool` and `int` are checked exactly: an `int` is not a yes or a no, and a `bool` is no timeout.
     if not (type(value) is kind if kind in {bool, int} else isinstance(value, kind)):
         msg = f"`{name}` is given as a {kind.__name__}."
         raise TypeError(msg)
+
     if type(value) is int and value <= 0:
         msg = f"`{name}` is a number of seconds over 0."
         raise ValueError(msg)
+
     if name == "allow_ips" and isinstance(value, tuple):
         _check_allowed(value)
     elif name == "disallow_ips" and isinstance(value, tuple):
@@ -672,6 +677,7 @@ def _check_setting(name: str, value: object) -> None:
             if not isinstance(module, str) or not _MODULE.fullmatch(module):
                 msg = f"{module!r} is not a module name: one has only ASCII letters, digits and underscores."
                 raise ValueError(msg)
+
     # What Odoo.sh does with the text is not seen: it is held to what Odoo reads as tags.
     if name == "test_tags" and isinstance(value, str) and not _TEST_TAGS.fullmatch(value):
         msg = "Test tags hold only ASCII letters, digits and `_/:.,*+-[]`."
@@ -680,13 +686,16 @@ def _check_setting(name: str, value: object) -> None:
 
 def _check_allowed(addresses: tuple[object, ...]) -> None:
     _check_entries("allow_ips", addresses)
+
     for address in addresses:
         if not isinstance(address, IPv4Address):
             # The page asks for IPv4 addresses, one a line: what Odoo.sh does with anything else is unseen.
             msg = f"`allow_ips` is given as IPv4 addresses, not as {type(address).__name__}."
             raise TypeError(msg)
+
         # `0.0.0.0` could read as any address, and none of these is one Odoo.sh sees a client come from.
         kinds = (address.is_unspecified, address.is_loopback, address.is_multicast, address.is_link_local)
+
         if any(kinds) or address.is_reserved:
             msg = f"{address} is not an address Odoo.sh sees a client come from."
             raise ValueError(msg)
@@ -694,6 +703,7 @@ def _check_allowed(addresses: tuple[object, ...]) -> None:
 
 def _check_disallowed(entries: tuple[object, ...]) -> None:
     _check_entries("disallow_ips", entries)
+
     for entry in entries:
         if not isinstance(entry, IPv4Address | IPv6Address | IPv4Network | IPv6Network):
             msg = f"`disallow_ips` is given as addresses and networks, not {type(entry).__name__}."
@@ -704,6 +714,7 @@ def _check_entries(name: str, entries: tuple[object, ...]) -> None:
     if not entries:
         msg = f"`{name}` names at least one entry, or is left `None`."
         raise ValueError(msg)
+
     if len(set(entries)) != len(entries):
         msg = f"`{name}` names an entry twice."
         raise ValueError(msg)
@@ -896,12 +907,16 @@ class ProjectSettingsChange:
 
     def __post_init__(self) -> None:
         given = self.given()
+
         if not given:
             msg = "A change of settings names at least one setting."
             raise ValueError(msg)
+
         for name, value in given.items():
             _check_setting(name, value)
+
         both = set(self.allow_ips or ()) & set(self.disallow_ips or ())
+
         if both:
             msg = f"{min(both)} is both to allow and to remove."
             raise ValueError(msg)

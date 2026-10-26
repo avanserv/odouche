@@ -91,6 +91,7 @@ def test_a_backup_is_immutable_and_holds_no_id_nor_path(client):
         "downloadable",
         "size",
     ]
+
     with pytest.raises(dataclasses.FrozenInstanceError):
         backup.size = 0
 
@@ -151,6 +152,7 @@ def test_a_project_that_is_not_listed_is_not_found(client, upstream):
 )
 def test_names_the_field_that_changed_shape(client, upstream, index, field, value):
     backup = upstream.bodies[PATH]["result"][index]
+
     if value is None:
         del backup[field]
     else:
@@ -170,5 +172,6 @@ def test_a_changed_shape_error_shows_nothing_of_the_answer(client, upstream, ses
         client.backups("acme-shop")
 
     text = "".join(traceback.format_exception(raised.value))
+
     for value in ("acme-shop-staging-88124", "acme-corp-odoo-addons-4217", session):
         assert value not in text
