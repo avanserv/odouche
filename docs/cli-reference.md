@@ -28,7 +28,7 @@ osh [OPTIONS] COMMAND [ARGS]...
 | --- | --- |
 | [`osh auth`](#osh-auth) | Log in to Odoo.sh, log out, and show the session in use. |
 | [`osh backups`](#osh-backups) | List the backups of an Odoo.sh project, take one, download one, and copy one over SSH. |
-| [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project, a branch's history, show and change its settings, and the revision a build runs. |
+| [`osh branches`](#osh-branches) | List the branches of an Odoo.sh project, a branch's history, show and change its settings, the revision a build runs, and move a branch between development and staging. |
 | [`osh builds`](#osh-builds) | List, show and watch the builds of a branch, start a new one, open its panels and read the mails it caught. |
 | [`osh logs`](#osh-logs) | Print the end of a build's log: the install or odoo log of the branch's latest build, or another. |
 | [`osh projects`](#osh-projects) | List the Odoo.sh projects you can reach, show one's overview, show and change its settings, check it, read its audit log, and list its members. |
@@ -219,7 +219,7 @@ osh backups pull --output daily.sql.gz
 
 ## `osh branches`
 
-List the branches of an Odoo.sh project, a branch's history, show and change its settings, and the revision a build runs.
+List the branches of an Odoo.sh project, a branch's history, show and change its settings, the revision a build runs, and move a branch between development and staging.
 
 ```text
 osh branches [OPTIONS] COMMAND [ARGS]...
@@ -229,6 +229,7 @@ osh branches [OPTIONS] COMMAND [ARGS]...
 | --- | --- |
 | [`osh branches list`](#osh-branches-list) | List a project's branches with their stage: production, staging, then development, each sorted by name. |
 | [`osh branches history`](#osh-branches-history) | List a branch's history, newest first: each push with its commits, each rebuild and each move between stages. |
+| [`osh branches move`](#osh-branches-move) | Change state on Odoo.sh: move a branch between development and staging. |
 | [`osh branches revision`](#osh-branches-revision) | Show what a build of a branch runs: its head commit, its Odoo version, and the Odoo revision the branch has selected. The latest build, or `--build`. |
 | [`osh branches settings`](#osh-branches-settings) | Show a branch's settings, or change them. |
 
@@ -274,6 +275,29 @@ Example:
 
 ```bash
 osh branches history --branch staging --limit 30
+```
+
+### `osh branches move`
+
+Change state on Odoo.sh: move a branch between development and staging.
+
+A move to staging starts a build of the branch on a copy of production's data. A move to development drops its staging builds, which are not backed up. A production branch is not moved. It asks first, unless `--yes` is given.
+
+```text
+osh branches move [OPTIONS]
+```
+
+| Option | Description | Environment |
+| --- | --- | --- |
+| `--to TO` | The stage to move the branch to. A branch is moved to or from production in the Odoo.sh page. Required. One of `staging`, `development`. | |
+| `--project PROJECT` | The project's name. Default: the git checkout's. | `OSH_PROJECT` |
+| `--branch BRANCH` | The branch's name. Default: the git checkout's. | `OSH_BRANCH` |
+| `--yes`, `-y` | Change without asking. Needed when stdin or stderr is not a terminal. | |
+
+Example:
+
+```bash
+osh branches move --branch feature-x --to staging
 ```
 
 ### `osh branches revision`

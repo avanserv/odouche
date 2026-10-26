@@ -79,6 +79,8 @@ _OUTCOME_HINTS = {
     "same change again does no harm.",
     "project settings change": "`osh projects settings show` shows whether the settings were changed. Sending the "
     "same change again does no harm.",
+    "branch stage move": "`osh branches list` shows the branch's stage. Running the move again is refused once the "
+    "branch is there.",
     "download preparation": "Preparing the file again does no harm: run the command again, naming the backup rather "
     "than giving --new.",
 }

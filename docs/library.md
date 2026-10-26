@@ -790,6 +790,7 @@ Every other call of the client only reads. These are the calls that change somet
 | `client.prepare_download(project, backup)` | Has Odoo.sh prepare the backup's file, which it keeps for 2 hours. |
 | `client.change_branch_settings(branch, change)` | Sets the settings a `SettingsChange` gives on the branch. |
 | `client.change_project_settings(project, change)` | Sets the settings a `ProjectSettingsChange` gives on the project, the IP allow list by entry. |
+| `client.move_branch(branch, to)` | Moves the branch between development and staging. |
 
 ```python
 import odouche
@@ -920,6 +921,31 @@ with odouche.Client() as client:
         print(outcome.after.ip_allow_list, outcome.moved)
 ```
 
+- `move_branch` takes a `Branch` or a branch's number and the `Stage` to move it to, and returns
+  the `Branch` read back in that stage. A move to staging starts a build on a copy of production's
+  data, which `client.latest_build(moved)` finds; a move to development drops the branch's staging
+  builds, which are not backed up. It asks Odoo.sh three times: for the branch's stage, the move,
+  then the branch again. When the branch does not read back in the new stage, it raises
+  `OutcomeUnknownError`.
+- Only a move between development and staging is sent. A production branch, a move to production, a
+  stage the library does not know and a branch already in `to` raise `StageRefusedError` before the
+  move, and before any request when the `Branch` passed already shows it. The stage that decides is the one read in
+  the same call, so a `Branch` read earlier can refuse a move but never allow one.
+  `client.check_move(branch, to)` raises the same refusals for a `Branch` and asks nothing, on a
+  read-only client too.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    branches = {branch.name: branch for branch in client.branches("acme-shop")}
+    branch = branches["feature-reports"]
+    client.check_move(branch, odouche.Stage.STAGING)
+    moved = client.move_branch(branch, odouche.Stage.STAGING)
+    print(moved.stage, client.latest_build(moved))
+```
+
 - `prepare_download` takes the project and a `Backup` that is `downloadable`, and
   `neutralized=False` for the exact database or `filestore=False` to leave the filestore out. It
   returns a `PreparedDownload`, whose `link` is the page's link to the file. It is sent on the build
@@ -983,7 +1009,7 @@ print(names)
 | `UpstreamChangedError` | Odoo.sh answered in a shape the library does not read. Please report it. |
 | `UpstreamUnavailableError` | Odoo.sh could not be reached, or answered with a server error. |
 | `ReadOnlyError` | A read-only client was asked to change state. Nothing was sent. |
-| `StageRefusedError` | The branch is in a stage the library does not change. |
+| `StageRefusedError` | The branch is in a stage, or is asked into one, the library does not change. Nothing was sent. |
 | `OutcomeUnknownError` | A state-changing request was sent and Odoo.sh did not confirm it. Look before trying again. |
 | `StreamTimeoutError` | A build was still being watched, or a log followed, at its timeout. |
 | `KeyringUnavailableError` | No accepted keyring backend is available to store the session. |

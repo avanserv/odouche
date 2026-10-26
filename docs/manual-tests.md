@@ -202,6 +202,8 @@ check that names production is the refusal.
 | S59 | The same | `osh projects settings set --add-ip 192.0.2.7 < /dev/null` | That the change cannot be confirmed, with `--yes` as the way, before any request | 2 |
 | S60 | As R44 | `osh projects settings set session_lifetime=<another value> --yes`, then set it back | Either the settings after, or exit 10 when the new lifetime ended the session at read-back. Write down which in [upstream](upstream-project.md#project-settings) | 0 or 10 |
 | S61 | As R44, on a project with a dedicated server | `osh --format json projects settings show > before.json`, `osh projects settings set http_timeout_seconds=<another whole number of minutes, in seconds> --yes`, then `osh --format json projects settings show > after.json` and `diff before.json after.json`. Set it back the same way | `http_timeout_seconds: <old> → <new>`, then the settings after. The diff shows `http_timeout_seconds` alone: `cron_timeout_seconds` kept its value | 0 |
+| S62 | A throwaway development branch `<throwaway-branch>`, and a staging branch free in the subscription | `osh branches history --branch <throwaway-branch>` and `osh --format json branches settings show --branch <throwaway-branch> > before.json`, then `osh branches move --branch <throwaway-branch> --to staging` and answer `y`, then `osh builds watch --branch <throwaway-branch>`. Then `osh branches move --branch <throwaway-branch> --to development --yes`, `osh branches history --branch <throwaway-branch>` and `osh --format json branches settings show --branch <throwaway-branch> > after.json` | The project, the branch, `Move: development → staging` and what Odoo.sh does, the question, then `Branch <throwaway-branch> is now in staging.` with the watch to run. The watch follows a new build. The way back says the staging builds are dropped and sends without asking. Write into [upstream](upstream-branches.md#stage-moves) whether the move back started a build, as the history shows, and whether `diff before.json after.json` shows `push_behavior` | 0 |
+| S63 | | `osh branches move --branch <production-branch> --to development` | Refused before any question: a production branch is not moved | 9 |
 
 ## Backups
 
@@ -285,6 +287,7 @@ tool result and the server's stderr for the session value: it appears in none.
 | M40 | As M29 and R44 | Ask to add `192.0.2.7` to the IP allow list of `<project>`, then to make it public | The agent has no tool for either and says so, or a call is refused with `Extra inputs are not permitted`. Nothing is in the server's stderr and the page's settings are unchanged | - |
 | M41 | As M40 | Ask to switch the AI agent of the development defaults of `<project>`, then to set it back | `change_project_settings` prompts each time. The result names `ai_agent` as changed, `get_project_settings` shows it, and the server's stderr has one line with the tool, the project and `changed ai_agent` | - |
 | M42 | As R53 | Ask who the admins of `<project>` are | `list_members`: the members highest role first, their logins and names only in `untrusted_members`, the admins those R53 lists | - |
+| M43 | As M29 | Ask to move `<dev-branch>` to staging | The agent has no tool for it and says so. Nothing is in the server's stderr and the branch is still in development | - |
 
 ## Not covered
 

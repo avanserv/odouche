@@ -265,6 +265,7 @@ build of the commit you just pushed.
 `osh builds rebuild` starts a new build of the branch, which replaces its latest one. It is one
 of the commands that change a project, with
 [`osh branches settings set`](#changing-a-branchs-settings),
+[`osh branches move`](#moving-a-branch-between-stages),
 [`osh projects settings set`](#changing-a-projects-settings), [`osh backups create`](#taking-a-backup),
 [`osh backups download`](#downloading-a-backup), and [`osh ssh`](#a-shell-on-a-build) and
 [`osh backups pull`](#copying-a-backup-over-ssh) when they allow your address. Every other command
@@ -315,6 +316,31 @@ osh branches settings set --branch feature-x project_defaults=no module_install=
   harm.
 - The Odoo version and revision, the operating system and the custom domains are not changed by
   `set`.
+
+## Moving a branch between stages
+
+`osh branches move --to staging` moves a development branch to staging, and `--to development`
+moves a staging branch back:
+
+```bash
+osh branches move --branch feature-x --to staging
+osh builds watch --branch feature-x
+```
+
+- A move to staging starts a build of the branch on a copy of production's data, with outgoing
+  mails caught and scheduled actions turned off, and its next commits build the same way. A move
+  to development drops the branch's staging builds, which are not backed up.
+- The production branch is not moved, and no branch is moved to production: that is done in the
+  Odoo.sh page. `--to production` exits 2. A production branch, or one already in the stage asked,
+  exits 9 and sends nothing: before the question when `osh branches list` already shows it,
+  otherwise once the stage is read again just before the move.
+- It first says on stderr the project, the branch with its stage, the move, and what Odoo.sh does
+  to the branch. It asks, and takes `--yes` in a script, as [a rebuild](#rebuilding-a-branch) does.
+- The move is sent once, then the branch is read back and shown as `osh branches list` shows it.
+  After a move to staging, stderr names `osh builds watch` to follow the new build.
+- When Odoo.sh does not confirm the move, or the branch does not read back in the new stage, the
+  command exits 10: look with `osh branches list`. Running the move again is refused once the
+  branch is there.
 
 ## Taking a backup
 
@@ -548,15 +574,15 @@ on stdout. These commands do otherwise:
 | --- | --- | --- |
 | 0 | Success. `osh auth logout` with nothing to log out of is one. | Every command |
 | 1 | Unexpected error, which is a bug to report, or a prompt or a question that was declined. | Every command |
-| 2 | Usage error: an unknown option, a value an option does not take, options that do not go together, no [project or branch](#project-and-branch), a download with neither `--output` nor `--link`, or to a file that exists or a directory you cannot write to, a rebuild, a backup, a download, a change of settings or an IP allow that cannot be confirmed, or a setting a branch's Settings tab or a project's Settings page does not let you change with the others as given. | Every command |
+| 2 | Usage error: an unknown option, a value an option does not take, options that do not go together, no [project or branch](#project-and-branch), a download with neither `--output` nor `--link`, or to a file that exists or a directory you cannot write to, a rebuild, a move, a backup, a download, a change of settings or an IP allow that cannot be confirmed, or a setting a branch's Settings tab or a project's Settings page does not let you change with the others as given. | Every command |
 | 3 | No session, or an expired one. Run `osh auth login`. | Every command that needs the session |
 | 4 | The project, branch, build, backup or log is not one the logged-in user can reach. A build that is not among the branch's latest ones is not, and neither is the build of a branch that has none, a backup that cannot be downloaded, a build with no panels yet, the monitor of a development branch, a mail the build did not catch, or the mails of a production branch. | Every command that takes a project |
 | 5 | The session is not allowed to do this. | Every command that asks Odoo.sh |
 | 6 | Odoo.sh answered in a shape `osh` does not read. Please report it. | Every command that asks Odoo.sh |
 | 7 | Odoo.sh could not be reached, or answered with a server error. | Every command that asks Odoo.sh |
 | 8 | A followed log, a login, a project's audit log, or a backup's or a download's wait reached its timeout, or `ssh` did not get in once the IP was allowed. | `osh logs --follow --timeout`, `osh auth login`, `osh projects audit`, `osh backups create --wait`, `osh backups download`, `osh ssh` |
-| 9 | Refused, and nothing was changed: a read-only run, or a branch in a stage `osh` does not change, or a setting its Settings tab does not offer in that stage. | `osh builds rebuild`, `osh branches settings set`, `osh backups create`, `osh backups download --new` |
-| 10 | A change was sent and Odoo.sh did not confirm it. `osh builds list` shows whether a build was started, `osh backups list` whether a backup was taken, `osh branches settings show` or `osh projects settings show` whether the settings were changed; `osh ssh`, `osh backups download` and either `settings set` can be run again. | `osh builds rebuild`, `osh branches settings set`, `osh projects settings set`, `osh backups create`, `osh backups download`, `osh ssh` |
+| 9 | Refused, and nothing was changed: a read-only run, or a branch in a stage `osh` does not change, or a setting its Settings tab does not offer in that stage, or a move to the stage a branch is in. | `osh builds rebuild`, `osh branches settings set`, `osh branches move`, `osh backups create`, `osh backups download --new` |
+| 10 | A change was sent and Odoo.sh did not confirm it. `osh builds list` shows whether a build was started, `osh backups list` whether a backup was taken, `osh branches settings show` or `osh projects settings show` whether the settings were changed, `osh branches list` whether a branch was moved; `osh ssh`, `osh backups download` and either `settings set` can be run again. | `osh builds rebuild`, `osh branches settings set`, `osh projects settings set`, `osh branches move`, `osh backups create`, `osh backups download`, `osh ssh` |
 | 11 | No usable keyring: none to store the session in, or one that stayed locked. | `osh auth login`, `osh auth logout`, every command that reads the stored session |
 | 12 | The login ended without a session. | `osh auth login` |
 | 13 | Any other error from the library. | Every command |

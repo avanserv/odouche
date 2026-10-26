@@ -1,4 +1,6 @@
+import ast
 import asyncio
+from pathlib import Path
 
 import pytest
 from mcp.server import MCPServer
@@ -63,6 +65,20 @@ def test_server_exposes_its_tools():
 
 def test_server_exposes_the_tool_that_changes_state_only_when_allowed():
     assert _names(create_server(allow_changes=True)) == [*READS, *CHANGES]
+
+
+def test_no_tool_moves_a_branch_between_stages_even_when_changes_are_allowed():
+    names = _names(create_server(allow_changes=True))
+    package = Path(odouche_mcp.__file__).parent
+    called = {
+        node.attr
+        for path in package.rglob("*.py")
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+        if isinstance(node, ast.Attribute)
+    }
+
+    assert [name for name in names if "move" in name or "stage" in name] == []
+    assert called & {"move_branch", "check_move"} == set()
 
 
 @pytest.mark.parametrize(("argv", "tools"), [([], READS), (["--allow-changes"], [*READS, *CHANGES])])
