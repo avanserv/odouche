@@ -126,6 +126,44 @@ osh --format json projects settings show --project acme-shop | jq .ip_allow_list
   not know, or an allowed entry that is neither an address nor a network, exits 6.
 - It changes nothing on Odoo.sh.
 
+## Changing a project's settings
+
+`osh projects settings set` changes the settings of a [project](#project-and-branch) you are an
+admin of, and only those given that differ: the others keep their value. It takes `NAME=VALUE` as
+[`osh branches settings set`](#changing-a-branchs-settings) does, named and valued as `osh projects
+settings show --format json` prints them, and the IP allow list by entry:
+
+```bash
+osh projects settings set ai_agent=opencode demo_data=no
+osh projects settings set --add-ip 203.0.113.7 --remove-ip 198.51.100.42
+```
+
+- Every value is checked before anything is asked of Odoo.sh: an unknown name or value exits 2.
+  `--add-ip` takes an IPv4 address and `--remove-ip` an address or a network as `show` lists it,
+  each as many times as needed. `ip_allow_list=` exits 2: the list is never replaced whole.
+- A timeout is in seconds, a whole number of minutes within the bounds of the Settings page, and is
+  changed on a dedicated server only. Both timeouts are sent, as the page sends them, the other
+  with its value as read. The defaults of new development branches follow the rules of
+  a branch's new build options. The list holds ten entries at most. Each exits 2 before the question.
+- It first says on stderr the project and each setting from its value to the new one, the list
+  included. An address already allowed, or an entry not in the list, is said and left out. With
+  nothing to change it sends nothing and exits 0.
+- A change to the allow list, public access or the session lifetime changes who can reach the
+  project: a line says so, and the question asks to change access. SSH from a removed entry then
+  needs the one-hour rule [`osh ssh`](#a-shell-on-a-build) asks for, PostgreSQL on a dedicated
+  server is closed to it, and an emptied list is said too.
+- `osh` cannot tell the address you reach Odoo.sh from without allowing it, so it does not refuse a
+  change that removes yours. The list covers SSH, and PostgreSQL on a dedicated server, to
+  production and staging: the web page and `osh` keep working, and `osh ssh` can still allow your
+  address for SSH for an hour.
+- The list is rebuilt from a read made just before the change, so an edit made elsewhere in
+  between is overwritten, as it is by the page.
+- It asks and takes `--yes` as [a rebuild](#rebuilding-a-branch) does, and exits 5 for a user who
+  is not an admin of the project. The rest is as for a branch: one request, the settings read back
+  shown, a setting Odoo.sh moved along said, and exit 10 when Odoo.sh does not confirm the change.
+- The project's name, the `odoo.com` domain block, the deploy key, the commit statuses, submodules
+  and anything billed are not changed by `set`.
+
 ## Checking a project
 
 `osh projects check` reads the [project](#project-and-branch)'s overview, as `osh projects show`
@@ -206,7 +244,8 @@ build of the commit you just pushed.
 
 `osh builds rebuild` starts a new build of the branch, which replaces its latest one. It is one
 of the commands that change a project, with
-[`osh branches settings set`](#changing-a-branchs-settings), [`osh backups create`](#taking-a-backup),
+[`osh branches settings set`](#changing-a-branchs-settings),
+[`osh projects settings set`](#changing-a-projects-settings), [`osh backups create`](#taking-a-backup),
 [`osh backups download`](#downloading-a-backup), and [`osh ssh`](#a-shell-on-a-build) and
 [`osh backups pull`](#copying-a-backup-over-ssh) when they allow your address. Every other command
 that opens a client opens it read-only, and it sends no change.
@@ -438,6 +477,7 @@ osh --format json builds show --project acme --branch feature-x | jq -r .result
     | `osh projects show` | One `ProjectOverview`. |
     | `osh branches list` | An array of `Branch`, in the order of the table. |
     | `osh branches history` | An array of `Tracking`, newest first, whatever `--commits` says. |
+    | `osh projects settings show`, `osh projects settings set` | One `ProjectSettings`: after the change, for `set`. |
     | `osh branches settings show`, `osh branches settings set` | One `BranchSettings`: after the change, for `set`. |
     | `osh branches revision` | One `BuildRevision`. Submodule commits are not in it, and a line on stderr says they are not available. |
     | `osh backups list` | An array of `Backup`, newest first. |
@@ -488,7 +528,7 @@ on stdout. These commands do otherwise:
 | --- | --- | --- |
 | 0 | Success. `osh auth logout` with nothing to log out of is one. | Every command |
 | 1 | Unexpected error, which is a bug to report, or a prompt or a question that was declined. | Every command |
-| 2 | Usage error: an unknown option, a value an option does not take, options that do not go together, no [project or branch](#project-and-branch), a download with neither `--output` nor `--link`, or to a file that exists or a directory you cannot write to, a rebuild, a backup, a download, a change of settings or an IP allow that cannot be confirmed, or a setting a branch's Settings tab does not let you change with the others as given. | Every command |
+| 2 | Usage error: an unknown option, a value an option does not take, options that do not go together, no [project or branch](#project-and-branch), a download with neither `--output` nor `--link`, or to a file that exists or a directory you cannot write to, a rebuild, a backup, a download, a change of settings or an IP allow that cannot be confirmed, or a setting a branch's Settings tab or a project's Settings page does not let you change with the others as given. | Every command |
 | 3 | No session, or an expired one. Run `osh auth login`. | Every command that needs the session |
 | 4 | The project, branch, build, backup or log is not one the logged-in user can reach. A build that is not among the branch's latest ones is not, and neither is the build of a branch that has none, a backup that cannot be downloaded, a build with no panels yet, the monitor of a development branch, a mail the build did not catch, or the mails of a production branch. | Every command that takes a project |
 | 5 | The session is not allowed to do this. | Every command that asks Odoo.sh |
@@ -496,7 +536,7 @@ on stdout. These commands do otherwise:
 | 7 | Odoo.sh could not be reached, or answered with a server error. | Every command that asks Odoo.sh |
 | 8 | A followed log, a login, a project's audit log, or a backup's or a download's wait reached its timeout, or `ssh` did not get in once the IP was allowed. | `osh logs --follow --timeout`, `osh auth login`, `osh projects audit`, `osh backups create --wait`, `osh backups download`, `osh ssh` |
 | 9 | Refused, and nothing was changed: a read-only run, or a branch in a stage `osh` does not change, or a setting its Settings tab does not offer in that stage. | `osh builds rebuild`, `osh branches settings set`, `osh backups create`, `osh backups download --new` |
-| 10 | A change was sent and Odoo.sh did not confirm it. `osh builds list` shows whether a build was started, `osh backups list` whether a backup was taken, `osh branches settings show` whether the settings were changed; `osh ssh`, `osh backups download` and `osh branches settings set` can be run again. | `osh builds rebuild`, `osh branches settings set`, `osh backups create`, `osh backups download`, `osh ssh` |
+| 10 | A change was sent and Odoo.sh did not confirm it. `osh builds list` shows whether a build was started, `osh backups list` whether a backup was taken, `osh branches settings show` or `osh projects settings show` whether the settings were changed; `osh ssh`, `osh backups download` and either `settings set` can be run again. | `osh builds rebuild`, `osh branches settings set`, `osh projects settings set`, `osh backups create`, `osh backups download`, `osh ssh` |
 | 11 | No usable keyring: none to store the session in, or one that stayed locked. | `osh auth login`, `osh auth logout`, every command that reads the stored session |
 | 12 | The login ended without a session. | `osh auth login` |
 | 13 | Any other error from the library. | Every command |

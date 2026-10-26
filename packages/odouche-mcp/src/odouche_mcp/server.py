@@ -44,7 +44,7 @@ from odouche_mcp._read import (
 )
 from odouche_mcp._session import get_session
 from odouche_mcp._wait import DEFAULT_WAIT, MAX_WAIT, wait_for_build
-from odouche_mcp._write import CHANGING, SETTINGS, changing_tool, settings_tool
+from odouche_mcp._write import CHANGING, SETTINGS, changing_tool, project_settings_tool, settings_tool
 
 
 INSTRUCTIONS = (
@@ -230,6 +230,23 @@ def create_server(*, allow_changes: bool = False) -> MCPServer:
         )
         add_tool(
             server,
+            project_settings_tool(allow_changes=allow_changes),
+            returns=(
+                "the project's name, the names of the settings changed and of those already at that value, each "
+                "other setting Odoo.sh changed along with them, before and after, and the settings after."
+            ),
+            touches=(
+                "the settings given of the project: the defaults of new development branches and, on a dedicated "
+                "server, the timeouts. Never the IP allow list, public access or the session lifetime."
+            ),
+            bounds=(
+                "six requests to Odoo.sh, two when every setting already has that value; the change is sent once "
+                "and never retried."
+            ),
+            annotations=SETTINGS,
+        )
+        add_tool(
+            server,
             changing_tool(allow_changes=allow_changes),
             returns="the new build, which is in progress.",
             touches="starts a new build of the branch, which replaces its latest one.",
@@ -247,7 +264,8 @@ def main(argv: Sequence[str] | None = None) -> None:
     parser.add_argument(
         "--allow-changes",
         action="store_true",
-        help="also register `change_branch_settings` and `rebuild_branch`, the tools that change state on Odoo.sh",
+        help="also register `change_branch_settings`, `change_project_settings` and `rebuild_branch`, the tools "
+        "that change state on Odoo.sh",
     )
     options = parser.parse_args(argv)
     create_server(allow_changes=options.allow_changes).run(transport="stdio")

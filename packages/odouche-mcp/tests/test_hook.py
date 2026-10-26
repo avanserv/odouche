@@ -64,6 +64,7 @@ def test_a_read_only_tool_is_approved(tool: str):
     [
         call("mcp__odouche__rebuild_branch"),
         call("mcp__odouche__change_branch_settings"),
+        call("mcp__odouche__change_project_settings"),
         call("mcp__odouche__delete_project"),
         call("mcp__other__list_builds"),
         call("mcp__odouche__list_builds_"),
@@ -98,8 +99,13 @@ def test_a_stream_that_cannot_be_read_prints_nothing():
 
 @pytest.mark.parametrize(
     ("tool", "approved"),
-    [("list_builds", True), ("rebuild_branch", False), ("change_branch_settings", False)],
-    ids=["read", "change", "settings"],
+    [
+        ("list_builds", True),
+        ("rebuild_branch", False),
+        ("change_branch_settings", False),
+        ("change_project_settings", False),
+    ],
+    ids=["read", "change", "settings", "project settings"],
 )
 def test_the_script_runs_on_the_standard_library_alone(*, tool: str, approved: bool):
     done = subprocess.run(  # noqa: S603  The interpreter running the tests, on a file of the repository.

@@ -149,6 +149,9 @@ These calls change something on Odoo.sh. Every other call only reads.
 - A change of a branch's settings sets only the settings named: what a new commit does, on a
   development or a staging branch, and a development branch's new build options. A setting the
   branch's Settings tab does not offer in its stage is refused before anything is sent.
+- A change of a project's settings sets only the settings named, for an admin of the project:
+  the session lifetime, public access, the defaults of new development branches, the timeouts on
+  a dedicated server, and the IP allow list, by entry, never replaced whole.
 - A backup is taken of a staging or a production branch's latest build, and Odoo.sh keeps it for
   three days.
 - Allowing an IP lets the address of the machine that sends it connect to the builds with `ssh`
@@ -161,6 +164,9 @@ For each of them:
 - A client opened read-only refuses them before anything is sent.
 - Allowing an IP allows only the address the request comes from: odouche sends no address, so it
   cannot open a build to anyone else. The rule expires by itself, and odouche never removes one.
+- The project's IP allow list takes only the addresses you type into `osh projects settings set`,
+  behind a question that says the change is to who can reach the project. No MCP tool changes it,
+  public access or the session lifetime, with or without `--allow-changes`.
 - The library asks for no confirmation: the tool that calls it does.
 
 [State-changing operations](library.md#state-changing-operations) has the details.
@@ -168,8 +174,8 @@ For each of them:
 ## The MCP server
 
 The server is read-only by default. Tools that change state on Odoo.sh are opt-in, and every tool
-documents what it does and what it can touch. Such tools, a rebuild and a change of a branch's
-settings, are registered only when the server is started with
+documents what it does and what it can touch. Such tools, a rebuild and a change of a branch's or
+a project's settings, are registered only when the server is started with
 [`--allow-changes`](mcp.md#changing-state), and each call of one writes a line to the server's
 stderr, with the names of the settings changed but never their values.
 
