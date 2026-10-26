@@ -106,7 +106,15 @@ its number and commit. The build of an event holds its number, status and result
 ### `get_build`
 
 Without `build_id`, it reads the branch's latest build. A build older than the branch's latest
-ones is not found.
+ones is not found. Odoo.sh has no settings request for a build: a new build takes its branch's
+settings, which `get_branch_settings` reads.
+
+### `get_branch_settings`
+
+The settings come with the branch and its stage: the new build options, from `project_defaults` to
+`ai_agent`, apply to a development branch only, and not while `project_defaults` is true. A value
+the library does not know is an error naming the field, not a value passed on. For a build, see
+`get_build`.
 
 ### `wait_for_build`
 
@@ -153,8 +161,8 @@ again, since a second call can start a second build.
 
 ## Security
 
-- **By default** the server reads your projects, their branches, their builds and the builds'
-  logs. It changes nothing on Odoo.sh.
+- **By default** the server reads your projects, their branches, a branch's settings, their builds
+  and the builds' logs. It changes nothing on Odoo.sh.
 - **With `--allow-changes`** it can also start a rebuild of a development or a staging branch.
 - **It never** logs in, takes a session as an argument, returns the session in a result or writes
   a file.

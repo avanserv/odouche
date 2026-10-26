@@ -21,6 +21,7 @@ READS = [
     "list_builds",
     "list_history",
     "get_build",
+    "get_branch_settings",
     "wait_for_build",
     "read_log",
 ]

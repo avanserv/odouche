@@ -17,6 +17,7 @@ A tool that changes Odoo.sh is registered only when the server is started with
 | [`list_builds`](#list_builds) | No | reads only |
 | [`list_history`](#list_history) | No | reads only |
 | [`get_build`](#get_build) | No | reads only |
+| [`get_branch_settings`](#get_branch_settings) | No | reads only |
 | [`wait_for_build`](#wait_for_build) | No | reads only |
 | [`read_log`](#read_log) | No | reads only |
 | [`rebuild_branch`](#rebuild_branch) | Yes | starts a new build of the branch, which replaces its latest one. |
@@ -119,7 +120,7 @@ List the history of a branch of a project, newest first: each push with its comm
 
 ## `get_build`
 
-Read one build of a branch of a project: the build of that number, or the latest one when none is given.
+Read one build of a branch of a project: the build of that number, or the latest one when none is given. Odoo.sh has no settings request for a build: a new build takes its branch's settings, which `get_branch_settings` reads.
 
 | Argument | Type | Default |
 | --- | --- | --- |
@@ -130,6 +131,26 @@ Read one build of a branch of a project: the build of that number, or the latest
 - **Returns**: the build, with its commit and the address of its database.
 - **Touches**: reads only
 - **Bounds**: three requests to Odoo.sh; a build older than the branch's latest ones is not found.
+
+| Hint | Value |
+| --- | --- |
+| `readOnlyHint` | true |
+| `destructiveHint` | false |
+| `idempotentHint` | true |
+| `openWorldHint` | true |
+
+## `get_branch_settings`
+
+Read the settings of a branch of a project: what a new commit does, which modules and tests a new build runs, its Odoo version and revision, its operating system and its custom domains.
+
+| Argument | Type | Default |
+| --- | --- | --- |
+| `project` | string | Required. |
+| `branch` | string | Required. |
+
+- **Returns**: the branch with its stage, and its settings; the new build options apply to a development branch only.
+- **Touches**: reads only
+- **Bounds**: three requests to Odoo.sh.
 
 | Hint | Value |
 | --- | --- |

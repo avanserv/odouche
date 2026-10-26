@@ -1,4 +1,4 @@
-"""The tools that read projects, branches, a branch's history and builds.
+"""The tools that read projects, branches, a branch's history and settings, and builds.
 
 Branch names, commit messages, and author and pusher names are written by third parties. They are returned in
 the fields of the library's models only, never in a sentence the server writes.
@@ -56,6 +56,12 @@ class BuildRead:
     build: odouche.Build
 
 
+@dataclass(frozen=True)
+class SettingsRead:
+    branch: odouche.Branch
+    settings: odouche.BranchSettings
+
+
 def list_projects(limit: int = DEFAULT_LISTED) -> Projects:
     """List the Odoo.sh projects the user can reach. Call it first: every other tool takes a project by its name."""
     limit = capped(limit, MAX_LISTED)
@@ -91,9 +97,16 @@ def list_history(project: str, branch: str, limit: int = DEFAULT_HISTORY) -> His
 
 
 def get_build(project: str, branch: str, build_id: int | None = None) -> BuildRead:
-    """Read one build of a branch of a project: the build of that number, or the latest one when none is given."""
+    """Read one build of a branch of a project: the build of that number, or the latest one when none is given. Odoo.sh has no settings request for a build: a new build takes its branch's settings, which `get_branch_settings` reads."""
     with open_client() as client:
         return BuildRead(find_build(client, project, branch, build_id))
+
+
+def get_branch_settings(project: str, branch: str) -> SettingsRead:
+    """Read the settings of a branch of a project: what a new commit does, which modules and tests a new build runs, its Odoo version and revision, its operating system and its custom domains."""
+    with open_client() as client:
+        found = find_branch(client, project, branch)
+        return SettingsRead(found, client.branch_settings(found))
 
 
 def capped(limit: int, cap: int, name: str = "A limit") -> int:

@@ -316,6 +316,47 @@ with odouche.Client() as client:
 - The build is as it is now, with no commit, name or address: `client.build` has the rest of a
   build that is still among the branch's latest.
 
+### Branch settings
+
+`client.branch_settings(branch)` returns a branch's settings, as its Settings tab shows them, as
+`BranchSettings`. `branch` is a `Branch` or a branch's number.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    branches = {branch.name: branch for branch in client.branches("acme-shop")}
+    settings = client.branch_settings(branches["feature-invoicing"])
+    print(settings.push_behavior, settings.machine)
+```
+
+| Field | Meaning |
+| --- | --- |
+| `push_behavior` | A `PushBehavior`, what a new commit does: `NOTHING`, `NEW_BUILD` or `UPDATE`. |
+| `project_defaults` | Whether the project's development defaults apply instead of the six fields below. |
+| `module_install` | A `ModuleInstall`, the modules a new build installs: `REPOSITORY`, `ALL` or `LISTED`. |
+| `modules` | The modules stored for `LISTED`, whatever `module_install` is. They apply only to `LISTED`. |
+| `tests` | A `BuildTests`, the tests a new build runs: `OFF`, `MODULES` (the installed modules') or `TAGS`. |
+| `test_tags` | The Odoo test tags stored for `TAGS`, whatever `tests` is, or `None`. They apply only to `TAGS`. |
+| `demo_data` | Whether a new build loads demonstration data. |
+| `ai_agent` | An `AiAgent`, the agent the AI tab runs: `CLAUDE` or `OPENCODE`. |
+| `odoo_version` | The Odoo version, such as `19.0`, or `None` for the project's. |
+| `odoo_revision_id` | The id Odoo.sh gives the pinned weekly Odoo revision, or `None` for the latest. Its name is not given. |
+| `machine`, `recommended_machine` | The operating system builds run on, and the one Odoo.sh recommends, such as `ubuntu-24.04`. |
+| `next_machine` | The operating system the next commit's build moves to, or `None`. |
+| `domains` | The custom domains. |
+| `dns_target` | The host a custom domain's CNAME record points to. |
+
+- It is one request, and only reads.
+- A value the library does not know, in any of the four enumerations, raises
+  `UpstreamChangedError` naming the field, unlike a `Stage` that becomes `UNKNOWN`: a setting is
+  never passed through unchecked.
+- The new build options, `project_defaults` to `ai_agent`, apply to a development branch only.
+  While `project_defaults` is true the project's development defaults apply instead, and those are
+  not read.
+- Odoo.sh has no settings request for a build, as `Client.build` says.
+
 ### Logs
 
 `client.logs(project, build)` returns the logs a build has, as a list of `Log`. `project` is a

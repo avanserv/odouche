@@ -59,6 +59,16 @@ nothing else is public: see [Stability](library.md#stability).
 
 ::: odouche.PushedCommit
 
+::: odouche.BranchSettings
+
+::: odouche.PushBehavior
+
+::: odouche.ModuleInstall
+
+::: odouche.BuildTests
+
+::: odouche.AiAgent
+
 ## Backups
 
 ::: odouche.Backup

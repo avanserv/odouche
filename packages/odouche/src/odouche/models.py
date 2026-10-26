@@ -226,6 +226,98 @@ class Tracking:
     """The stage a branch moved to or was created in, or `None` for any event but a stage one."""
 
 
+class PushBehavior(StrEnum):
+    """What a new commit on a branch does."""
+
+    NOTHING = "nothing"
+    NEW_BUILD = "new_build"
+    """A new build, with a new database."""
+    UPDATE = "update"
+    """The latest build is updated with the commit, and keeps its database."""
+
+
+class ModuleInstall(StrEnum):
+    """Which modules a new build installs."""
+
+    REPOSITORY = "repository"
+    """The modules of the project's repository."""
+    ALL = "all"
+    """The standard Odoo modules and the repository's. The page says it turns the test suite off."""
+    LISTED = "listed"
+    """The modules of the settings' `modules`."""
+
+
+class BuildTests(StrEnum):
+    """Which tests a new build runs."""
+
+    OFF = "off"
+    MODULES = "modules"
+    """The tests of the modules it installs."""
+    TAGS = "tags"
+    """Those the settings' `test_tags` select."""
+
+
+class AiAgent(StrEnum):
+    """The agent a branch's AI tab runs."""
+
+    CLAUDE = "claude"
+    OPENCODE = "opencode"
+
+
+@dataclass(frozen=True, slots=True)
+class BranchSettings:
+    """A branch's settings, as its Settings tab shows them.
+
+    The new build options, `project_defaults` to `ai_agent`, apply to a development branch only.
+    The project's development defaults are not read here.
+    """
+
+    push_behavior: PushBehavior
+    """What a new commit does."""
+
+    project_defaults: bool
+    """Whether the project's development defaults apply instead of the next six fields, which the page then disables."""
+
+    module_install: ModuleInstall
+    """Which modules a new build installs."""
+
+    modules: tuple[str, ...]
+    """The modules stored for `LISTED`, given whatever `module_install` is. They apply only to `LISTED`."""
+
+    tests: BuildTests
+    """Which tests a new build runs."""
+
+    test_tags: str | None
+    """The Odoo test tags stored for `TAGS`, given whatever `tests` is. They apply only to `TAGS`."""
+
+    demo_data: bool
+    """Whether a new build loads demonstration data."""
+
+    ai_agent: AiAgent
+    """The agent the AI tab runs."""
+
+    odoo_version: str | None
+    """The Odoo version, such as `19.0`, or `None` for the project's."""
+
+    odoo_revision_id: int | None
+    """The id Odoo.sh gives the pinned weekly Odoo revision, or `None` for the latest. Its name is not given."""
+
+    machine: str
+    """The operating system builds run on, such as `ubuntu-24.04`."""
+
+    recommended_machine: str
+    """The operating system Odoo.sh recommends."""
+
+    next_machine: str | None
+    """The operating system the next commit's build moves to, or `None`. Only `None` was seen."""
+
+    domains: tuple[str, ...]
+    """The custom domains."""
+
+    dns_target: str | None
+    """The host a custom domain's CNAME record points to."""
+
+
 @dataclass(frozen=True, slots=True)
 class SshTarget:
     """Where `ssh` reaches a build: the user to log in as and the host."""
