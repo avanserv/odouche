@@ -445,6 +445,63 @@ class LogLine:
     """Whether the line was longer than the library reads, and was cut."""
 
 
+@dataclass(frozen=True, slots=True)
+class Mail:
+    """A mail a build caught instead of sending it. Every field but `id` is untrusted: the build's code or its data wrote it."""
+
+    id: str
+    """The worker's name for the mail, which `Client.mail` takes."""
+
+    date: datetime | None
+    """When the mail is dated, in UTC, or `None` when `date_text` is not a date the library reads."""
+
+    date_text: str
+    """The date as the worker gives it."""
+
+    sender: str
+    """The `From` header, as written."""
+
+    recipients: str
+    """The `To` header, as written: every address, comma-separated."""
+
+    subject: str
+    """The `Subject` header, as written."""
+
+
+@dataclass(frozen=True, slots=True)
+class MailAttachment:
+    """A file attached to a caught mail. Its name is untrusted, and its content is not read."""
+
+    name: str
+    """Its file name, as the mail gives it. Empty when it has none."""
+
+    size: int
+    """Its bytes, decoded. A forwarded mail counts none: its parts are not read."""
+
+
+@dataclass(frozen=True, slots=True)
+class MailContent:
+    """One caught mail with its body. The body and the names are untrusted text, never rendered."""
+
+    mail: Mail
+    """The mail as `Client.mails` lists it."""
+
+    cc: str
+    """The `Cc` header, as written. Empty when it has none."""
+
+    body: str
+    """The plain text part, or the HTML part as text. Never rendered."""
+
+    attachments: tuple[MailAttachment, ...]
+    """The files attached to it."""
+
+    truncated: bool
+    """Whether anything was cut: the body at 1 MiB as UTF-8, a header at 65536 characters, or the parts at 1000.
+
+    The 1000 count every MIME part, containers included. Also when the mail was over 16 MiB or could not be read: then `body` and `attachments` are empty.
+    """
+
+
 class BackupKind(StrEnum):
     """How a backup was made, and where it is kept."""
 

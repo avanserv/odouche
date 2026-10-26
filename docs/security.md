@@ -77,19 +77,28 @@ neither read nor deleted, and the one from the environment is never stored.
 Session values do not appear in logs, exceptions, object representations, command output or MCP
 tool results.
 
-## Build logs
+## Build logs and mails
 
-Odoo.sh serves build logs from its worker hosts, which take a project's access token and not the
-session.
+Odoo.sh serves build logs, and the mails a development or a staging build caught, from its worker
+hosts, which take a project's access token and not the session.
 
 - The session is sent to `www.odoo.sh` only, never to a worker.
 - The token is asked from Odoo.sh for each call and kept in memory for that call. It is never
   stored, logged or shown.
 - It is sent over HTTPS to the worker Odoo.sh names, and only when that is a host directly under
-  `odoo.com`. Odoo.sh takes it in the address of the request.
+  `odoo.com`. Odoo.sh takes it in the address of a log's request, and in the body of a mail's.
+- The worker's own address of a mail's HTML and of its pop-out carry the token: odouche never
+  asks for them, builds them or prints them.
 - Log content is untrusted. It is whatever a process printed, which can include terminal escape
   sequences and your instance's own secrets. The library returns it unchanged and never writes it
   to its own log.
+- Mail content is untrusted too: the build's code or its data wrote it. The library turns an HTML
+  body into text. It never renders it, follows a link of it, loads an image or writes it to its own
+  log. A mail over 16 MiB is not read, nor is a list of mails over 16 MiB. `osh` strips a mail of
+  escape sequences, control characters and bidirectional controls before printing it, on a
+  terminal or not.
+- An agent that runs `osh` through a shell reads that stripped text without the marking the MCP
+  server gives it, which says it is not to be followed.
 
 ## A shell on a build
 
@@ -152,9 +161,10 @@ documents what it does and what it can touch. The one such tool, a rebuild, is r
 the server is started with [`--allow-changes`](mcp.md#changing-state), and each call of it writes a
 line to the server's stderr.
 
-The tool that reads a build's log puts text the build printed into an agent's context. It is
-[labelled as untrusted and not masked](mcp.md#build-logs): a log can hold an instruction meant for
-the agent, or a secret of the instance.
+The tools that read a build's log and the mails it caught put text the build wrote into an agent's
+context: `read_log`, `list_mails` and `read_mail`. It is
+[labelled as untrusted and not masked](mcp.md#build-logs-and-mails): a log or a mail can hold an
+instruction meant for the agent, or a secret of the instance.
 
 ## Reporting a vulnerability
 

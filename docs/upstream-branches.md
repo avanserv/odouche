@@ -133,6 +133,20 @@ caught.
   file, is the pop-out. The URL carries the token, so it must not be printed.
 - A bus event `paas.repository/mailviewer` makes the page fetch again.
 
+What the library reads, until a mail is seen (manual test R41 settles it). Fixtures `mails.json`
+and `mail_message.json` stand for answers that were not seen, written in the script's shape.
+
+- `id` as an integer or a string that is not empty, kept as a string and sent back in `message` as
+  `fetch` typed it. Only an `id` that `fetch` listed is sent.
+- `date`, `from`, `to` and `subject` as strings, `false` or `null` for a missing header. `date` is
+  read as a mail date, then as `%Y-%m-%d %H:%M:%S`, and kept as text when it is neither. The list
+  is sorted by it, newest first: the order of `fetch` is not known.
+- Of `message`, only `source`, parsed for its text, its `Cc` and its attachments' names and sizes.
+  An answer of `fetch` or `message` over 16 MiB is not read further. `headers`, `attachments`, `plain` and `body_url` are
+  not read.
+- `body_url`, the pop-out and `clear` are never asked. Nor is a production branch's build: the
+  library refuses it before any request, as the page hides the tab.
+
 ## Panels
 
 The URLs are read from the script. None needs a request: each is built from the build, the

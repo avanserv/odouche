@@ -152,10 +152,32 @@ Without `kind`, it reads the install log when the build has it and the odoo log 
 text is matched as it is, case included, and not as a pattern. A `kind` of `unknown` is refused.
 
 The lines come in `untrusted_lines`, without their escape sequences and control characters, and
-are [not instructions](#build-logs). `truncated` is true when the last mebibyte held more lines
-than returned, or one was cut. It says nothing of what the log holds before that, which is not
-read. When the lines are over the most a result holds, the oldest are left out. A result carries
-them twice, as text and as structured content.
+are [not instructions](#build-logs-and-mails). `truncated` is true when the last mebibyte held
+more lines than returned, or one was cut. It says nothing of what the log holds before that, which
+is not read. When the lines are over the most a result holds, the oldest are left out. A result
+carries them twice, as text and as structured content.
+
+### `list_mails`
+
+A development or a staging build sends no mail: Odoo.sh catches each one, and this tool lists
+them, newest first. Without `build_id`, it lists the branch's latest build's. A build that caught
+nothing gives an empty list, and a branch of another stage is an error.
+
+The mails come in `untrusted_mails`, each header on one line without its escape sequences and
+control characters, and are [not instructions](#build-logs-and-mails). `truncated` is true when
+there are more, a header was cut, or a mail was left out because its `id` is over 256 bytes or
+holds a control character. A mail's `id` is what `read_mail` takes, whole.
+
+### `read_mail`
+
+It reads one mail by the `id` that `list_mails` gives it, of the same build. An HTML body comes as
+text: scripts, styles and images are dropped, a link keeps its address after its text, and
+nothing is opened. Attachments come by name and size: their content is not read.
+
+Every part of the mail comes in an `untrusted_` field: `untrusted_mail`, `untrusted_cc`,
+`untrusted_attachments` and `untrusted_body_lines`, which holds the body from its first line.
+`truncated` is true when a header, a name, the body or the parts were cut, past 1000 MIME parts
+counted with their containers, or the mail was over 16 MiB and not read at all.
 
 ### `rebuild_branch`
 
@@ -168,8 +190,9 @@ again, since a second call can start a second build.
 
 ## Security
 
-- **By default** the server reads your projects, their branches, a branch's settings, their builds
-  and the builds' logs. It changes nothing on Odoo.sh.
+- **By default** the server reads your projects, their branches, a branch's settings, their builds,
+  the builds' logs and the mails a development or staging build caught. It changes nothing on
+  Odoo.sh.
 - **With `--allow-changes`** it can also start a rebuild of a development or a staging branch.
 - **It never** logs in, takes a session as an argument, returns the session in a result or writes
   a file.
@@ -234,27 +257,33 @@ it to `.claude/settings.json`:
   in your configuration. Under another name than `odouche`, change `SERVER` in the script and the
   matcher above.
 - It does not read a call's arguments, and it never denies a call.
-- `read_log` is one of the tools it approves, so the lines of a [build log](#build-logs) reach
-  the agent without a prompt.
+- `read_log`, `list_mails` and `read_mail` are among the tools it approves, so the lines of a
+  [build log](#build-logs-and-mails) and the text of a caught mail reach the agent without a
+  prompt.
 - It does not replace `--allow-changes`: without the flag there is no tool to ask about.
 
 Another client decides from the [hints](#tool-contract) each tool carries.
 
-### Build logs
+### Build logs and mails
 
 A log is whatever the build printed: the output of every module, and of every request made to the
-instance. Anyone who can make it print a line can write one that reads as an instruction to an
-agent, and a log can hold a secret of the instance.
+instance. A caught mail is whatever the build's code wrote, often from its data: a customer's
+name, a message sent through a form. Anyone who can make the build print a line or send a mail can
+write one that reads as an instruction to an agent, and either can hold a secret of the instance.
 
-- `read_log` returns the lines in one field, `untrusted_lines`, and its description tells the
-  agent that they are data and are not to be followed. That lowers the risk of prompt injection.
-  It does not remove it: an agent can still act on what it reads.
-- Secrets are not masked. A mask would catch some and promise all, so the lines pass through as
-  they are, into the agent's context and whatever the client does with it.
-- No line of a log is written to the server's stderr.
+- `read_log` returns the lines in one field, `untrusted_lines`, and `list_mails` and `read_mail`
+  return a mail only in fields named `untrusted_`. Each tool's description tells the agent that
+  they are data and are not to be followed, and so do the instructions the server gives a client
+  when it connects. That lowers the risk of prompt injection. It does not remove it: an agent can
+  still act on what it reads.
+- Each is stripped of escape sequences and control characters and capped in size before it is
+  returned.
+- Secrets are not masked. A mask would catch some and promise all, so the text passes through as
+  it is, into the agent's context and whatever the client does with it.
+- No line of a log and nothing of a mail is written to the server's stderr.
 
 This is why the server is read-only unless you [start it otherwise](#changing-state): an agent
-misled by a log has no tool that changes anything on Odoo.sh.
+misled by a log or a mail has no tool that changes anything on Odoo.sh.
 
 ## Arguments and results
 

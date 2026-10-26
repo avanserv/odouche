@@ -18,6 +18,10 @@ from odouche_cli._output import Column, Format, Output, strip_control, strip_lin
 from odouche_cli.app import app, root
 
 
+# Every bidirectional control, each of which can reorder what a terminal shows.
+BIDI = "\u061c\u200e\u200f\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069"
+
+
 SENTINEL = "sentinel-session-value"
 ANSI = re.compile(r"\x1b\[")
 BOX = re.compile(r"[─-╿]")
@@ -210,6 +214,13 @@ CONTROLS = "".join(map(chr, [*range(0x20), *range(0x7F, 0xA0)]))
 
 def test_strip_control_removes_c0_del_and_c1_and_nothing_else():
     assert strip_control(f"a{CONTROLS}b é\xa0~") == "a b é\xa0~"
+
+
+def test_both_strips_remove_the_bidirectional_controls():
+    text = "paypal.com" + BIDI + "\tmoc.evil"
+
+    assert strip_control(text) == "paypal.com moc.evil"
+    assert strip_line_control(text) == "paypal.com\tmoc.evil"
 
 
 def test_strip_control_makes_whitespace_and_line_separators_a_space():

@@ -1,0 +1,27 @@
+{
+  "jsonrpc": "2.0",
+  "id": 50,
+  "result": [
+    {
+      "id": "1761213600.M1P1Q1.build",
+      "date": "Thu, 23 Oct 2026 10:00:00 +0000",
+      "from": "Acme <noreply@example.com>",
+      "to": "Jane Doe <jane@example.com>, billing@example.com",
+      "subject": "Your invoice INV/2026/0042"
+    },
+    {
+      "id": "1761217200.M2P1Q2.build",
+      "date": "Thu, 23 Oct 2026 13:00:00 +0200",
+      "from": "Acme <noreply@example.com>",
+      "to": "John Roe <john@example.com>",
+      "subject": "Reset your password"
+    },
+    {
+      "id": "1761206400.M3P1Q3.build",
+      "date": "Thu, 23 Oct 2026 08:00:00 +0000",
+      "from": "Acme <noreply@example.com>",
+      "to": "jane@example.com",
+      "subject": "Welcome to Acme"
+    }
+  ]
+}

@@ -69,6 +69,9 @@ _REFUSED: dict[int, tuple[type[OdoucheError], str]] = {
 
 _logger = logging.getLogger("odouche")
 
+# The body of an answer that was longer than its request's `limit`, and was not read.
+_OVERSIZED = object()
+
 
 class _WithoutQuery(logging.Filter):
     """Cuts the query from the address the HTTP client logs: a worker takes the token there."""
@@ -93,6 +96,10 @@ class _EventOnly(logging.Filter):
 logging.getLogger("httpx2").addFilter(_WithoutQuery())
 for _layer in ("http11", "http2", "connection", "proxy", "socks"):
     logging.getLogger(f"httpcore2.{_layer}").addFilter(_EventOnly())
+
+
+class TooLargeError(Exception):
+    """An answer longer than the `limit` its request was given. Only a request with a `limit` raises it."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -372,13 +379,28 @@ class Transport:
             raise UpstreamChangedError(operation, "status", status=answer.status)
         raise cast("OdoucheError", _error(operation, answer, None))
 
-    def worker_call(self, operation: str, worker: str, path: str, token: Secret) -> dict[str, object]:
-        """Send one JSON-RPC request to a worker, with `token` and without the session.
+    def worker_call(
+        self,
+        operation: str,
+        worker: str,
+        path: str,
+        token: Secret,
+        params: Mapping[str, object] | None = None,
+        *,
+        limit: int | None = None,
+    ) -> dict[str, object]:
+        """Send one JSON-RPC request to a worker, with `params` and `token` and without the session.
 
-        It is repeated as a `call` with `retry` is, so it is for reads only.
+        It is repeated as a `call` with `retry` is, so it is for reads only. With `limit`, an
+        answer is read no further than that many bytes, and one longer raises `TooLargeError`.
         """
+        if params is not None and "token" in params:
+            raise ValueError("The token is sent by the transport alone")
         url = _worker_url(operation, worker, path)
-        answer = self._attempt(operation, "POST", url, {"token": token.expose_secret()}, retry=True)
+        sent = {**(params or {}), "token": token.expose_secret()}
+        answer = self._attempt(operation, "POST", url, sent, retry=True, limit=limit)
+        if answer.status == httpx2.codes.OK and answer.body is _OVERSIZED:
+            raise TooLargeError
         error = _error(operation, answer, None)
         if error is not None:
             raise error
@@ -492,17 +514,18 @@ class Transport:
         *,
         retry: bool,
         within: float | None = None,
+        limit: int | None = None,
     ) -> _Answer:
         """Send a request, again if it may be, and raise if Odoo.sh rejects the session."""
         end = None if within is None else time.monotonic() + within
         with self._lock:
-            answer = self._send(method, url, params, within)
+            answer = self._send(method, url, params, within, limit)
             for delay in _BACKOFF if retry else ():
                 left = None if end is None else end - time.monotonic() - delay
                 if not answer.transient or (left is not None and left <= 0):
                     break
                 self._sleep(delay)
-                answer = self._send(method, url, params, left)
+                answer = self._send(method, url, params, left, limit)
         rejected = answer.status is not None and is_unauthenticated(answer.status, answer.location, answer.body)
         # A worker knows nothing of the session.
         if rejected and url.host == HOST:
@@ -513,12 +536,18 @@ class Transport:
         return answer
 
     def _send(
-        self, method: str, url: httpx2.URL, params: Mapping[str, object] | None, within: float | None = None
+        self,
+        method: str,
+        url: httpx2.URL,
+        params: Mapping[str, object] | None,
+        within: float | None = None,
+        limit: int | None = None,
     ) -> _Answer:
         """Make one attempt: a `POST` with `params` as a JSON-RPC body, or a `GET` with them as the query.
 
         A failure is returned, not raised: the client's exception holds the request, and an error
-        raised while it is being handled would carry it as its context.
+        raised while it is being handled would carry it as its context. A `POST` with `limit` reads
+        no more of the answer than that many bytes and one.
         """
         headers = {"Cookie": f"session_id={self._session.expose_secret()}"} if url.host == HOST else {}
         started = time.perf_counter()
@@ -527,16 +556,20 @@ class Transport:
                 query = {key: str(value) for key, value in (params or {}).items()}
                 response = self._client.get(url, params=query or None, headers=headers, timeout=_bounded(within))
             else:
-                response = self._client.post(
+                request = self._client.build_request(
+                    "POST",
                     url,
                     json={"jsonrpc": "2.0", "method": "call", "params": dict(params or {}), "id": 1},
                     headers=headers,
                     timeout=_bounded(within),
                 )
+                response = self._client.send(request, stream=limit is not None)
+            content = response.content if limit is None else _capped(response, limit)
         except httpx2.RequestError as error:
             answer = _Answer(failure=type(error).__name__)
         else:
-            answer = _Answer(response.status_code, response.headers.get("Location"), _json(response.content))
+            body = _OVERSIZED if content is None else _json(content)
+            answer = _Answer(response.status_code, response.headers.get("Location"), body)
         elapsed = (time.perf_counter() - started) * 1000
         _logger.debug("%s %s: %s in %.0f ms", method, url.path, answer.status or answer.failure, elapsed)
         return answer
@@ -633,6 +666,19 @@ def _body(operation: str, response: httpx2.Response) -> Body:
     if length is not None and not length.isdecimal():
         raise UpstreamChangedError(operation, "Content-Length", status=status)
     return Body(None if length is None else int(length), _chunks(operation, response))
+
+
+def _capped(response: httpx2.Response, limit: int) -> bytes | None:
+    """Read a body streamed in, or `None` once it is longer than `limit` bytes. The response is closed either way."""
+    held = bytearray()
+    try:
+        for chunk in response.iter_bytes():
+            held += chunk
+            if len(held) > limit:
+                return None
+    finally:
+        response.close()
+    return bytes(held)
 
 
 def _json(content: bytes) -> object:

@@ -127,7 +127,7 @@ Contacted during login and on the project pages:
 | Host | Role | Authentication |
 | --- | --- | --- |
 | `www.odoo.sh` | Pages, every `/app/...` JSON request and the bus websocket | `session_id` |
-| `<worker>.odoo.com` | Build logs and backup downloads, under `/paas/...` | The project's `access_token` for logs; for a download, a `token` handed over by `www.odoo.sh` ([Upstream backups](upstream-backups.md#download)) |
+| `<worker>.odoo.com` | Build logs, caught mails and backup downloads, under `/paas/...` | The project's `access_token` for logs and mails; for a download, a `token` handed over by `www.odoo.sh` ([Upstream backups](upstream-backups.md#download)) |
 | `github.com` | Hop 3 of the login | GitHub's own session |
 | `avatars.githubusercontent.com` | User avatars | None |
 
@@ -199,7 +199,7 @@ The answer is 200 with `{"jsonrpc": "2.0", "id": 1, "result": ...}`.
 | Project, on its page and in `get_info` | `project_name` | `/project/<project_name>`, `/app/project/<project_name>/get_info` |
 | Project, in every other project request | `technical_name` | `/app/project/<technical_name>/branches` |
 | Branch | numeric `id` | `/app/branch/<id>/...` |
-| Build | numeric `id` | `/app/build/<id>/...`, `<worker_url>/paas/build/<id>/...` |
+| Build | numeric `id` | `/app/build/<id>/...`, `<worker_url>/paas/build/<id>/...`, `<worker_url>/paas/<id>/mail/...` |
 
 - `technical_name` is `<owner>-<name>-<id>` in lower case, from the project's GitHub owner and
   repository name and its numeric id.
