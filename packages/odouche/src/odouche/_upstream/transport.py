@@ -323,18 +323,22 @@ class Transport:
         retry: bool = False,
         not_found: str | None = None,
         within: float | None = None,
+        limit: int | None = None,
     ) -> dict[str, object]:
         """Send one JSON-RPC request and return the answer, which holds no `error`.
 
         `retry` repeats a request that failed in transit or on a gateway error. A state-changing
         request goes through `change`. `within` is the seconds a caller has left: no phase of the
-        request waits longer, and it is not sent again past them.
+        request waits longer, and it is not sent again past them. With `limit`, an answer is read
+        no further than that many bytes, and one longer raises `TooLargeError`.
 
         `not_found` is the message of the `NotFoundError` raised for the error Odoo.sh gives no
         reason for, which is its answer to a branch that does not exist. Without it that answer
         is an `UpstreamChangedError`.
         """
-        answer = self._attempt(operation, "POST", _url(path), params, retry=retry, within=within)
+        answer = self._attempt(operation, "POST", _url(path), params, retry=retry, within=within, limit=limit)
+        if answer.status == httpx2.codes.OK and answer.body is _OVERSIZED:
+            raise TooLargeError
         error = _error(operation, answer, not_found)
         if error is not None:
             raise error
@@ -547,10 +551,12 @@ class Transport:
 
         A failure is returned, not raised: the client's exception holds the request, and an error
         raised while it is being handled would carry it as its context. A `POST` with `limit` reads
-        no more of the answer than that many bytes and one.
+        no more of the answer than that many bytes and one, and stops as a read timeout once
+        `within` seconds have passed, however steadily the answer arrives.
         """
         headers = {"Cookie": f"session_id={self._session.expose_secret()}"} if url.host == HOST else {}
         started = time.perf_counter()
+        end = None if within is None else time.monotonic() + within
         try:
             if method == "GET":
                 query = {key: str(value) for key, value in (params or {}).items()}
@@ -564,7 +570,7 @@ class Transport:
                     timeout=_bounded(within),
                 )
                 response = self._client.send(request, stream=limit is not None)
-            content = response.content if limit is None else _capped(response, limit)
+            content = response.content if limit is None else _capped(response, limit, end)
         except httpx2.RequestError as error:
             answer = _Answer(failure=type(error).__name__)
         else:
@@ -668,14 +674,21 @@ def _body(operation: str, response: httpx2.Response) -> Body:
     return Body(None if length is None else int(length), _chunks(operation, response))
 
 
-def _capped(response: httpx2.Response, limit: int) -> bytes | None:
-    """Read a body streamed in, or `None` once it is longer than `limit` bytes. The response is closed either way."""
+def _capped(response: httpx2.Response, limit: int, end: float | None) -> bytes | None:
+    """Read a body streamed in, or `None` once it is longer than `limit` bytes. The response is closed either way.
+
+    Past `end`, on the clock of `time.monotonic`, it raises `ReadTimeout`: the client's timeout
+    bounds each wait for a chunk, not the whole body.
+    """
     held = bytearray()
     try:
+        # Decoded: an answer compressed small is still counted at its size.
         for chunk in response.iter_bytes():
             held += chunk
             if len(held) > limit:
                 return None
+            if end is not None and time.monotonic() >= end:
+                raise httpx2.ReadTimeout("The answer was still arriving when the time left ran out.")
     finally:
         response.close()
     return bytes(held)

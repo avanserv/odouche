@@ -133,6 +133,29 @@ esac
   the script runs `set -o pipefail` or reads `${PIPESTATUS[0]}`.
 - It changes nothing on Odoo.sh.
 
+## A project's audit log
+
+`osh projects audit` lists the [project](#project-and-branch)'s audit log, newest first: the date
+in UTC, who did it, the stage, or `project` for an action on the project, the action and what
+Odoo.sh adds about it.
+
+```bash
+osh projects audit --limit 10
+osh projects audit --since 2026-10-01
+osh --format json projects audit --project acme-shop | jq '.[] | select(.kind == "download_database")'
+```
+
+- Odoo.sh shows the log to an admin of the project only. Anyone else exits 5, and the log is not
+  asked for.
+- Odoo.sh sends the whole of the last 30 days in one answer, with no paging. `--limit`, 20 by
+  default and 200 at most, and `--since` bound what is printed, not what Odoo.sh sends. Nothing
+  older than 30 days can be read, whatever `--since` says.
+- `--since` takes a date, `2026-10-01`, or a time, `2026-10-01T09:30:00`, in UTC. `--limit`
+  applies first: when it leaves out entries since that date, a line on stderr says so.
+- An action `osh` does not know is printed as Odoo.sh names it, and one that failed is followed by
+  `(failed)`. The author and the details are printed without control characters.
+- It changes nothing on Odoo.sh.
+
 ## Watching a build
 
 `osh builds watch` follows one build until it finishes: the one whose number is given, or the
@@ -447,7 +470,7 @@ on stdout. These commands do otherwise:
 | 5 | The session is not allowed to do this. | Every command that asks Odoo.sh |
 | 6 | Odoo.sh answered in a shape `osh` does not read. Please report it. | Every command that asks Odoo.sh |
 | 7 | Odoo.sh could not be reached, or answered with a server error. | Every command that asks Odoo.sh |
-| 8 | A followed log, a login, or a backup's or a download's wait reached its timeout, or `ssh` did not get in once the IP was allowed. | `osh logs --follow --timeout`, `osh auth login`, `osh backups create --wait`, `osh backups download`, `osh ssh` |
+| 8 | A followed log, a login, a project's audit log, or a backup's or a download's wait reached its timeout, or `ssh` did not get in once the IP was allowed. | `osh logs --follow --timeout`, `osh auth login`, `osh projects audit`, `osh backups create --wait`, `osh backups download`, `osh ssh` |
 | 9 | Refused, and nothing was changed: a read-only run, or a branch in a stage `osh` does not change, or a setting its Settings tab does not offer in that stage. | `osh builds rebuild`, `osh branches settings set`, `osh backups create`, `osh backups download --new` |
 | 10 | A change was sent and Odoo.sh did not confirm it. `osh builds list` shows whether a build was started, `osh backups list` whether a backup was taken, `osh branches settings show` whether the settings were changed; `osh ssh`, `osh backups download` and `osh branches settings set` can be run again. | `osh builds rebuild`, `osh branches settings set`, `osh backups create`, `osh backups download`, `osh ssh` |
 | 11 | No usable keyring: none to store the session in, or one that stayed locked. | `osh auth login`, `osh auth logout`, every command that reads the stored session |

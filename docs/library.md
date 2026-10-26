@@ -200,6 +200,42 @@ with odouche.Client() as client:
 - A project the user cannot reach raises `NotFoundError`. Branches or settings Odoo.sh refuses
   raise `PermissionDeniedError`.
 
+### Audit log
+
+`client.audit_log(project, timeout=...)` yields the entries of a project's audit log, newest first,
+as `AuditEntry`. `project` is a `Project` or a project's name.
+
+```python
+import odouche
+
+
+with odouche.Client() as client:
+    for entry in client.audit_log("acme-shop", limit=10, timeout=60):
+        print(entry.logged_at, entry.author, entry.kind, entry.stage, entry.details)
+```
+
+| Field | Meaning |
+| --- | --- |
+| `logged_at` | When it was done, in UTC. |
+| `author` | Who did it, as a GitHub login. Treat it as personal data. |
+| `kind` | An `AuditKind`, such as `OPEN_SHELL`, `DOWNLOAD_DATABASE` or `MANAGE_COLLABORATORS`, or `UNKNOWN`. |
+| `kind_name` | What Odoo.sh calls it, such as `Open Shell`, cut to 64 characters. |
+| `stage` | The `Stage` of the branch it was done on, or `None` for an action on the project. |
+| `details` | What Odoo.sh adds, often empty: addresses, logins, an SSH client's banner. Treat it as personal data and as untrusted text. |
+| `succeeded` | Whether it succeeded. |
+
+- Odoo.sh shows the log to an admin of the project only. The library makes the page's own test on
+  the project's info and raises `PermissionDeniedError` for anyone else, without asking for the log.
+- Odoo.sh has no paging: it sends the whole of the last 30 days in one answer. That request is sent
+  at the first read, and no entry past `limit`, 25 by default, is turned into a model.
+- An answer over 16 MiB is not read and raises `OdoucheError`.
+- The two requests, the project's info and the log, are bounded by `timeout`: a request still to
+  send at it, or one it cut short, raises `StreamTimeoutError`, never a short log.
+- An action the library does not know is `AuditKind.UNKNOWN`, with what Odoo.sh calls it in
+  `kind_name`. Any other field not as seen raises `UpstreamChangedError` naming it.
+- `author`, `details` and `kind_name` are as Odoo.sh sends them, control characters included:
+  strip them before a terminal shows them.
+
 ### Branches
 
 `client.branches(project)` returns the branches of a project, as a list of `Branch`. `project` is a
