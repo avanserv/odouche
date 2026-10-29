@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/avanserv/odouche/compare/v0.8.0...v0.8.1) (2026-10-29)
+
+
+### Documentation
+
+* Use the avanserv Zensical theme ([#92](https://github.com/avanserv/odouche/issues/92)) ([57fef62](https://github.com/avanserv/odouche/commit/57fef62f2679090a872eee058d6e3bdc233453a1))
+
 ## [0.8.0](https://github.com/avanserv/odouche/compare/v0.7.0...v0.8.0) (2026-10-26)
 
 
