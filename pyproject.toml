@@ -204,6 +204,7 @@ min_confidence = 80
 
 [dependency-groups]
 dev = [
+    "avanserv-zensical-theme @ git+https://github.com/avanserv/zensical-theme@v0.1.0",
     "basedpyright>=1.40.1",
     "deptry>=0.25.1",
     "mkdocstrings-python>=2.0.9",
